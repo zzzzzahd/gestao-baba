@@ -19,13 +19,14 @@ export const BabaProvider = ({ children }) => {
   const [myBabas, setMyBabas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Criar um Baba temporário para o visitante
+  // Objeto de Baba temporário para permitir o uso das ferramentas sem login
   const guestBaba = {
     id: 'guest-session',
     name: 'Baba Rápido (Visitante)',
     is_private: false,
     game_days: [],
-    match_duration: 10
+    match_duration: 10,
+    modality: 'futsal'
   };
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export const BabaProvider = ({ children }) => {
       loadMyBabas();
     } else {
       setMyBabas([]);
-      // ATENÇÃO: Se for visitante, carregamos o Baba Virtual em vez de deixar null
+      // Define o baba virtual para o visitante em vez de deixar null
       setCurrentBaba(guestBaba);
     }
   }, [user]);
@@ -52,7 +53,7 @@ export const BabaProvider = ({ children }) => {
       if (error) throw error;
       setMyBabas(data || []);
       
-      // Se tiver pelo menos um baba, seleciona o primeiro por padrão
+      // Seleciona automaticamente o primeiro baba se disponível
       if (data && data.length > 0 && !currentBaba) {
         setCurrentBaba(data[0]);
       }
@@ -63,7 +64,6 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Restante das funções (createBaba, updateBaba, etc) permanecem iguais...
   const createBaba = async (babaData) => {
     if (!user) {
       toast.error('Crie uma conta para salvar Babas fixos!');
@@ -79,7 +79,9 @@ export const BabaProvider = ({ children }) => {
         }])
         .select()
         .single();
+
       if (error) throw error;
+      
       toast.success('Baba criado com sucesso!');
       await loadMyBabas();
       return { data, error: null };
@@ -90,17 +92,52 @@ export const BabaProvider = ({ children }) => {
   };
 
   const updateBaba = async (babaId, updates) => {
+    // Se for o baba do visitante, atualiza apenas no estado local
     if (babaId === 'guest-session') {
-      setCurrentBaba({ ...currentBaba, ...updates });
-      return { data: currentBaba, error: null };
+      setCurrentBaba(prev => ({ ...prev, ...updates }));
+      return { data: { ...currentBaba, ...updates }, error: null };
     }
+
     try {
-      const { data, error } = await supabase.from(TABLES.BABAS).update(updates).eq('id', babaId).select().single();
+      const { data, error } = await supabase
+        .from(TABLES.BABAS)
+        .update(updates)
+        .eq('id', babaId)
+        .select()
+        .single();
+
       if (error) throw error;
+      
+      toast.success('Baba atualizado!');
       await loadMyBabas();
+      if (currentBaba?.id === babaId) {
+        setCurrentBaba(data);
+      }
       return { data, error: null };
     } catch (error) {
+      toast.error('Erro ao atualizar baba');
       return { data: null, error };
+    }
+  };
+
+  const deleteBaba = async (babaId) => {
+    if (babaId === 'guest-session') return;
+
+    try {
+      const { error } = await supabase
+        .from(TABLES.BABAS)
+        .delete()
+        .eq('id', babaId);
+
+      if (error) throw error;
+      
+      toast.success('Baba excluído!');
+      await loadMyBabas();
+      if (currentBaba?.id === babaId) {
+        setCurrentBaba(null);
+      }
+    } catch (error) {
+      toast.error('Erro ao excluir baba');
     }
   };
 
@@ -109,8 +146,14 @@ export const BabaProvider = ({ children }) => {
       setCurrentBaba(guestBaba);
       return guestBaba;
     }
+
     try {
-      const { data, error } = await supabase.from(TABLES.BABAS).select('*').eq('id', babaId).single();
+      const { data, error } = await supabase
+        .from(TABLES.BABAS)
+        .select('*')
+        .eq('id', babaId)
+        .single();
+
       if (error) throw error;
       setCurrentBaba(data);
       return data;
@@ -119,11 +162,9 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  const value = { currentBaba, myBabas, loading, createBaba, updateBaba, selectBaba, loadMyBabas };
-
-  return (
-    <BabaContext.Provider value={value}>
-      {children}
-    </BabaContext.Provider>
-  );
-};
+  const value = {
+    currentBaba,
+    myBabas,
+    loading,
+    createBaba,
+    updateBaba,
