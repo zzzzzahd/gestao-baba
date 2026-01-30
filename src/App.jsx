@@ -4,8 +4,6 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
-// Components
-import InstallPWA from './components/InstallPWA';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -62,8 +60,6 @@ function App() {
             }}
           />
           
-          {/* Botão de instalação PWA */}
-          <InstallPWA />
           
           <Routes>
             <Route path="/login" element={<LoginPage />} />
