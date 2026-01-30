@@ -19,7 +19,7 @@ export const BabaProvider = ({ children }) => {
   const [myBabas, setMyBabas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Objeto de Baba temporário para permitir o uso das ferramentas sem login
+  // --- ADIÇÃO PARA O MODO VISITANTE ---
   const guestBaba = {
     id: 'guest-session',
     name: 'Baba Rápido (Visitante)',
@@ -28,13 +28,14 @@ export const BabaProvider = ({ children }) => {
     match_duration: 10,
     modality: 'futsal'
   };
+  // -------------------------------------
 
   useEffect(() => {
     if (user) {
       loadMyBabas();
     } else {
       setMyBabas([]);
-      // Define o baba virtual para o visitante em vez de deixar null
+      // --- ALTERAÇÃO AQUI: Em vez de null, entregamos o guestBaba ---
       setCurrentBaba(guestBaba);
     }
   }, [user]);
@@ -53,12 +54,12 @@ export const BabaProvider = ({ children }) => {
       if (error) throw error;
       setMyBabas(data || []);
       
-      // Seleciona automaticamente o primeiro baba se disponível
       if (data && data.length > 0 && !currentBaba) {
         setCurrentBaba(data[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar babas:', error);
+      toast.error('Erro ao carregar babas');
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -87,12 +88,13 @@ export const BabaProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       toast.error('Erro ao criar baba');
+      console.error(error);
       return { data: null, error };
     }
   };
 
   const updateBaba = async (babaId, updates) => {
-    // Se for o baba do visitante, atualiza apenas no estado local
+    // --- ADIÇÃO PARA O VISITANTE: Atualiza apenas localmente ---
     if (babaId === 'guest-session') {
       setCurrentBaba(prev => ({ ...prev, ...updates }));
       return { data: { ...currentBaba, ...updates }, error: null };
@@ -116,6 +118,7 @@ export const BabaProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       toast.error('Erro ao atualizar baba');
+      console.error(error);
       return { data: null, error };
     }
   };
@@ -138,6 +141,7 @@ export const BabaProvider = ({ children }) => {
       }
     } catch (error) {
       toast.error('Erro ao excluir baba');
+      console.error(error);
     }
   };
 
@@ -158,6 +162,8 @@ export const BabaProvider = ({ children }) => {
       setCurrentBaba(data);
       return data;
     } catch (error) {
+      toast.error('Erro ao carregar baba');
+      console.error(error);
       return null;
     }
   };
@@ -168,3 +174,14 @@ export const BabaProvider = ({ children }) => {
     loading,
     createBaba,
     updateBaba,
+    deleteBaba,
+    selectBaba,
+    loadMyBabas
+  };
+
+  return (
+    <BabaContext.Provider value={value}>
+      {children}
+    </BabaContext.Provider>
+  );
+};
