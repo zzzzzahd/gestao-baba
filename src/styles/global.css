@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-dark: #0d0d0d;
+  --card-glass: rgba(255, 255, 255, 0.05);
+  --cyan-electric: #00f2ff;
+  --green-neon: #39ff14;
+  --text-white: #ffffff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-white);
+  background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+  background-size: 30px 30px;
+  min-height: 100vh;
+  font-family: 'Rajdhani', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cyan-electric);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--green-neon);
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
+    background: var(--cyan-electric);
+    color: #000;
+    box-shadow: 0 4px 15px rgba(0, 242, 255, 0.3);
+  }
+  
+  .btn-primary:hover {
+    box-shadow: 0 6px 25px rgba(0, 242, 255, 0.5);
+    transform: translateY(-2px);
+  }
+  
+  .btn-secondary {
+    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
+    background: transparent;
+    border: 1px solid var(--green-neon);
+    color: var(--green-neon);
+  }
+  
+  .btn-secondary:hover {
+    background: rgba(57, 255, 20, 0.1);
+  }
+  
+  .btn-visitor {
+    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
+    background: var(--card-glass);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn-danger {
+    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
+    background: rgba(255, 68, 68, 0.1);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.3);
+  }
+  
+  .card-glass {
+    background: var(--card-glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+  }
+  
+  .input-tactical {
+    @apply w-full px-4 py-3 rounded-lg bg-transparent border border-cyan-electric/30 text-white outline-none;
+    transition: all 0.2s;
+  }
+  
+  .input-tactical:focus {
+    border-color: var(--cyan-electric);
+    box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+  }
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { 
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideInUp 0.4s ease-out;
+}
