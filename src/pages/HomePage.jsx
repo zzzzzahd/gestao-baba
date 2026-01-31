@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase'; // ÚNICA ALTERAÇÃO: Ajustado de '../lib/supabase' para '../services/supabase'
 import { 
   Trophy, Clock, ClipboardList, Users, Camera, Plus, Save, Edit2, 
   CheckCircle2, Circle, Loader2, Play, DollarSign 
