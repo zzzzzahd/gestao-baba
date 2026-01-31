@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2, Trash2, Edit3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'; // Caminho corrigido para garantir o deploy
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
@@ -24,6 +24,8 @@ const ProfilePage = () => {
   useEffect(() => {
     const getData = async () => {
       try {
+        if (!user) return;
+
         // Busca Perfil
         const { data: profileData } = await supabase
           .from('profiles')
@@ -64,7 +66,11 @@ const ProfilePage = () => {
     try {
       const { error } = await supabase.from('profiles').upsert({
         id: user.id,
-        ...profile,
+        name: profile.name,
+        age: profile.age,
+        position: profile.position,
+        heart_team: profile.heart_team,
+        avatar_url: profile.avatar_url,
         updated_at: new Date()
       });
 
@@ -81,7 +87,7 @@ const ProfilePage = () => {
   const handlePhotoUpload = async (file) => {
     if (!file) return;
     try {
-      toast.loading("Enviando foto...");
+      const loadingToast = toast.loading("Enviando foto...");
       const fileExt = file.name.split('.').pop();
       const filePath = `avatars/${user.id}.${fileExt}`;
 
@@ -95,8 +101,13 @@ const ProfilePage = () => {
         .from('baba-photos')
         .getPublicUrl(filePath);
 
-      setProfile({ ...profile, avatar_url: `${publicUrl}?t=${Date.now()}` });
-      toast.dismiss();
+      const finalUrl = `${publicUrl}?t=${Date.now()}`;
+      
+      // Atualiza estado local e banco de dados imediatamente
+      setProfile(prev => ({ ...prev, avatar_url: finalUrl }));
+      await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', user.id);
+      
+      toast.dismiss(loadingToast);
       toast.success("Foto atualizada!");
     } catch (error) {
       toast.dismiss();
@@ -135,8 +146,8 @@ const ProfilePage = () => {
     <div className="min-h-screen bg-black text-white p-5 pb-24 font-sans">
       {/* HEADER */}
       <header className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-black text-cyan-electric italic">MEU PERFIL</h1>
-        <button onClick={signOut} className="text-red-500 opacity-50 hover:opacity-100 transition-opacity">
+        <h1 className="text-2xl font-black text-cyan-electric italic tracking-tighter">MEU PERFIL</h1>
+        <button onClick={signOut} className="text-red-500 opacity-50 hover:opacity-100 transition-opacity p-2 bg-red-500/10 rounded-xl">
           <LogOut size={22}/>
         </button>
       </header>
@@ -145,11 +156,11 @@ const ProfilePage = () => {
       <div className="card-glass p-6 rounded-3xl border border-white/10 mb-6 relative overflow-hidden shadow-2xl">
         <div className="flex flex-col items-center gap-4 relative z-10">
           <div className="relative group">
-            <div className="w-28 h-28 rounded-full bg-white/5 border-2 border-cyan-electric flex items-center justify-center overflow-hidden">
+            <div className="w-28 h-28 rounded-full bg-white/5 border-2 border-cyan-electric flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(0,242,255,0.2)]">
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
               ) : (
-                <Camera className="opacity-20" size={40}/>
+                <Camera className="opacity-20 text-cyan-electric" size={40}/>
               )}
             </div>
             <label className="absolute bottom-0 right-0 bg-cyan-electric p-2.5 rounded-full cursor-pointer shadow-lg hover:scale-110 transition-transform">
@@ -163,11 +174,11 @@ const ProfilePage = () => {
               type="text"
               value={profile.name}
               onChange={(e) => setProfile({...profile, name: e.target.value.toUpperCase()})}
-              className="bg-transparent text-xl font-black uppercase italic text-center w-full outline-none focus:text-cyan-electric"
+              className="bg-transparent text-xl font-black uppercase italic text-center w-full outline-none focus:text-cyan-electric transition-colors"
               placeholder="SEU NOME"
             />
             <p className="text-[9px] text-cyan-electric font-bold tracking-[0.3em] uppercase mt-1 opacity-60">
-              Draft ID: #{user.id.slice(0, 4)}
+              Draft ID: #{user?.id?.slice(0, 8)}
             </p>
           </div>
         </div>
@@ -189,10 +200,10 @@ const ProfilePage = () => {
             <select 
               value={profile.position}
               onChange={(e) => setProfile({...profile, position: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:border-cyan-electric appearance-none"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:border-cyan-electric appearance-none text-white"
             >
-              <option value="Linha" className="bg-gray-900">Linha</option>
-              <option value="Goleiro" className="bg-gray-900">Goleiro</option>
+              <option value="Linha" className="bg-black text-white">Linha</option>
+              <option value="Goleiro" className="bg-black text-white">Goleiro</option>
             </select>
           </div>
           <div className="col-span-2 space-y-1">
@@ -210,7 +221,7 @@ const ProfilePage = () => {
         <button 
           onClick={handleUpdateProfile}
           disabled={saving}
-          className="w-full mt-6 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric transition-colors"
+          className="w-full mt-6 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric transition-colors disabled:opacity-50"
         >
           {saving ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>}
           Salvar Alterações
@@ -225,7 +236,7 @@ const ProfilePage = () => {
 
         {myBabas.length > 0 ? (
           myBabas.map((baba) => (
-            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between">
+            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between animate-slide-in">
               <div className="text-left">
                 <h4 className="text-xs font-black uppercase italic tracking-tight">{baba.name}</h4>
                 <p className="text-[8px] opacity-50 font-bold uppercase">{baba.match_day} às {baba.match_time}h</p>
@@ -265,7 +276,7 @@ const ProfilePage = () => {
               <p className="text-[9px] opacity-50 uppercase font-bold">Criar um novo grupo</p>
             </div>
           </div>
-          <span className="text-cyan-electric font-black">→</span>
+          <span className="text-cyan-electric font-black group-hover:translate-x-1 transition-transform">→</span>
         </button>
 
         <div className="card-glass p-5 rounded-3xl border border-white/10">
