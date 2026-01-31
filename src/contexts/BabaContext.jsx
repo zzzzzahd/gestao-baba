@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, TABLES } from '../services/supabase';
-import { useAuth } from './AuthContext';
+import { useAuth } from './AuthContext'; // Verifique se o nome do arquivo é exatamente este
 import toast from 'react-hot-toast';
 
 const BabaContext = createContext({});
@@ -17,7 +17,6 @@ export const BabaProvider = ({ children }) => {
   const [myBabas, setMyBabas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Configuração padrão para visitantes (Modo Ferramenta Rápida)
   const GUEST_BABA = {
     id: 'guest-session',
     name: 'Baba Rápido (Visitante)',
@@ -25,7 +24,6 @@ export const BabaProvider = ({ children }) => {
     modality: 'futsal'
   };
 
-  // 1. Efeito para monitorar login/logout
   useEffect(() => {
     if (user) {
       fetchBabas();
@@ -35,27 +33,36 @@ export const BabaProvider = ({ children }) => {
     }
   }, [user]);
 
-  // 2. Busca babas no Banco de Dados
   const fetchBabas = async () => {
     if (!user) return;
     setLoading(true);
     try {
+      // O erro de tela branca pode estar aqui se a coluna 'coordinators' não existir ou não for array
       const { data, error } = await supabase
         .from(TABLES.BABAS)
         .select(`*, players:players(count)`)
         .or(`president_id.eq.${user.id},coordinators.cs.{${user.id}}`);
 
-      if (error) throw error;
-      setMyBabas(data || []);
-      if (data?.length > 0) setCurrentBaba(data[0]);
+      if (error) {
+        console.error("Erro na query do Supabase:", error);
+        // Se a query falhar, tentamos buscar apenas pelo president_id para não travar o app
+        const { data: retryData } = await supabase
+          .from(TABLES.BABAS)
+          .select(`*, players:players(count)`)
+          .eq('president_id', user.id);
+        
+        setMyBabas(retryData || []);
+      } else {
+        setMyBabas(data || []);
+        if (data?.length > 0) setCurrentBaba(data[0]);
+      }
     } catch (err) {
-      console.error("Erro ao buscar babas:", err.message);
+      console.error("Erro fatal no fetchBabas:", err.message);
     } finally {
-      setLoading(false);
+      setLoading(false); // Garante que o loading pare, evitando a tela branca infinita
     }
   };
 
-  // 3. Seleção de Baba (DB ou Visitante)
   const selectBaba = async (id) => {
     if (id === 'guest-session') {
       setCurrentBaba(GUEST_BABA);
@@ -66,7 +73,6 @@ export const BabaProvider = ({ children }) => {
     return data;
   };
 
-  // 4. Atualização de Baba
   const updateBaba = async (id, updates) => {
     if (id === 'guest-session') {
       setCurrentBaba(prev => ({ ...prev, ...updates }));
@@ -83,24 +89,20 @@ export const BabaProvider = ({ children }) => {
     return { data, error };
   };
 
-  // 5. Funções de Criação e Deleção (Melhoradas para funcionar com o Dashboard)
   const createBaba = async (babaData) => {
     if (!user) {
       toast.error("Você precisa estar logado para criar um baba.");
       return { error: 'Not authenticated' };
     }
-
     try {
       const { data, error } = await supabase
         .from(TABLES.BABAS)
         .insert([{ ...babaData, president_id: user.id }])
         .select()
         .single();
-
       if (error) throw error;
-
       toast.success("Baba criado com sucesso!");
-      fetchBabas(); // Atualiza a lista
+      fetchBabas();
       return { data, error: null };
     } catch (error) {
       toast.error(error.message);
@@ -117,7 +119,6 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Objeto de valor do contexto
   const contextValue = {
     currentBaba,
     myBabas,
