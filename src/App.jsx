@@ -3,12 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // --- CONTEXTOS ---
-// Provedores de estado global para Autenticação e Dados do Baba
 import { AuthProvider } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
 // --- COMPONENTES DE SEGURANÇA ---
-// Protege rotas que exigem login obrigatório
 import ProtectedRoute from './components/ProtectedRoute';
 
 // --- PÁGINAS ---
@@ -28,101 +26,107 @@ function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        {/* Toaster: Gerencia notificações de sucesso/erro em todo o app */}
+        {/* Toaster: Estilizado para o tema Dark/Cyan do Draft Baba */}
         <Toaster 
           position="top-center" 
           reverseOrder={false}
           toastOptions={{
+            duration: 3000,
             style: {
-              background: '#1a1a1a',
+              background: '#0a0a0a',
               color: '#fff',
-              border: '1px solid rgba(0, 242, 255, 0.2)',
-              fontFamily: 'sans-serif',
-              fontSize: '14px'
+              border: '1px solid rgba(0, 242, 255, 0.3)',
+              borderRadius: '1rem',
+              fontSize: '12px',
+              fontWeight: '800',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              padding: '16px'
+            },
+            success: {
+              iconTheme: {
+                primary: '#00f2ff',
+                secondary: '#000',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#ff4b4b',
+                secondary: '#fff',
+              },
+              style: {
+                border: '1px solid rgba(255, 75, 75, 0.3)',
+              }
             }
           }}
         />
         
         <Routes>
-          {/* -----------------------------------------------------------
-              ROTAS PÚBLICAS 
-              Acessíveis por qualquer pessoa (Visitantes ou não logados)
-          ----------------------------------------------------------- */}
+          {/* --- ROTAS PÚBLICAS --- */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          
-          {/* Rota de registro aponta para LoginPage que gerencia o estado isLogin */}
           <Route path="/register" element={<LoginPage />} />
           
-          {/* Fluxo do Visitante */}
+          {/* Fluxo do Visitante (Ferramentas Rápidas) */}
           <Route path="/visitor" element={<VisitorMode />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
-          {/* A HomePage é HÍBRIDA. 
-            - Se logado: Mostra o Baba atual do usuário.
-            - Se não logado: Mostra o Sorteador Manual.
-            Por isso, ela NÃO fica dentro do ProtectedRoute.
-          */}
+          {/* HomePage: Híbrida (Lógica tratada internamente pelo BabaContext) */}
           <Route path="/home" element={<HomePage />} />
 
-          {/* -----------------------------------------------------------
-              ROTAS PROTEGIDAS 
-              Exigem que o usuário esteja logado (via ProtectedRoute)
-          ----------------------------------------------------------- */}
+          {/* --- ROTAS PROTEGIDAS (Necessitam Login) --- */}
           
-          {/* Dashboard: Onde o usuário gerencia seus Babas ou cria um novo */}
+          {/* Dashboard: Gestão de Grupos de Baba */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
           } />
 
-          {/* Edição de Baba específico */}
+          {/* Edição de Baba específico (Reutiliza Dashboard com ID) */}
           <Route path="/edit-baba/:id" element={
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
           } />
 
-          {/* Perfil do Atleta e Configurações de Conta */}
+          {/* Perfil do Atleta e Estatísticas Pessoais */}
           <Route path="/profile" element={
             <ProtectedRoute>
               <ProfilePage />
             </ProtectedRoute>
           } />
 
-          {/* Gestão Financeira: PIX, mensalidades e confirmação de pagamentos */}
+          {/* Financeiro: PIX e Controle de Caixa */}
           <Route path="/financial" element={
             <ProtectedRoute>
               <FinancialPage />
             </ProtectedRoute>
           } />
 
-          {/* Rankings: Estatísticas de Gols, Assistências e Vitórias */}
+          {/* Rankings: Artilharia e Assistências Oficiais */}
           <Route path="/rankings" element={
             <ProtectedRoute>
               <RankingsPage />
             </ProtectedRoute>
           } />
 
-          {/* Times: Visualização da escalação oficial gerada pelo sistema */}
+          {/* Teams: Painel de Sorteio e Lista de Jogadores para o Jogo de Hoje */}
           <Route path="/teams" element={
             <ProtectedRoute>
               <TeamsPage />
             </ProtectedRoute>
           } />
 
-          {/* Match: O painel de controle da partida em tempo real para o ADM */}
+          {/* Match: Controle de Tempo, Gols e Fila de Espera (Painel ADM) */}
           <Route path="/match" element={
             <ProtectedRoute>
               <MatchPage />
             </ProtectedRoute>
           } />
 
-          {/* -----------------------------------------------------------
-              REDIRECIONAMENTO DE SEGURANÇA
-              Caso o usuário digite uma URL que não existe
-          ----------------------------------------------------------- */}
+          {/* Fallback de Segurança: Qualquer rota não mapeada volta para a Landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BabaProvider>
