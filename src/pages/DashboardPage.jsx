@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import { supabase } from '../lib/supabase'; // Import necessário para carregar dados na edição
+import { supabase } from '../services/supabase'; // CORREÇÃO: Ajustado de '../lib/supabase' para '../services/supabase' conforme estrutura de pastas
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
