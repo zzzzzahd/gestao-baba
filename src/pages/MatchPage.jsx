@@ -1,74 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const MatchPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { currentBaba } = useBaba();
-  const [timer, setTimer] = useState(600);
-  const [isRunning, setIsRunning] = useState(false);
-  const [scores, setScores] = useState({ a: 0, b: 0 });
-  const [teams, setTeams] = useState({
-    a: { name: 'TIME A', players: [] },
-    b: { name: 'TIME B', players: [] }
-  });
+  
+  const [teams, setTeams] = useState([]);
+  const [currentMatch, setCurrentMatch] = useState(null);
+  const [timer, setTimer] = useState(600); // 10 minutos padrão
+  const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
-    // Busca os times sorteados salvos na memória temporária
+    // 1. Tentar carregar times do Sorteio (Modo Visitante)
     const savedTeams = localStorage.getItem('temp_teams');
+    
     if (savedTeams) {
-      setTeams(JSON.parse(savedTeams));
+      const parsedTeams = JSON.parse(savedTeams);
+      setTeams(parsedTeams);
+      // Define os dois primeiros times para a partida atual
+      if (parsedTeams.length >= 2) {
+        setCurrentMatch({
+          teamA: parsedTeams[0],
+          teamB: parsedTeams[1],
+          scoreA: 0,
+          scoreB: 0
+        });
+      }
+    } else if (!user) {
+      // Se não tem time salvo e não tá logado, volta pro início
+      toast.error("Nenhum time sorteado!");
+      navigate('/visitor');
     }
-  }, []);
+  }, [user, navigate]);
 
+  // Cronômetro simples
   useEffect(() => {
-    let interval;
-    if (isRunning && timer > 0) {
-      interval = setInterval(() => setTimer(t => t - 1), 1000);
+    let interval = null;
+    if (isActive && timer > 0) {
+      interval = setInterval(() => setTimer(timer - 1), 1000);
     } else if (timer === 0) {
-      setIsRunning(false);
-      toast.error('FIM DE PAPO! Tempo esgotado.');
+      setIsActive(false);
+      toast.success("Fim de partida!");
     }
     return () => clearInterval(interval);
-  }, [isRunning, timer]);
+  }, [isActive, timer]);
 
-  const addGoal = (team) => {
-    setScores(prev => {
-      const newScores = { ...prev, [team]: prev[team] + 1 };
-      // REGRA: Quem fizer 2 gols primeiro vence (Morte Súbita)
-      if (newScores[team] >= 2) {
-        toast.success(`FIM DE JOGO! O ${team === 'a' ? 'TIME A' : 'TIME B'} fez 2 gols!`, { duration: 5000 });
-        setIsRunning(false);
-      }
-      return newScores;
-    });
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+  if (!currentMatch) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <p className="text-cyan-electric animate-pulse font-black">PREPARANDO QUADRA...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen p-5 bg-black text-white">
-       {/* UI do Placar e Cronômetro */}
-       <div className="text-center">
-          <h1 className="text-7xl font-mono text-cyan-electric mb-6">{formatTime(timer)}</h1>
-          <div className="grid grid-cols-2 gap-4">
-             <div className="bg-gray-900 p-4 rounded-xl border border-cyan-electric">
-                <h3>{teams.a.name}</h3>
-                <h2 className="text-5xl my-2">{scores.a}</h2>
-                <button onClick={() => addGoal('a')} className="bg-cyan-electric text-black w-full py-2 rounded">GOL</button>
-             </div>
-             <div className="bg-gray-900 p-4 rounded-xl border border-green-500">
-                <h3>{teams.b.name}</h3>
-                <h2 className="text-5xl my-2">{scores.b}</h2>
-                <button onClick={() => addGoal('b')} className="bg-green-500 text-black w-full py-2 rounded">GOL</button>
-             </div>
+    <div className="min-h-screen bg-black text-white p-5 font-sans">
+      {/* Placar Principal */}
+      <div className="max-w-md mx-auto space-y-6">
+        <div className="flex justify-between items-center text-[10px] font-black opacity-50 italic">
+          <button onClick={() => navigate('/home')} className="text-white">← VOLTAR</button>
+          <span>MODO PARTIDA RÁPIDA</span>
+          <div className="w-10"></div>
+        </div>
+
+        {/* Cronômetro */}
+        <div className="card-glass p-6 border border-white/10 text-center">
+          <div className={`text-6xl font-black mb-2 ${timer < 60 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+            {formatTime(timer)}
           </div>
-          <button onClick={() => setIsRunning(!isRunning)} className="mt-8 p-4 border border-white rounded-full">
-            {isRunning ? 'PAUSAR' : 'COMEÇAR'}
+          <button 
+            onClick={() => setIsActive(!isActive)}
+            className={`px-8 py-2 rounded-full font-black text-xs uppercase tracking-widest ${isActive ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-cyan-electric text-black'}`}
+          >
+            {isActive ? 'Pausar' : 'Começar'}
           </button>
-       </div>
+        </div>
+
+        {/* Times e Gols */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Time A */}
+          <div className="card-glass border border-white/10 overflow-hidden">
+            <div className="bg-white/5 p-2 text-center text-[10px] font-black uppercase">{currentMatch.teamA.name}</div>
+            <div className="p-6 text-center">
+              <div className="text-5xl font-black mb-4">{currentMatch.scoreA}</div>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentMatch({...currentMatch, scoreA: Math.max(0, currentMatch.scoreA - 1)})} className="flex-1 bg-white/5 py-2 rounded-lg text-xs">-</button>
+                <button onClick={() => setCurrentMatch({...currentMatch, scoreA: currentMatch.scoreA + 1})} className="flex-1 bg-white/10 py-2 rounded-lg text-lg font-black">+</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Time B */}
+          <div className="card-glass border border-white/10 overflow-hidden">
+            <div className="bg-white/5 p-2 text-center text-[10px] font-black uppercase">{currentMatch.teamB.name}</div>
+            <div className="p-6 text-center">
+              <div className="text-5xl font-black mb-4">{currentMatch.scoreB}</div>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentMatch({...currentMatch, scoreB: Math.max(0, currentMatch.scoreB - 1)})} className="flex-1 bg-white/5 py-2 rounded-lg text-xs">-</button>
+                <button onClick={() => setCurrentMatch({...currentMatch, scoreB: currentMatch.scoreB + 1})} className="flex-1 bg-white/10 py-2 rounded-lg text-lg font-black">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de Próximos Times */}
+        {teams.length > 2 && (
+          <div className="card-glass p-4 border border-white/5">
+            <h3 className="text-[10px] font-black opacity-30 mb-3 uppercase italic">Próximos da Fila</h3>
+            <div className="space-y-2">
+              {teams.slice(2).map((team, i) => (
+                <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
+                  <span className="text-xs font-bold">{team.name}</span>
+                  <span className="text-[10px] opacity-40">{team.players.length} Jogadores</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button 
+          onClick={() => {
+            if(window.confirm("Deseja encerrar e sortear novamente?")) {
+              localStorage.removeItem('temp_teams');
+              navigate('/home');
+            }
+          }}
+          className="w-full py-4 text-[10px] font-black opacity-30 uppercase tracking-widest"
+        >
+          Encerrar Sessão
+        </button>
+      </div>
     </div>
   );
 };
+
 export default MatchPage;
