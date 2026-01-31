@@ -13,18 +13,10 @@
     <meta name="apple-mobile-web-app-title" content="DRAFT">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
-    <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
-    
-    <link rel="apple-touch-startup-image" href="/icons/icon-512x512.png">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 
     <style>
-      /* Reset tático para remover comportamentos indesejados de toque e rolagem */
+      /* Reset tático */
       * {
         -webkit-tap-highlight-color: transparent;
         box-sizing: border-box;
@@ -45,21 +37,17 @@
         font-family: 'Inter', sans-serif;
         color: white;
         overflow-x: hidden;
-        /* Evita o "bounce" elástico no iOS que mostra fundo branco */
-        position: fixed;
-        width: 100%;
-        height: 100%;
+        /* Removido o position:fixed que travava a rolagem */
+        min-height: 100vh;
       }
 
       #root {
-        height: 100%;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        min-height: 100vh;
       }
 
-      /* Estilização da Scrollbar para manter o visual Dark/Neon */
+      /* Estilização da Scrollbar Neon */
       ::-webkit-scrollbar {
-        width: 4px;
+        width: 6px;
       }
       ::-webkit-scrollbar-track {
         background: #000;
@@ -67,6 +55,13 @@
       ::-webkit-scrollbar-thumb {
         background: #00f2ff;
         border-radius: 10px;
+        box-shadow: 0 0 10px #00f2ff;
+      }
+
+      /* Prevenção de seleção de texto em botões para parecer App Nativo */
+      button {
+        user-select: none;
+        -webkit-user-select: none;
       }
     </style>
   </head>
