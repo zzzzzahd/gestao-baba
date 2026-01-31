@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, TABLES } from '../services/supabase';
 import { useAuth } from './AuthContext';
+import toast from 'react-hot-toast';
 
 const BabaContext = createContext({});
 
@@ -82,9 +83,39 @@ export const BabaProvider = ({ children }) => {
     return { data, error };
   };
 
-  // 5. Funções Vazias (Placeholder para evitar erros em outros componentes)
-  const createBaba = async () => console.warn("Login necessário para criar");
-  const deleteBaba = async () => console.warn("Login necessário para deletar");
+  // 5. Funções de Criação e Deleção (Melhoradas para funcionar com o Dashboard)
+  const createBaba = async (babaData) => {
+    if (!user) {
+      toast.error("Você precisa estar logado para criar um baba.");
+      return { error: 'Not authenticated' };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.BABAS)
+        .insert([{ ...babaData, president_id: user.id }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Baba criado com sucesso!");
+      fetchBabas(); // Atualiza a lista
+      return { data, error: null };
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
+  };
+
+  const deleteBaba = async (id) => {
+    if (!user) return;
+    const { error } = await supabase.from(TABLES.BABAS).delete().eq('id', id);
+    if (!error) {
+      toast.success("Baba removido.");
+      fetchBabas();
+    }
+  };
 
   // Objeto de valor do contexto
   const contextValue = {
@@ -93,7 +124,7 @@ export const BabaProvider = ({ children }) => {
     loading,
     selectBaba,
     updateBaba,
-    loadMyBabas: fetchBabas, // Mantém compatibilidade com o nome antigo
+    loadMyBabas: fetchBabas, 
     createBaba,
     deleteBaba
   };
