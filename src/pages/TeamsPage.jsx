@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabase';
 import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, Users, Play, Clock } from 'lucide-react';
+import { Trophy, Users, Play, Clock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TeamsPage = () => {
   const navigate = useNavigate();
-  const { currentBaba } = useBaba();
-  const { user, profile } = useAuth(); // profile para ver se é admin
+  const { currentBaba, getOfficialTeams, saveOfficialTeams, getConfirmedPlayers } = useBaba();
+  const { profile } = useAuth(); // Usado para checar permissão de admin
   
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +17,8 @@ const TeamsPage = () => {
   useEffect(() => {
     if (currentBaba) {
       loadTeamsAndCheckSort();
+    } else {
+      navigate('/home');
     }
   }, [currentBaba]);
 
@@ -25,29 +26,24 @@ const TeamsPage = () => {
     try {
       setLoading(true);
       
-      // 1. Verificar se já existe sorteio para hoje no banco
-      const { data: existingSort } = await supabase
-        .from('official_teams')
-        .select('*')
-        .eq('baba_id', currentBaba.id)
-        .eq('created_at', new Date().toISOString().split('T')[0])
-        .single();
+      // 1. Verificar se já existe sorteio oficial para hoje via Contexto
+      const existingSort = await getOfficialTeams(currentBaba.id);
 
       if (existingSort) {
         setTeams(existingSort.teams_data);
         setIsSorted(true);
       } else {
-        // 2. Se não existe, verificar se já está no horário (30 min antes)
+        // 2. Se não existe, verifica se já está na janela de sorteio (30 min antes)
         checkIfShouldSort();
       }
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao carregar times:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const checkIfShouldSort = async () => {
+  const checkIfShouldSort = () => {
     const agora = new Date();
     const [horas, minutos] = currentBaba.match_time.split(':');
     const horaJogo = new Date();
@@ -62,51 +58,56 @@ const TeamsPage = () => {
   };
 
   const generateAutoSort = async () => {
-    // 1. Buscar quem confirmou presença
-    const { data: confirmedPlayers } = await supabase
-      .from('presences')
-      .select('player_id, profiles(name, avatar_url)')
-      .eq('baba_id', currentBaba.id);
+    try {
+      // 1. Buscar confirmados via Contexto
+      const confirmedPlayers = await getConfirmedPlayers(currentBaba.id);
 
-    if (!confirmedPlayers || confirmedPlayers.length < 4) {
-      return; // Não tem gente suficiente para o sorteio automático ainda
+      if (!confirmedPlayers || confirmedPlayers.length < 4) {
+        return; // Mínimo de 4 para um 2x2 básico
+      }
+
+      // 2. Lógica de Sorteio (Sua lógica original preservada)
+      const shuffled = [...confirmedPlayers].sort(() => Math.random() - 0.5);
+      const resultTeams = [];
+      
+      // Divide em times de 5 (ou conforme configurado no futuro)
+      while (shuffled.length) {
+        resultTeams.push({
+          name: `Time ${String.fromCharCode(65 + resultTeams.length)}`,
+          players: shuffled.splice(0, 5).map(p => ({
+            id: p.player_id,
+            name: p.profiles?.name || 'Jogador',
+            avatar_url: p.profiles?.avatar_url
+          }))
+        });
+      }
+
+      // 3. Salva no banco via Contexto para que todos os membros vejam o mesmo sorteio
+      await saveOfficialTeams(currentBaba.id, resultTeams);
+
+      setTeams(resultTeams);
+      setIsSorted(true);
+      toast.success("Times sorteados automaticamente!");
+    } catch (error) {
+      console.error("Erro no sorteio:", error);
     }
-
-    // 2. Lógica de Sorteio (Embaralhar e dividir em times de 5 - ajuste conforme sua regra)
-    const shuffled = [...confirmedPlayers].sort(() => Math.random() - 0.5);
-    const resultTeams = [];
-    while (shuffled.length) {
-      resultTeams.push({
-        name: `Time ${String.fromCharCode(65 + resultTeams.length)}`,
-        players: shuffled.splice(0, 5).map(p => ({
-          id: p.player_id,
-          name: p.profiles.name,
-          avatar_url: p.profiles.avatar_url
-        }))
-      });
-    }
-
-    // 3. Salvar sorteio oficial no banco para todos verem
-    await supabase.from('official_teams').insert({
-      baba_id: currentBaba.id,
-      teams_data: resultTeams
-    });
-
-    setTeams(resultTeams);
-    setIsSorted(true);
-    toast.success("Times sorteados automaticamente!");
   };
 
   const handleGoToMatch = () => {
-    // Salva no localStorage para a MatchPage ler a fila
+    // Mantém sua integração com a MatchPageVisitor (modo offline/quadra)
     localStorage.setItem('temp_teams', JSON.stringify(teams));
     navigate('/match');
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-electric">Carregando times...</div>;
+  if (loading) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+      <Loader2 className="animate-spin text-cyan-electric" size={40} />
+      <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Escalando Jogadores...</span>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-black text-white p-6 pb-32 font-sans">
       <div className="max-w-md mx-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
@@ -115,31 +116,49 @@ const TeamsPage = () => {
               {isSorted ? "Sorteio Realizado" : "Aguardando horário limite"}
             </p>
           </div>
-          <button onClick={() => navigate('/home')} className="opacity-50 text-xs font-bold">VOLTAR</button>
+          <button 
+            onClick={() => navigate('/home')} 
+            className="p-2 px-4 bg-white/5 rounded-xl text-[10px] font-black hover:bg-white/10 transition-colors uppercase italic"
+          >
+            Sair
+          </button>
         </header>
 
         {!isSorted ? (
-          <div className="text-center py-20 bg-white/5 rounded-[2rem] border border-white/5 border-dashed">
-            <Clock className="mx-auto mb-4 opacity-20" size={48} />
-            <p className="text-sm font-bold opacity-40 uppercase px-10">
-              O sorteio será liberado 30 minutos antes do início do baba.
+          <div className="text-center py-20 bg-white/5 rounded-[2.5rem] border border-white/5 border-dashed flex flex-col items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-cyan-electric/5 flex items-center justify-center mb-6">
+              <Clock className="text-cyan-electric opacity-40" size={32} />
+            </div>
+            <p className="text-xs font-bold opacity-40 uppercase px-12 leading-relaxed">
+              O sorteio será liberado <span className="text-cyan-electric">30 minutos</span> antes do início do baba.
             </p>
           </div>
         ) : (
-          <div className="space-y-4 mb-24">
+          <div className="space-y-6">
             {teams.map((team, idx) => (
-              <div key={idx} className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                <h3 className="text-cyan-electric font-black italic uppercase text-sm mb-4 flex items-center gap-2">
-                  <Users size={16} /> {team.name}
+              <div key={idx} className="card-glass border border-white/10 rounded-[2rem] p-6 shadow-xl relative overflow-hidden group">
+                {/* Indicador visual do time */}
+                <div className="absolute top-0 right-0 p-4 opacity-5 font-black text-4xl italic">{idx + 1}</div>
+                
+                <h3 className="text-cyan-electric font-black italic uppercase text-sm mb-6 flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-cyan-electric shadow-[0_0_8px_#00f2ff]"></div>
+                  {team.name}
                 </h3>
-                <div className="space-y-3">
+
+                <div className="space-y-4">
                   {team.players.map(p => (
-                    <div key={p.id} className="flex items-center gap-3">
-                      <img 
-                        src={p.avatar_url || `https://ui-avatars.com/api/?name=${p.name}&background=111&color=fff`} 
-                        className="w-8 h-8 rounded-full border border-white/10" 
-                      />
-                      <span className="text-xs font-bold uppercase">{p.name}</span>
+                    <div key={p.id} className="flex items-center gap-4 group/player">
+                      <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-white/5 flex-shrink-0">
+                        <img 
+                          src={p.avatar_url || `https://ui-avatars.com/api/?name=${p.name}&background=111&color=00f2ff&bold=true`} 
+                          className="w-full h-full object-cover"
+                          alt={p.name}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black uppercase italic tracking-tight group-hover/player:text-cyan-electric transition-colors">{p.name}</span>
+                        <span className="text-[8px] opacity-30 font-bold uppercase tracking-widest">Confirmado</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -148,14 +167,14 @@ const TeamsPage = () => {
           </div>
         )}
 
-        {/* BOTÃO IR PRA QUADRA - SÓ PARA ADMIN/PRESIDENTE */}
-        {isSorted && (profile?.role === 'admin' || profile?.role === 'president') && (
-          <div className="fixed bottom-6 left-0 right-0 px-6">
+        {/* BOTÃO IR PRA QUADRA - VISÍVEL APENAS PARA ADMINS/PRESIDENTE */}
+        {isSorted && (profile?.role === 'admin' || profile?.role === 'president' || profile?.role === 'owner') && (
+          <div className="fixed bottom-8 left-0 right-0 px-6 z-50">
             <button 
               onClick={handleGoToMatch}
-              className="w-full bg-cyan-electric text-black py-5 rounded-[2rem] font-black uppercase text-sm flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(0,242,255,0.3)] animate-bounce"
+              className="w-full bg-cyan-electric text-black py-5 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-3 shadow-[0_15px_40px_rgba(0,242,255,0.4)] hover:scale-[1.02] active:scale-95 transition-all"
             >
-              <Play fill="black" size={20} /> IR PARA A QUADRA
+              <Play fill="black" size={18} /> IR PARA A QUADRA
             </button>
           </div>
         )}
