@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2 } from 'lucide-react';
+import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2, Trash2, Edit3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
@@ -10,6 +10,7 @@ const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [myBabas, setMyBabas] = useState([]);
 
   const [profile, setProfile] = useState({
     name: user?.user_metadata?.name || '',
@@ -19,32 +20,42 @@ const ProfilePage = () => {
     avatar_url: null
   });
 
-  // 1. Carregar dados do perfil ao abrir a página
+  // 1. Carregar dados do perfil e Babas do usuário
   useEffect(() => {
-    const getProfile = async () => {
+    const getData = async () => {
       try {
-        const { data, error } = await supabase
+        // Busca Perfil
+        const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (data) {
+        if (profileData) {
           setProfile({
-            name: data.name || user?.user_metadata?.name || '',
-            age: data.age || '',
-            position: data.position || 'Linha',
-            heart_team: data.heart_team || '',
-            avatar_url: data.avatar_url
+            name: profileData.name || user?.user_metadata?.name || '',
+            age: profileData.age || '',
+            position: profileData.position || 'Linha',
+            heart_team: profileData.heart_team || '',
+            avatar_url: profileData.avatar_url
           });
         }
+
+        // Busca Babas Criados por mim
+        const { data: babasData } = await supabase
+          .from('babas')
+          .select('*')
+          .eq('owner_id', user.id);
+        
+        if (babasData) setMyBabas(babasData);
+
       } catch (error) {
-        console.error('Erro ao carregar perfil:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }
     };
-    getProfile();
+    getData();
   }, [user]);
 
   // 2. Salvar Dados do Perfil
@@ -75,7 +86,7 @@ const ProfilePage = () => {
       const filePath = `avatars/${user.id}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('baba-photos') // Usando o mesmo bucket para simplificar
+        .from('baba-photos')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
@@ -90,6 +101,27 @@ const ProfilePage = () => {
     } catch (error) {
       toast.dismiss();
       toast.error("Erro no upload");
+    }
+  };
+
+  // 4. Lógica para Apagar Baba
+  const handleDeleteBaba = async (babaId) => {
+    const confirmar = window.confirm("⚠️ ATENÇÃO: Apagar este Baba excluirá permanentemente todos os rankings e fotos vinculadas. Deseja continuar?");
+    
+    if (confirmar) {
+      try {
+        const { error } = await supabase
+          .from('babas')
+          .delete()
+          .eq('id', babaId);
+
+        if (error) throw error;
+
+        setMyBabas(myBabas.filter(b => b.id !== babaId));
+        toast.success("Baba removido com sucesso!");
+      } catch (error) {
+        toast.error("Erro ao remover Baba");
+      }
     }
   };
 
@@ -185,19 +217,52 @@ const ProfilePage = () => {
         </button>
       </div>
 
-      {/* AÇÕES E CONVITES */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* GERENCIAMENTO DE BABAS */}
+      <div className="space-y-4">
+        <h3 className="text-[10px] font-black opacity-40 uppercase ml-4 tracking-widest flex items-center gap-2">
+          <Settings size={14} className="text-cyan-electric"/> Gestão de Babas
+        </h3>
+
+        {myBabas.length > 0 ? (
+          myBabas.map((baba) => (
+            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between">
+              <div className="text-left">
+                <h4 className="text-xs font-black uppercase italic tracking-tight">{baba.name}</h4>
+                <p className="text-[8px] opacity-50 font-bold uppercase">{baba.match_day} às {baba.match_time}h</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => navigate(`/edit-baba/${baba.id}`)}
+                  className="p-3 bg-white/5 rounded-2xl text-white hover:bg-cyan-electric hover:text-black transition-all"
+                >
+                  <Edit3 size={16}/>
+                </button>
+                <button 
+                  onClick={() => handleDeleteBaba(baba.id)}
+                  className="p-3 bg-red-500/10 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                >
+                  <Trash2 size={16}/>
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-[10px] italic opacity-30 text-center py-4 bg-white/5 rounded-3xl border border-dashed border-white/10">
+            Você ainda não criou nenhum Baba.
+          </p>
+        )}
+
         <button 
           onClick={() => navigate('/dashboard')} 
-          className="card-glass p-5 rounded-3xl border border-cyan-electric/20 flex items-center justify-between group hover:border-cyan-electric transition-all bg-cyan-electric/5"
+          className="w-full card-glass p-5 rounded-3xl border border-cyan-electric/20 flex items-center justify-between group hover:border-cyan-electric transition-all bg-cyan-electric/5"
         >
           <div className="flex items-center gap-4">
             <div className="p-3 bg-cyan-electric/10 rounded-2xl text-cyan-electric group-hover:bg-cyan-electric group-hover:text-black transition-all">
               <PlusCircle size={20}/>
             </div>
             <div className="text-left">
-              <h3 className="text-sm font-black uppercase italic tracking-tight">Meus Babas</h3>
-              <p className="text-[9px] opacity-50 uppercase font-bold">Administrar ou Criar novo</p>
+              <h3 className="text-sm font-black uppercase italic tracking-tight">Novo Baba</h3>
+              <p className="text-[9px] opacity-50 uppercase font-bold">Criar um novo grupo</p>
             </div>
           </div>
           <span className="text-cyan-electric font-black">→</span>
