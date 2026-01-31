@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../services/supabase'; // ÚNICA ALTERAÇÃO: Ajustado de '../lib/supabase' para '../services/supabase'
+import { supabase } from '../services/supabase'; 
 import { 
   Trophy, Clock, ClipboardList, Users, Camera, Plus, Save, Edit2, 
   CheckCircle2, Circle, Loader2, Play, DollarSign 
@@ -14,7 +14,7 @@ const HomePage = () => {
   const { currentBaba } = useBaba();
   const { user } = useAuth();
   
-  // --- ESTADOS ORIGINAIS (MODO VISITANTE / SORTEIO) ---
+  // --- ESTADOS ORIGINAIS ---
   const [guestPlayerName, setGuestPlayerName] = useState('');
   const [isGoalkeeper, setIsGoalkeeper] = useState(false);
   const [guestList, setGuestList] = useState([]);
@@ -28,10 +28,17 @@ const HomePage = () => {
   const [loadingPresence, setLoadingPresence] = useState(true);
   const [isExpired, setIsExpired] = useState(false);
   const [editingRules, setEditingRules] = useState(false);
-  const [rulesText, setRulesText] = useState(currentBaba?.rules || "");
+  const [rulesText, setRulesText] = useState("");
   const [loadingPhoto, setLoadingPhoto] = useState(false);
 
-  // 1. LÓGICA DE SORTEIO MANUAL (Preservada para Visitantes)
+  // Sincroniza regras quando o baba carregar
+  useEffect(() => {
+    if (currentBaba?.rules) {
+      setRulesText(currentBaba.rules);
+    }
+  }, [currentBaba]);
+
+  // 1. LÓGICA DE SORTEIO MANUAL (Preservada)
   const handleSortear = () => {
     const goalkeepers = guestList.filter(p => p.isGoalkeeper);
     const outfieldPlayers = guestList.filter(p => !p.isGoalkeeper);
@@ -49,12 +56,10 @@ const HomePage = () => {
 
     for (let i = 0; i < numTeams; i++) {
       const teamPlayers = [];
-      // Adiciona goleiro se houver
       if (shufGKs.length > 0) {
         const gk = shufGKs.shift();
         teamPlayers.push({ name: gk.player.name, role: 'goleiro' });
       }
-      // Preenche o resto com jogadores de linha
       while (teamPlayers.length < playersPerTeam && shufOutfield.length > 0) {
         const p = shufOutfield.shift();
         teamPlayers.push({ name: p.player.name, role: 'linha' });
@@ -68,7 +73,6 @@ const HomePage = () => {
       });
     }
 
-    // Distribuir quem sobrou nos extras
     const leftovers = [...shufGKs, ...shufOutfield];
     leftovers.forEach((p, index) => {
       newTeams[index % numTeams].extras.push({ 
@@ -83,16 +87,16 @@ const HomePage = () => {
     toast.success("Times sorteados!");
   };
 
-  // 2. LÓGICA DE PRESENÇA (MODO ADM)
+  // 2. LÓGICA DE PRESENÇA
   const checkPresenceStatus = async () => {
-    if (!user || !currentBaba) return;
+    if (!user || !currentBaba?.id) return;
     try {
       const { data } = await supabase
         .from('presences')
         .select('*')
         .eq('baba_id', currentBaba.id)
         .eq('player_id', user.id)
-        .single();
+        .maybeSingle(); // Usando maybeSingle para evitar erro no console caso não exista
       if (data) setPresenceConfirmed(true);
     } catch (e) { 
       setPresenceConfirmed(false); 
@@ -103,7 +107,7 @@ const HomePage = () => {
 
   const handleTogglePresence = async () => {
     if (isExpired) {
-      toast.error("Inscrições encerradas! O sorteio já foi liberado.");
+      toast.error("Inscrições encerradas!");
       return;
     }
     try {
@@ -160,7 +164,10 @@ const HomePage = () => {
 
   // 4. CRONÔMETRO
   useEffect(() => {
-    if (!currentBaba?.game_time) return;
+    if (!currentBaba?.game_time) {
+      setTimeLeft("AGUARDANDO");
+      return;
+    }
     checkPresenceStatus();
     
     const timer = setInterval(() => {
@@ -199,7 +206,7 @@ const HomePage = () => {
         </span>
       </div>
 
-      {/* 1. HALL DA FAMA (EXIBIÇÃO) */}
+      {/* 1. HALL DA FAMA */}
       <section className="mb-6 relative h-44 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
         <img 
           src={currentBaba?.last_winner_photo || "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800"} 
@@ -214,8 +221,7 @@ const HomePage = () => {
           </h2>
         </div>
         
-        {/* Upload de Foto (Apenas Dono do Baba) */}
-        {user?.id === currentBaba?.owner_id && (
+        {user?.id === currentBaba?.president_id && (
           <label className="absolute top-4 right-4 bg-black/60 p-2.5 rounded-full border border-white/20 cursor-pointer hover:scale-110 transition-transform">
             {loadingPhoto ? <Loader2 size={16} className="animate-spin text-cyan-electric" /> : <Camera size={16} className="text-cyan-electric" />}
             <input type="file" className="hidden" onChange={(e) => handleUploadWinnerPhoto(e.target.files[0])} disabled={loadingPhoto} />
@@ -223,7 +229,7 @@ const HomePage = () => {
         )}
       </section>
 
-      {/* BOTÃO DE ESCALAÇÃO (LIBERA 30 MIN ANTES) */}
+      {/* BOTÃO DE ESCALAÇÃO */}
       {isExpired && currentBaba && (
         <button 
           onClick={() => navigate('/teams')}
@@ -235,7 +241,6 @@ const HomePage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
-        {/* 2. ÁREA DE PRESENÇA / ADIÇÃO */}
         <div className="card-glass p-5 rounded-3xl border border-white/10">
           <h3 className="text-[10px] font-black opacity-40 uppercase mb-4 tracking-widest flex items-center gap-2 text-cyan-electric">
              <Clock size={12}/> {currentBaba ? `Sua Presença (${timeLeft})` : "Adicionar Atletas"}
@@ -280,13 +285,12 @@ const HomePage = () => {
           )}
         </div>
 
-        {/* 3. QUADRO DE REGRAS */}
         <div className="card-glass p-5 rounded-3xl border border-white/10">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-[10px] font-black opacity-40 uppercase tracking-widest flex items-center gap-2 text-yellow-500">
               <ClipboardList size={12}/> Regras do Baba
             </h3>
-            {user?.id === currentBaba?.owner_id && (
+            {user?.id === currentBaba?.president_id && (
               <button 
                 onClick={() => editingRules ? handleSaveRules() : setEditingRules(true)} 
                 className="text-cyan-electric hover:scale-110 transition-transform"
@@ -304,12 +308,11 @@ const HomePage = () => {
             />
           ) : (
             <div className="text-[10px] font-bold opacity-60 space-y-1 italic leading-relaxed">
-              {currentBaba?.rules ? currentBaba.rules.split('\n').map((r, i) => <p key={i}>• {r}</p>) : <p>Nenhuma regra definida pelo administrador.</p>}
+              {currentBaba?.rules ? currentBaba.rules.split('\n').map((r, i) => <p key={i}>• {r}</p>) : <p>Nenhuma regra definida.</p>}
             </div>
           )}
         </div>
 
-        {/* 4. LISTA DE CONFIRMADOS E SORTEIO (MODO VISITANTE) */}
         {!currentBaba && (
           <div className="md:col-span-2 card-glass p-5 rounded-3xl border border-white/10">
             <div className="flex justify-between items-center mb-4">
@@ -340,7 +343,7 @@ const HomePage = () => {
                 </div>
                 <button 
                   onClick={() => navigate('/visitor-match')} 
-                  className="w-full bg-green-500 text-black py-4 rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-green-400 transition-colors"
+                  className="w-full bg-green-500 text-black py-4 rounded-2xl font-black uppercase text-xs shadow-lg"
                 >
                   <Play size={14} className="inline mr-2 fill-black"/> Iniciar Partida
                 </button>
@@ -349,9 +352,9 @@ const HomePage = () => {
               <div className="flex flex-wrap gap-2">
                 {guestList.length > 0 ? guestList.map(p => (
                   <div key={p.id} className="bg-white/5 px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2 animate-slide-in">
-                    <span className={`w-1.5 h-1.5 rounded-full ${p.isGoalkeeper ? 'bg-yellow-500 shadow-[0_0_5px_yellow]' : 'bg-cyan-electric'}`}></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${p.isGoalkeeper ? 'bg-yellow-500' : 'bg-cyan-electric'}`}></span>
                     <span className="text-[10px] font-bold uppercase">{p.player.name}</span>
-                    <button onClick={() => setGuestList(guestList.filter(item => item.id !== p.id))} className="text-[8px] opacity-30 hover:opacity-100 ml-1">✕</button>
+                    <button onClick={() => setGuestList(guestList.filter(item => item.id !== p.id))} className="text-[8px] opacity-30">✕</button>
                   </div>
                 )) : (
                   <p className="text-[10px] opacity-30 italic">Nenhum atleta adicionado ainda...</p>
@@ -364,17 +367,17 @@ const HomePage = () => {
 
       {/* NAVEGAÇÃO INFERIOR */}
       <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 p-4 flex justify-around items-center z-50">
-        <button onClick={() => navigate('/home')} className="text-cyan-electric flex flex-col items-center gap-1 transition-transform active:scale-90">
-          <Clock size={18}/><span className="text-[8px] font-black tracking-tighter">INÍCIO</span>
+        <button onClick={() => navigate('/home')} className="text-cyan-electric flex flex-col items-center gap-1">
+          <Clock size={18}/><span className="text-[8px] font-black">INÍCIO</span>
         </button>
-        <button onClick={() => navigate('/rankings')} className="opacity-40 flex flex-col items-center gap-1 hover:opacity-100 transition-opacity">
-          <Trophy size={18}/><span className="text-[8px] font-black tracking-tighter">RANKING</span>
+        <button onClick={() => navigate('/rankings')} className="opacity-40 flex flex-col items-center gap-1">
+          <Trophy size={18}/><span className="text-[8px] font-black">RANKING</span>
         </button>
-        <button onClick={() => navigate('/financial')} className="opacity-40 flex flex-col items-center gap-1 hover:opacity-100 transition-opacity">
-          <DollarSign size={18}/><span className="text-[8px] font-black tracking-tighter">CAIXA</span>
+        <button onClick={() => navigate('/financial')} className="opacity-40 flex flex-col items-center gap-1">
+          <DollarSign size={18}/><span className="text-[8px] font-black">CAIXA</span>
         </button>
-        <button onClick={() => navigate('/profile')} className="opacity-40 flex flex-col items-center gap-1 hover:opacity-100 transition-opacity">
-          <Users size={18}/><span className="text-[8px] font-black tracking-tighter">PERFIL</span>
+        <button onClick={() => navigate('/profile')} className="opacity-40 flex flex-col items-center gap-1">
+          <Users size={18}/><span className="text-[8px] font-black">PERFIL</span>
         </button>
       </nav>
     </div>
