@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { Bolt, Play, ArrowLeft } from 'lucide-react';
+import { Zap, Play, ArrowLeft } from 'lucide-react';
 
 const VisitorMode = () => {
   const navigate = useNavigate();
