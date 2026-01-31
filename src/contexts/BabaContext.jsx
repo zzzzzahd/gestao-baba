@@ -20,58 +20,50 @@ export const BabaProvider = ({ children }) => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Tabelas conforme o Schema do Banco
+  // Estados para o Sorteio de Times (Essencial para as telas de jogo)
+  const [teamA, setTeamA] = useState([]);
+  const [teamB, setTeamB] = useState([]);
+
   const TABLES = {
     BABAS: 'babas',
     PLAYERS: 'players',
-    PROFILES: 'profiles'
+    PROFILES: 'profiles',
+    MATCHES: 'matches'
   };
 
-  // Carrega os Babas que o usuário participa ou administra
+  // 1. Carregar Babas do Usuário
   const loadMyBabas = async () => {
     if (!user) return;
-
     try {
       setLoading(true);
-      
-      // Busca Babas onde o usuário é presidente ou está na lista de coordenadores
       const { data, error } = await supabase
         .from(TABLES.BABAS)
         .select('*')
         .or(`president_id.eq.${user.id},coordinators.cs.{${user.id}}`);
 
       if (error) throw error;
-      
       setMyBabas(data || []);
-
-      // Se houver babas e nenhum selecionado, seleciona o primeiro por padrão
-      if (data && data.length > 0 && !currentBaba) {
+      if (data?.length > 0 && !currentBaba) {
         setCurrentBaba(data[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar seus babas:', error);
+      console.error('Erro ao carregar babas:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Carrega jogadores do Baba atual (fazendo Join com Profiles)
+  // 2. Carregar Jogadores do Baba Atual (Join com Profiles)
   const loadPlayers = async () => {
     if (!currentBaba) return;
-
     try {
       const { data, error } = await supabase
         .from(TABLES.PLAYERS)
         .select(`
           *,
-          profile:profiles (
-            name,
-            avatar_url,
-            phone
-          )
+          profile:profiles (name, avatar_url)
         `)
-        .eq('baba_id', currentBaba.id)
-        .order('name', { ascending: true });
+        .eq('baba_id', currentBaba.id);
 
       if (error) throw error;
       setPlayers(data || []);
@@ -80,55 +72,79 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Efeito para recarregar babas quando o usuário logar
-  useEffect(() => {
-    loadMyBabas();
-  }, [user]);
+  // 3. Lógica de Sorteio de Times (O "Coração" do App)
+  const drawTeams = (availablePlayers) => {
+    if (availablePlayers.length < 2) {
+      toast.error("Adicione pelo menos 2 jogadores!");
+      return;
+    }
 
-  // Efeito para recarregar jogadores quando o Baba atual mudar
-  useEffect(() => {
-    loadPlayers();
-  }, [currentBaba]);
+    // Separa goleiros e jogadores de linha
+    const goalies = availablePlayers.filter(p => p.position === 'goleiro');
+    const fieldPlayers = availablePlayers.filter(p => p.position !== 'goleiro');
 
-  // Função para trocar o Baba ativo
-  const selectBaba = (baba) => {
-    setCurrentBaba(baba);
-    toast.success(`Baba ${baba.name} selecionado!`);
+    // Embaralhamento (Fisher-Yates)
+    const shuffle = (array) => {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    };
+
+    const shuffledGoalies = shuffle([...goalies]);
+    const shuffledField = shuffle([...fieldPlayers]);
+
+    const ta = [];
+    const tb = [];
+
+    // Distribui Goleiros
+    shuffledGoalies.forEach((g, index) => {
+      if (index % 2 === 0) ta.push(g); else tb.push(g);
+    });
+
+    // Distribui Linha
+    shuffledField.forEach((p, index) => {
+      if (index % 2 === 0) ta.push(p); else tb.push(p);
+    });
+
+    setTeamA(ta);
+    setTeamB(tb);
+    toast.success("Times sorteados!");
   };
 
-  // Função para criar um novo Baba
-  const createBaba = async (babaData) => {
+  // 4. Salvar Resultado da Partida
+  const saveMatchResult = async (matchData) => {
     try {
       const { data, error } = await supabase
-        .from(TABLES.BABAS)
-        .insert([{ 
-          ...babaData, 
-          president_id: user.id 
-        }])
-        .select()
-        .single();
+        .from(TABLES.MATCHES)
+        .insert([{ ...matchData, baba_id: currentBaba.id }])
+        .select();
 
       if (error) throw error;
-
-      setMyBabas([...myBabas, data]);
-      setCurrentBaba(data);
-      toast.success('Baba criado com sucesso!');
-      return { data, error: null };
+      toast.success("Partida registrada!");
+      return data;
     } catch (error) {
-      toast.error('Erro ao criar baba');
-      return { data: null, error };
+      toast.error("Erro ao salvar partida");
+      return null;
     }
   };
 
+  useEffect(() => { loadMyBabas(); }, [user]);
+  useEffect(() => { loadPlayers(); }, [currentBaba]);
+
   const value = {
     currentBaba,
-    setCurrentBaba: selectBaba,
+    setCurrentBaba,
     myBabas,
     players,
     loading,
+    teamA,
+    teamB,
+    drawTeams,
+    saveMatchResult,
     refreshBabas: loadMyBabas,
-    refreshPlayers: loadPlayers,
-    createBaba
+    refreshPlayers: loadPlayers
   };
 
   return (
