@@ -44,7 +44,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-5">
+    <div className="min-h-screen flex items-center justify-center p-5 bg-black">
       <div className="w-full max-w-md">
         <div className="mb-16">
           <Logo size="large" />
@@ -119,7 +119,7 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div className="mt-8 text-center text-xs opacity-50">
+        <div className="mt-8 text-center text-xs opacity-50 text-white">
           <p>Gestão profissional de peladas</p>
           <p className="mt-1">v1.0.0 - 2026</p>
         </div>
