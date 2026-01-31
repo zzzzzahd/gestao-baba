@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
@@ -14,83 +14,99 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // Estado para dados extras (role, avatar, etc)
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!supabase) {
-      console.warn('Supabase não disponível. Auth desativado.');
-      setLoading(false);
-      return;
-    }
-
-    // Sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) fetchProfile(currentUser.id);
-      setLoading(false);
-    });
-
-    // Listener de mudanças (Login/Logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchProfile(currentUser.id);
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => subscription?.unsubscribe();
-  }, []);
-
-  // --- FUNÇÕES DE PERFIL (Para a ProfilePage) ---
-
+  // 1. Função de busca de Perfil (Melhorada com tratamento de erro)
   const fetchProfile = async (userId) => {
+    if (!userId) return;
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // maybeSingle evita erro se o perfil ainda não existir
       
-      if (data) setProfile(data);
+      if (data) {
+        setProfile(data);
+      }
     } catch (error) {
       console.error("Erro ao buscar perfil:", error);
     }
   };
 
+  useEffect(() => {
+    if (!supabase) {
+      console.warn('Supabase não disponível.');
+      setLoading(false);
+      return;
+    }
+
+    // Pega sessão inicial
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        }
+      } catch (error) {
+        console.error("Erro na sessão inicial:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listener de mudanças
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        await fetchProfile(currentUser.id);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  // --- FUNÇÕES DE PERFIL ---
+
   const updateProfile = async (updates) => {
     if (!user) return { error: 'Usuário não logado' };
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert({ id: user.id, ...updates, updated_at: new Date() })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, ...updates, updated_at: new Date() })
+        .select()
+        .single();
 
-    if (!error) {
-      setProfile(data);
-      toast.success('Perfil atualizado!');
+      if (!error) {
+        setProfile(data);
+        toast.success('Perfil atualizado!');
+      }
+      return { data, error };
+    } catch (e) {
+      return { data: null, error: e };
     }
-    return { data, error };
   };
 
   const uploadAvatar = async (userId, file) => {
     try {
       const fileExt = file.name.split('.').pop();
       const filePath = `${userId}/${Math.random()}.${fileExt}`;
-
-      // Upload da imagem no Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Pegar a URL pública
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
@@ -102,10 +118,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- FUNÇÕES DE AUTENTICAÇÃO ORIGINAIS ---
+  // --- FUNÇÕES DE AUTENTICAÇÃO ---
 
   const signUp = async (email, password, metadata = {}) => {
-    if (!supabase) return { error: 'Supabase indisponível' };
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -122,11 +137,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signIn = async (email, password) => {
-    if (!supabase) return { error: 'Supabase indisponível' };
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      toast.success('Bem-vindo de volta!');
+      toast.success('Bem-vindo!');
       return { data, error: null };
     } catch (error) {
       toast.error(error.message);
@@ -135,10 +149,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
-    if (!supabase) return;
     try {
       await supabase.auth.signOut();
-      toast.success('Logout realizado!');
+      setProfile(null);
+      setUser(null);
+      toast.success('Até a próxima!');
     } catch (error) {
       toast.error(error.message);
     }
@@ -156,9 +171,10 @@ export const AuthProvider = ({ children }) => {
     refreshProfile: () => fetchProfile(user?.id)
   };
 
+  // MUDANÇA CRUCIAL: Sempre retornamos o Provider, mas passamos o loading dentro dele
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
