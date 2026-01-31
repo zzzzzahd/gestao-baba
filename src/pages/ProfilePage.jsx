@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2, Trash2, Edit3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../services/supabase'; // Única alteração real: pasta services
+import { useBaba } from '../contexts/BabaContext'; // Importado para gerenciar dados
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateProfile, uploadAvatar } = useAuth(); // Funções que centralizaremos no Auth
+  const { getMyBabas, deleteBaba } = useBaba(); // Funções que centralizaremos no BabaContext
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [myBabas, setMyBabas] = useState([]);
@@ -20,36 +22,21 @@ const ProfilePage = () => {
     avatar_url: null
   });
 
-  // 1. Carregar dados do perfil e Babas do usuário
+  // 1. Carregar dados do perfil e Babas do usuário usando os Contextos
   useEffect(() => {
     const getData = async () => {
       try {
         if (!user) return;
 
-        // Busca Perfil
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (profileData) {
-          setProfile({
-            name: profileData.name || user?.user_metadata?.name || '',
-            age: profileData.age || '',
-            position: profileData.position || 'Linha',
-            heart_team: profileData.heart_team || '',
-            avatar_url: profileData.avatar_url
-          });
-        }
-
-        // Busca Babas Criados por mim
-        const { data: babasData } = await supabase
-          .from('babas')
-          .select('*')
-          .eq('owner_id', user.id);
-        
+        // Busca Babas Criados por mim via Contexto
+        const babasData = await getMyBabas(user.id);
         if (babasData) setMyBabas(babasData);
+
+        // O perfil agora vem do metadata do user ou de uma função centralizada
+        // Se houver campos extras na tabela 'profiles', o AuthContext deve prover
+        if (user.profile_details) {
+            setProfile(prev => ({ ...prev, ...user.profile_details }));
+        }
 
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -60,17 +47,13 @@ const ProfilePage = () => {
     getData();
   }, [user]);
 
-  // 2. Salvar Dados do Perfil
+  // 2. Salvar Dados do Perfil via AuthContext
   const handleUpdateProfile = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from('profiles').upsert({
+      const { error } = await updateProfile({
         id: user.id,
-        name: profile.name,
-        age: profile.age,
-        position: profile.position,
-        heart_team: profile.heart_team,
-        avatar_url: profile.avatar_url,
+        ...profile,
         updated_at: new Date()
       });
 
@@ -83,48 +66,32 @@ const ProfilePage = () => {
     }
   };
 
-  // 3. Upload de Foto de Perfil
+  // 3. Upload de Foto via AuthContext
   const handlePhotoUpload = async (file) => {
     if (!file) return;
     try {
       const loadingToast = toast.loading("Enviando foto...");
-      const fileExt = file.name.split('.').pop();
-      const filePath = `avatars/${user.id}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('baba-photos')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('baba-photos')
-        .getPublicUrl(filePath);
-
-      const finalUrl = `${publicUrl}?t=${Date.now()}`;
       
-      setProfile(prev => ({ ...prev, avatar_url: finalUrl }));
-      await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', user.id);
+      const publicUrl = await uploadAvatar(user.id, file);
       
-      toast.dismiss(loadingToast);
-      toast.success("Foto atualizada!");
+      if (publicUrl) {
+        setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+        toast.dismiss(loadingToast);
+        toast.success("Foto atualizada!");
+      }
     } catch (error) {
       toast.dismiss();
       toast.error("Erro no upload");
     }
   };
 
-  // 4. Lógica para Apagar Baba
+  // 4. Lógica para Apagar Baba via BabaContext
   const handleDeleteBaba = async (babaId) => {
     const confirmar = window.confirm("⚠️ ATENÇÃO: Apagar este Baba excluirá permanentemente todos os rankings e fotos vinculadas. Deseja continuar?");
     
     if (confirmar) {
       try {
-        const { error } = await supabase
-          .from('babas')
-          .delete()
-          .eq('id', babaId);
-
+        const { error } = await deleteBaba(babaId);
         if (error) throw error;
 
         setMyBabas(myBabas.filter(b => b.id !== babaId));
@@ -277,13 +244,6 @@ const ProfilePage = () => {
           </div>
           <span className="text-cyan-electric font-black group-hover:translate-x-1 transition-transform">→</span>
         </button>
-
-        <div className="card-glass p-5 rounded-3xl border border-white/10">
-          <h3 className="text-[10px] font-black opacity-40 uppercase mb-4 tracking-widest flex items-center gap-2">
-            <UserPlus size={14} className="text-cyan-electric"/> Convites Pendentes
-          </h3>
-          <p className="text-[10px] italic opacity-30 text-center py-2">Nenhum convite no momento.</p>
-        </div>
       </div>
     </div>
   );
