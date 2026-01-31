@@ -15,16 +15,17 @@ import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import RankingsPage from './pages/RankingsPage';
-import MatchPage from './pages/MatchPage';         // Painel de Jogo Oficial (ADM)
+import MatchPage from './pages/MatchPage';          // Painel de Jogo Oficial (ADM)
 import MatchPageVisitor from './pages/MatchPageVisitor'; // Painel de Jogo Rápido (Visitante)
-import TeamsPage from './pages/TeamsPage';         // Visualização de Times e Sorteio Oficial
+import TeamsPage from './pages/TeamsPage';          // Visualização de Times e Sorteio Oficial
 import DashboardPage from './pages/DashboardPage'; // Criação e Edição de Babas
-import VisitorMode from './pages/VisitorMode';     // Tela de boas-vindas ao Modo Visitante
+import VisitorMode from './pages/VisitorMode';      // Tela de boas-vindas ao Modo Visitante
 import FinancialPage from './pages/FinancialPage'; // Gestão de Mensalidades e PIX
 
 function App() {
   return (
     <AuthProvider>
+      {/* O BabaProvider DEVE ficar dentro do AuthProvider para acessar o usuário logado */}
       <BabaProvider>
         {/* Toaster: Estilizado para o tema Dark/Cyan do Draft Baba */}
         <Toaster 
@@ -64,19 +65,24 @@ function App() {
         
         <Routes>
           {/* --- ROTAS PÚBLICAS --- */}
+          {/* A LandingPage é a porta de entrada oficial (/) */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage />} />
           
-          {/* Fluxo do Visitante (Ferramentas Rápidas) */}
+          {/* Fluxo do Visitante (Ferramentas Rápidas - Sem Login) */}
           <Route path="/visitor" element={<VisitorMode />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
-          {/* HomePage: Híbrida (Lógica tratada internamente pelo BabaContext) */}
-          <Route path="/home" element={<HomePage />} />
-
-          {/* --- ROTAS PROTEGIDAS (Necessitam Login) --- */}
+          {/* --- ROTAS PROTEGIDAS (Necessitam Login via ProtectedRoute) --- */}
           
+          {/* HomePage: Agora protegida para garantir que o perfil do atleta seja carregado */}
+          <Route path="/home" element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          } />
+
           {/* Dashboard: Gestão de Grupos de Baba */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
@@ -84,7 +90,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Edição de Baba específico (Reutiliza Dashboard com ID) */}
+          {/* Edição de Baba específico */}
           <Route path="/edit-baba/:id" element={
             <ProtectedRoute>
               <DashboardPage />
@@ -112,21 +118,21 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Teams: Painel de Sorteio e Lista de Jogadores para o Jogo de Hoje */}
+          {/* Teams: Painel de Sorteio e Lista de Jogadores */}
           <Route path="/teams" element={
             <ProtectedRoute>
               <TeamsPage />
             </ProtectedRoute>
           } />
 
-          {/* Match: Controle de Tempo, Gols e Fila de Espera (Painel ADM) */}
+          {/* Match: Controle de Tempo e Gols (Painel ADM) */}
           <Route path="/match" element={
             <ProtectedRoute>
               <MatchPage />
             </ProtectedRoute>
           } />
 
-          {/* Fallback de Segurança: Qualquer rota não mapeada volta para a Landing */}
+          {/* Fallback de Segurança: Qualquer rota desconhecida volta para a Landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BabaProvider>
