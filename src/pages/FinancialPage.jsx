@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase'; // Ajustado para /lib
+import { supabase } from '../services/supabase'; // Ajustado para /lib
 import toast from 'react-hot-toast';
 
 const FinancialPage = () => {
