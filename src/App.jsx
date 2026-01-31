@@ -9,7 +9,7 @@ import InstallPWA from './components/InstallPWA';
 
 // Pages
 import LoginPage from './pages/LoginPage';
-import ProfilePage from './pages/ProfilePage'; // <--- NOVA PÁGINA ADICIONADA
+import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
 import MatchPage from './pages/MatchPage';
@@ -54,11 +54,14 @@ function App() {
           <InstallPWA />
           
           <Routes>
-            {/* Páginas Públicas */}
+            {/* PÚBLICAS: Acesso livre para Login e Modo Visitante */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/visitor" element={<VisitorMode />} />
             
-            {/* Rota de Perfil: A primeira após o Login */}
+            {/* HÍBRIDA: A MatchPage precisa ser acessível ao visitante para ele marcar os gols do sorteio rápido */}
+            <Route path="/match" element={<MatchPage />} />
+
+            {/* PROTEGIDAS: Exigem conta e salvam dados no Supabase */}
             <Route
               path="/profile"
               element={
@@ -67,8 +70,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            
-            {/* Dashboard: Lista de Babas e Criação */}
             <Route
               path="/dashboard"
               element={
@@ -77,15 +78,32 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/home"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rankings"
+              element={
+                <ProtectedRoute>
+                  <RankingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/financial"
+              element={
+                <ProtectedRoute>
+                  <FinancialPage />
+                </ProtectedRoute>
+              }
+            />
             
-            {/* Painel do Baba (Os 4 Pilares: Foto, Check-in, Regras, Lista/Sorteio) */}
-            <Route path="/home" element={<HomePage />} />
-            
-            <Route path="/match" element={<MatchPage />} />
-            <Route path="/rankings" element={<RankingsPage />} />
-            <Route path="/financial" element={<FinancialPage />} />
-            
-            {/* Redirecionamento padrão - Alterado para cair no Profile após login */}
+            {/* Redirecionamento padrão */}
             <Route path="/" element={<Navigate to="/profile" />} />
           </Routes>
         </BabaProvider>
