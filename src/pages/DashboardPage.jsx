@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
+import { supabase } from '../lib/supabase'; // Import necessário para carregar dados na edição
 import Logo from '../components/Logo';
+import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
+  const { id } = useParams(); // Pega o ID da URL se for edição
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { myBabas, createBaba, selectBaba, loading } = useBaba();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
   const [newBaba, setNewBaba] = useState({
     name: '',
     modality: 'futsal',
@@ -18,19 +23,52 @@ const DashboardPage = () => {
     match_duration: 10
   });
 
-  const handleCreateBaba = async (e) => {
+  // LOGICA PARA CARREGAR DADOS SE FOR EDIÇÃO
+  useEffect(() => {
+    if (id) {
+      const loadBabaData = async () => {
+        const { data, error } = await supabase
+          .from('babas')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (data) {
+          setNewBaba(data);
+          setIsEditing(true);
+          setShowCreateModal(true); // Abre o modal direto para editar
+        }
+      };
+      loadBabaData();
+    }
+  }, [id]);
+
+  const handleCreateOrUpdateBaba = async (e) => {
     e.preventDefault();
-    const { error } = await createBaba(newBaba);
-    if (!error) {
-      setShowCreateModal(false);
-      setNewBaba({
-        name: '',
-        modality: 'futsal',
-        is_private: false,
-        game_days: [],
-        game_time: '20:00',
-        match_duration: 10
-      });
+    
+    if (isEditing) {
+      // LOGICA DE ATUALIZAR
+      const { error } = await supabase
+        .from('babas')
+        .update(newBaba)
+        .eq('id', id);
+
+      if (!error) {
+        toast.success("Baba atualizado!");
+        navigate('/profile');
+      } else {
+        toast.error("Erro ao atualizar");
+      }
+    } else {
+      // LOGICA DE CRIAR (Original sua)
+      const { error } = await createBaba(newBaba);
+      if (!error) {
+        setShowCreateModal(false);
+        setNewBaba({
+          name: '', modality: 'futsal', is_private: false,
+          game_days: [], game_time: '20:00', match_duration: 10
+        });
+      }
     }
   };
 
@@ -68,7 +106,7 @@ const DashboardPage = () => {
 
         {/* Title */}
         <h1 className="text-3xl font-bold mb-6 text-cyan-electric">
-          MEUS BABAS
+          {isEditing ? 'EDITANDO BABA' : 'MEUS BABAS'}
         </h1>
 
         {/* Babas Grid */}
@@ -76,14 +114,14 @@ const DashboardPage = () => {
           <div className="text-center py-12">
             <i className="fas fa-spinner fa-spin text-4xl text-cyan-electric"></i>
           </div>
-        ) : myBabas.length === 0 ? (
+        ) : myBabas.length === 0 && !isEditing ? (
           <div className="card-glass p-12 text-center">
             <i className="fas fa-futbol text-6xl text-cyan-electric/30 mb-4"></i>
             <p className="text-lg opacity-60 mb-6">
               Você ainda não tem nenhum baba
             </p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => { setIsEditing(false); setShowCreateModal(true); }}
               className="btn-primary max-w-xs mx-auto"
             >
               CRIAR MEU PRIMEIRO BABA
@@ -125,7 +163,7 @@ const DashboardPage = () => {
             </div>
 
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => { setIsEditing(false); setShowCreateModal(true); }}
               className="btn-secondary"
             >
               <i className="fas fa-plus mr-2"></i>
@@ -134,45 +172,44 @@ const DashboardPage = () => {
           </>
         )}
 
-        {/* Create Modal */}
+        {/* Modal Único para Criar ou Editar */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50 animate-fade-in">
             <div className="card-glass p-6 max-w-md w-full animate-slide-in">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-cyan-electric">
-                  NOVO BABA
+                  {isEditing ? 'EDITAR BABA' : 'NOVO BABA'}
                 </h2>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    if(isEditing) navigate('/profile'); // Se fechar a edição, volta pro perfil
+                  }}
                   className="text-2xl hover:text-red-500 transition-colors"
                 >
                   <i className="fas fa-times"></i>
                 </button>
               </div>
 
-              <form onSubmit={handleCreateBaba} className="space-y-4">
+              <form onSubmit={handleCreateOrUpdateBaba} className="space-y-4">
                 <div>
-                  <label className="block text-sm mb-2 opacity-60">
-                    Nome do Baba
-                  </label>
+                  <label className="block text-sm mb-2 opacity-60">Nome do Baba</label>
                   <input
                     type="text"
                     value={newBaba.name}
                     onChange={(e) => setNewBaba({ ...newBaba, name: e.target.value })}
                     placeholder="Ex: Baba da Galera"
                     required
-                    className="input-tactical"
+                    className="input-tactical w-full bg-white/5 border border-white/10 p-3 rounded-lg"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm mb-2 opacity-60">
-                    Modalidade
-                  </label>
+                  <label className="block text-sm mb-2 opacity-60">Modalidade</label>
                   <select
                     value={newBaba.modality}
                     onChange={(e) => setNewBaba({ ...newBaba, modality: e.target.value })}
-                    className="input-tactical"
+                    className="input-tactical w-full bg-black border border-white/10 p-3 rounded-lg"
                   >
                     <option value="futsal">Futsal (5x5)</option>
                     <option value="society">Society (8x8)</option>
@@ -180,28 +217,23 @@ const DashboardPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm mb-2 opacity-60">
-                    Horário do Jogo
-                  </label>
+                  <label className="block text-sm mb-2 opacity-60">Horário do Jogo</label>
                   <input
                     type="time"
                     value={newBaba.game_time}
                     onChange={(e) => setNewBaba({ ...newBaba, game_time: e.target.value })}
-                    className="input-tactical"
+                    className="input-tactical w-full bg-white/5 border border-white/10 p-3 rounded-lg"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm mb-2 opacity-60">
-                    Duração da Partida (minutos)
-                  </label>
+                  <label className="block text-sm mb-2 opacity-60">Duração da Partida (minutos)</label>
                   <input
                     type="number"
                     value={newBaba.match_duration}
                     onChange={(e) => setNewBaba({ ...newBaba, match_duration: parseInt(e.target.value) })}
-                    min="5"
-                    max="30"
-                    className="input-tactical"
+                    min="5" max="30"
+                    className="input-tactical w-full bg-white/5 border border-white/10 p-3 rounded-lg"
                   />
                 </div>
 
@@ -213,21 +245,22 @@ const DashboardPage = () => {
                     onChange={(e) => setNewBaba({ ...newBaba, is_private: e.target.checked })}
                     className="w-5 h-5"
                   />
-                  <label htmlFor="private" className="text-sm">
-                    Baba privado (apenas por convite)
-                  </label>
+                  <label htmlFor="private" className="text-sm">Baba privado</label>
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="btn-visitor flex-1"
+                    onClick={() => {
+                       setShowCreateModal(false);
+                       if(isEditing) navigate('/profile');
+                    }}
+                    className="bg-white/10 hover:bg-white/20 flex-1 py-3 rounded-lg transition-all"
                   >
                     CANCELAR
                   </button>
-                  <button type="submit" className="btn-primary flex-1">
-                    CRIAR
+                  <button type="submit" className="bg-cyan-electric text-black font-bold flex-1 py-3 rounded-lg hover:brightness-110 transition-all">
+                    {isEditing ? 'SALVAR' : 'CRIAR'}
                   </button>
                 </div>
               </form>
