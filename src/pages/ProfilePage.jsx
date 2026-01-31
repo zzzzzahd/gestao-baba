@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2, Trash2, Edit3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase'; // Caminho corrigido para garantir o deploy
+import { supabase } from '../services/supabase'; // Única alteração real: pasta services
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
@@ -103,7 +103,6 @@ const ProfilePage = () => {
 
       const finalUrl = `${publicUrl}?t=${Date.now()}`;
       
-      // Atualiza estado local e banco de dados imediatamente
       setProfile(prev => ({ ...prev, avatar_url: finalUrl }));
       await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', user.id);
       
@@ -221,7 +220,7 @@ const ProfilePage = () => {
         <button 
           onClick={handleUpdateProfile}
           disabled={saving}
-          className="w-full mt-6 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric transition-colors disabled:opacity-50"
+          className="w-full mt-6 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric transition-colors"
         >
           {saving ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>}
           Salvar Alterações
@@ -236,7 +235,7 @@ const ProfilePage = () => {
 
         {myBabas.length > 0 ? (
           myBabas.map((baba) => (
-            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between animate-slide-in">
+            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between">
               <div className="text-left">
                 <h4 className="text-xs font-black uppercase italic tracking-tight">{baba.name}</h4>
                 <p className="text-[8px] opacity-50 font-bold uppercase">{baba.match_day} às {baba.match_time}h</p>
