@@ -4,13 +4,7 @@ import { useAuth } from './AuthContext';
 
 const BabaContext = createContext({});
 
-export const useBaba = () => {
-  const context = useContext(BabaContext);
-  if (!context) {
-    throw new Error('useBaba must be used within BabaProvider');
-  }
-  return context;
-};
+export const useBaba = () => useContext(BabaContext);
 
 export const BabaProvider = ({ children }) => {
   const { user } = useAuth();
@@ -18,101 +12,70 @@ export const BabaProvider = ({ children }) => {
   const [myBabas, setMyBabas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Configuração padrão para o Visitante
   const guestBaba = {
     id: 'guest-session',
     name: 'Baba Rápido (Visitante)',
-    match_duration: 10,
-    modality: 'futsal'
+    match_duration: 10
+  };
+
+  const loadMyBabas = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data } = await supabase
+        .from(TABLES.BABAS)
+        .select(`*, players:players(count)`)
+        .or(`president_id.eq.${user.id},coordinators.cs.{${user.id}}`);
+      setMyBabas(data || []);
+      if (data && data.length > 0) setCurrentBaba(data[0]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (user) {
       loadMyBabas();
     } else {
-      setMyBabas([]);
       setCurrentBaba(guestBaba);
+      setMyBabas([]);
     }
   }, [user]);
 
-  const loadMyBabas = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from(TABLES.BABAS)
-        .select(`*, players:players(count)`)
-        .or(`president_id.eq.${user.id},coordinators.cs.{${user.id}}`);
-
-      if (error) throw error;
-      setMyBabas(data || []);
-      if (data && data.length > 0 && !currentBaba) {
-        setCurrentBaba(data[0]);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar babas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createBaba = async (babaData) => {
-    if (!user) return { data: null, error: 'Auth required' };
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.BABAS)
-        .insert([{ ...babaData, president_id: user.id, created_at: new Date().toISOString() }])
-        .select().single();
-      if (error) throw error;
-      await loadMyBabas();
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
-  const updateBaba = async (babaId, updates) => {
-    if (babaId === 'guest-session') {
-      setCurrentBaba(prev => ({ ...prev, ...updates }));
-      return { data: { ...currentBaba, ...updates }, error: null };
-    }
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.BABAS)
-        .update(updates).eq('id', babaId).select().single();
-      if (error) throw error;
-      await loadMyBabas();
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
-  const deleteBaba = async (babaId) => {
-    if (babaId === 'guest-session') return;
-    try {
-      await supabase.from(TABLES.BABAS).delete().eq('id', babaId);
-      await loadMyBabas();
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const selectBaba = async (babaId) => {
-    if (babaId === 'guest-session') {
+  const selectBaba = async (id) => {
+    if (id === 'guest-session') {
       setCurrentBaba(guestBaba);
       return guestBaba;
     }
-    try {
-      const { data } = await supabase.from(TABLES.BABAS).select('*').eq('id', babaId).single();
-      setCurrentBaba(data);
-      return data;
-    } catch (error) {
-      return null;
+    const { data } = await supabase.from(TABLES.BABAS).select('*').eq('id', id).single();
+    if (data) setCurrentBaba(data);
+    return data;
+  };
+
+  const updateBaba = async (id, updates) => {
+    if (id === 'guest-session') {
+      setCurrentBaba(prev => ({ ...prev, ...updates }));
+      return { data: updates };
     }
+    const { data } = await supabase.from(TABLES.BABAS).update(updates).eq('id', id).select().single();
+    return { data };
+  };
+
+  const value = { 
+    currentBaba, 
+    myBabas, 
+    loading, 
+    selectBaba, 
+    updateBaba, 
+    loadMyBabas,
+    createBaba: async () => {}, 
+    deleteBaba: async () => {} 
   };
 
   return (
-    <BabaContext.Provider value={{ currentBaba, myBabas, loading, createBaba, updateBaba, deleteBaba, selectBaba, loadMyBabas }}>
+    <BabaContext.Provider value={value}>
       {children}
     </BabaContext.Provider>
   );
