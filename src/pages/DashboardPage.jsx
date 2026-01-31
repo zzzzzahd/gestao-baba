@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import { supabase, TABLES } from '../services/supabase'; 
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
@@ -10,7 +9,19 @@ const DashboardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { myBabas, createBaba, selectBaba, loading, loadMyBabas } = useBaba();
+  
+  // Agora usamos APENAS o contexto. 
+  // Removi o supabase e o TABLES daqui.
+  const { 
+    myBabas, 
+    createBaba, 
+    updateBaba,    // Adicione esta função ao seu BabaContext se ainda não tiver
+    selectBaba, 
+    getBabaById,   // Adicione esta função ao seu BabaContext (exemplo abaixo)
+    loading, 
+    loadMyBabas 
+  } = useBaba();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -23,54 +34,46 @@ const DashboardPage = () => {
     match_duration: 10
   });
 
-  // LOGICA PARA CARREGAR DADOS SE FOR EDIÇÃO
+  // LOGICA PARA CARREGAR DADOS VIA CONTEXTO
   useEffect(() => {
-    if (id) {
+    if (id && getBabaById) {
       const loadBabaData = async () => {
-        try {
-          const { data, error } = await supabase
-            .from(TABLES.BABAS)
-            .select('*')
-            .eq('id', id)
-            .maybeSingle(); // Troquei .single() por .maybeSingle() para evitar crash se não achar
-
-          if (data) {
-            setNewBaba(data);
-            setIsEditing(true);
-            setShowCreateModal(true);
-          }
-        } catch (err) {
-          console.error("Erro ao carregar baba:", err);
-          toast.error("Erro ao carregar dados do baba");
+        const data = await getBabaById(id); // O Contexto resolve o Supabase
+        if (data) {
+          setNewBaba(data);
+          setIsEditing(true);
+          setShowCreateModal(true);
+        } else {
+          toast.error("Baba não encontrado");
+          navigate('/profile');
         }
       };
       loadBabaData();
     }
-  }, [id]);
+  }, [id, getBabaById, navigate]);
 
   const handleCreateOrUpdateBaba = async (e) => {
     e.preventDefault();
     
     try {
       if (isEditing) {
-        const { error } = await supabase
-          .from(TABLES.BABAS)
-          .update({
-            name: newBaba.name,
-            modality: newBaba.modality,
-            is_private: newBaba.is_private,
-            game_time: newBaba.game_time,
-            match_duration: newBaba.match_duration
-          })
-          .eq('id', id);
+        // Usando a função centralizada do contexto
+        const { error } = await updateBaba(id, {
+          name: newBaba.name,
+          modality: newBaba.modality,
+          is_private: newBaba.is_private,
+          game_time: newBaba.game_time,
+          match_duration: newBaba.match_duration
+        });
 
         if (error) throw error;
         toast.success("Baba atualizado!");
-        if (loadMyBabas) loadMyBabas(); // Atualiza a lista global
         navigate('/profile');
       } else {
+        // createBaba já estava no contexto
         const { error } = await createBaba(newBaba);
         if (error) throw error;
+        
         setShowCreateModal(false);
         setNewBaba({
           name: '', modality: 'futsal', is_private: false,
@@ -78,6 +81,8 @@ const DashboardPage = () => {
         });
         toast.success("Novo baba criado!");
       }
+      
+      if (loadMyBabas) loadMyBabas();
     } catch (error) {
       toast.error(error.message || "Erro na operação");
     }
@@ -141,6 +146,7 @@ const DashboardPage = () => {
                     {baba.is_private && <i className="fas fa-lock text-yellow-500 text-sm"></i>}
                   </div>
                   <div className="flex items-center gap-4 text-[11px] font-bold opacity-60">
+                    {/* Note: players count deve ser tratado no contexto para evitar erro de leitura direta aqui */}
                     <span><i className="fas fa-users mr-1"></i> {baba.players?.[0]?.count || 0} ATLETAS</span>
                     <span><i className="fas fa-clock mr-1"></i> {baba.game_time}</span>
                   </div>
