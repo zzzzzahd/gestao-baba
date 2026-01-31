@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabase';
 import { useBaba } from '../contexts/BabaContext';
 import toast from 'react-hot-toast';
 
 const MatchPage = () => {
   const navigate = useNavigate();
-  const { currentBaba } = useBaba();
+  const { currentBaba, registerMatchStat } = useBaba(); // Função que criaremos no Contexto
   
   const [allTeams, setAllTeams] = useState([]); 
   const [currentMatch, setCurrentMatch] = useState(null);
   const [timer, setTimer] = useState(600); 
   const [isActive, setIsActive] = useState(false);
   
-  // Estados do Modal de Estatísticas
+  // Estados do Modal
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [pendingGoalTeam, setPendingGoalTeam] = useState(null);
   const [selectedScorer, setSelectedScorer] = useState('');
   const [selectedAssister, setSelectedAssister] = useState('');
 
+  // Carrega times do sorteio (localStorage para persistência rápida)
   useEffect(() => {
     const saved = localStorage.getItem('temp_teams');
     if (saved) {
@@ -32,9 +32,12 @@ const MatchPage = () => {
           scoreB: 0
         });
       }
-    } else { navigate('/home'); }
+    } else { 
+      navigate('/home'); 
+    }
   }, [navigate]);
 
+  // Lógica do Cronômetro
   useEffect(() => {
     let interval = null;
     if (isActive && timer > 0) {
@@ -60,44 +63,35 @@ const MatchPage = () => {
     try {
       const isTeamA = pendingGoalTeam === 'A';
       
-      // 1. Registrar no Supabase (se não for gol contra)
-      if (selectedScorer !== 'GOL_CONTRA') {
-        // Salvar GOL
-        await supabase.from('goals').insert({
-          player_id: selectedScorer,
+      // Registrar estatísticas no banco via Contexto (se houver um Baba ativo)
+      if (currentBaba?.id && selectedScorer !== 'GOL_CONTRA') {
+        await registerMatchStat({
           baba_id: currentBaba.id,
-          type: 'goal',
+          player_id: selectedScorer,
+          assister_id: (selectedAssister && selectedAssister !== 'SEM_ASSISTENCIA') ? selectedAssister : null,
           team: pendingGoalTeam
         });
-
-        // Salvar ASSISTÊNCIA
-        if (selectedAssister && selectedAssister !== 'SEM_ASSISTENCIA') {
-          await supabase.from('goals').insert({
-            player_id: selectedAssister,
-            baba_id: currentBaba.id,
-            type: 'assist',
-            team: pendingGoalTeam
-          });
-        }
       }
 
-      // 2. Atualizar Placar Visual
+      // Atualizar Placar Local
       setCurrentMatch(prev => ({
         ...prev,
         scoreA: isTeamA ? prev.scoreA + 1 : prev.scoreA,
         scoreB: !isTeamA ? prev.scoreB + 1 : prev.scoreB
       }));
 
-      toast.success("Placar atualizado!");
+      toast.success("GOL REGISTRADO!");
       setShowGoalModal(false);
       setSelectedScorer('');
       setSelectedAssister('');
 
-      // Regra de 2 gols
+      // Regra de "2 gols ganha" ou "morte súbita"
       const newScore = isTeamA ? currentMatch.scoreA + 1 : currentMatch.scoreB + 1;
       if (newScore >= 2) handleMatchEnd();
 
-    } catch (e) { toast.error("Erro ao salvar no banco"); }
+    } catch (e) { 
+      toast.error("Erro ao salvar estatísticas."); 
+    }
   };
 
   const handleMatchEnd = () => {
@@ -139,11 +133,13 @@ const MatchPage = () => {
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex justify-between items-center text-[10px] font-black opacity-40 uppercase">
           <button onClick={() => navigate('/home')}>← SAIR</button>
-          <span className="text-cyan-electric italic">MODO ADMIN: SALVANDO RANKING</span>
+          <span className="text-cyan-electric italic">
+            {currentBaba?.id ? `LOGADO EM: ${currentBaba.name}` : 'MODO VISITANTE'}
+          </span>
         </div>
 
         <div className="card-glass p-8 border border-white/10 text-center relative rounded-[2rem]">
-          <div className="text-6xl font-black mb-4 font-mono">{formatTime(timer)}</div>
+          <div className="text-6xl font-black mb-4 font-mono tracking-tighter">{formatTime(timer)}</div>
           <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
               <p className="text-[10px] font-black mb-2 text-cyan-electric uppercase truncate">{currentMatch?.teamA.name}</p>
@@ -155,7 +151,9 @@ const MatchPage = () => {
               <button onClick={() => openGoalModal('B')} className="text-6xl font-black w-full py-6 bg-white/5 rounded-3xl border border-white/10 active:scale-95 transition-all">{currentMatch?.scoreB}</button>
             </div>
           </div>
-          <button onClick={() => setIsActive(!isActive)} className={`mt-8 w-full py-4 rounded-2xl font-black text-xs tracking-[3px] transition-all ${isActive ? 'bg-red-500/20 text-red-500' : 'bg-cyan-electric text-black shadow-lg shadow-cyan-electric/20'}`}>{isActive ? 'PAUSAR JOGO' : 'INICIAR JOGO'}</button>
+          <button onClick={() => setIsActive(!isActive)} className={`mt-8 w-full py-4 rounded-2xl font-black text-xs tracking-[3px] transition-all ${isActive ? 'bg-red-500/20 text-red-500' : 'bg-cyan-electric text-black shadow-lg shadow-cyan-electric/20'}`}>
+            {isActive ? 'PAUSAR JOGO' : 'INICIAR JOGO'}
+          </button>
         </div>
 
         {/* MODAL DE REGISTRO */}
@@ -168,16 +166,18 @@ const MatchPage = () => {
                   <label className="text-[10px] font-black opacity-30 uppercase ml-2">Artilheiro</label>
                   <select value={selectedScorer} onChange={(e) => setSelectedScorer(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl mt-1 text-sm font-bold text-white outline-none focus:border-cyan-electric">
                     <option value="">Selecione o jogador...</option>
-                    {playersList?.map(p => <option key={p.id} value={p.id} className="bg-black">{p.name}</option>)}
+                    {playersList?.map(p => <option key={p.id || p.name} value={p.id || p.name} className="bg-black">{p.name}</option>)}
                     <option value="GOL_CONTRA" className="bg-black text-red-500">⚽ GOL CONTRA</option>
                   </select>
                 </div>
-                {selectedScorer !== 'GOL_CONTRA' && (
+                {selectedScorer && selectedScorer !== 'GOL_CONTRA' && (
                   <div>
                     <label className="text-[10px] font-black opacity-30 uppercase ml-2">Assistência</label>
                     <select value={selectedAssister} onChange={(e) => setSelectedAssister(e.target.value)} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl mt-1 text-sm font-bold text-white outline-none">
                       <option value="SEM_ASSISTENCIA">SEM ASSISTÊNCIA</option>
-                      {playersList?.filter(p => p.id !== selectedScorer).map(p => <option key={p.id} value={p.id} className="bg-black">{p.name}</option>)}
+                      {playersList?.filter(p => (p.id || p.name) !== selectedScorer).map(p => (
+                        <option key={p.id || p.name} value={p.id || p.name} className="bg-black">{p.name}</option>
+                      ))}
                     </select>
                   </div>
                 )}
