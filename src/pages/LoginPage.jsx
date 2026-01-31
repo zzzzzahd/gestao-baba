@@ -130,10 +130,15 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div className="mt-8 text-center text-xs opacity-50 text-white">
-          <p>Gestão profissional de peladas</p>
-          <p className="mt-1">v2.0.0 - 2026</p>
-        </div>
+        <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-white/10"></span>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
+              <span className="bg-black px-4 text-white/30">Draft Baba System</span>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
