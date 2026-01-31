@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
-import { supabase, TABLES } from '../services/supabase';
 import ShareableCardModal from '../components/ShareableCardModal';
 
 const RankingsPage = () => {
   const navigate = useNavigate();
-  const { currentBaba } = useBaba();
+  const { currentBaba, getRankings } = useBaba(); // Centralizando a busca no Contexto
   const [period, setPeriod] = useState('month'); // 'month' ou 'year'
   const [rankings, setRankings] = useState({
     goals: [],
@@ -26,26 +25,13 @@ const RankingsPage = () => {
   const loadRankings = async () => {
     try {
       setLoading(true);
-      const goalField = period === 'month' ? 'total_goals_month' : 'total_goals_year';
-      const assistField = period === 'month' ? 'total_assists_month' : 'total_assists_year';
-
-      const { data: goalsData } = await supabase
-        .from(TABLES.PLAYERS)
-        .select('name, position, avatar_url, ' + goalField)
-        .eq('baba_id', currentBaba.id)
-        .order(goalField, { ascending: false })
-        .limit(10);
-
-      const { data: assistsData } = await supabase
-        .from(TABLES.PLAYERS)
-        .select('name, position, avatar_url, ' + assistField)
-        .eq('baba_id', currentBaba.id)
-        .order(assistField, { ascending: false })
-        .limit(10);
-
+      // Chamamos a função centralizada que injetaremos no BabaContext
+      // Ela retornará os dados já filtrados e ordenados
+      const data = await getRankings(currentBaba.id, period);
+      
       setRankings({
-        goals: goalsData || [],
-        assists: assistsData || []
+        goals: data.goals || [],
+        assists: data.assists || []
       });
     } catch (error) {
       console.error('Erro ao carregar rankings:', error);
@@ -77,12 +63,12 @@ const RankingsPage = () => {
   }
 
   return (
-    <div className="min-h-screen p-5 bg-black text-white pb-24">
+    <div className="min-h-screen p-5 bg-black text-white pb-24 font-sans">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <button onClick={() => navigate('/home')} className="text-cyan-electric hover:text-white transition-colors">
-            <i className="fas fa-arrow-left text-xl mr-3"></i>
+          <button onClick={() => navigate('/home')} className="text-cyan-electric hover:text-white transition-colors group">
+            <i className="fas fa-arrow-left text-xl mr-3 group-hover:-translate-x-1 transition-transform"></i>
             <span className="font-black italic uppercase tracking-tighter">{currentBaba?.name}</span>
           </button>
           
@@ -96,7 +82,7 @@ const RankingsPage = () => {
         </div>
 
         {/* Title */}
-        <h1 className="text-4xl font-black text-center mb-8 text-cyan-electric italic italic">
+        <h1 className="text-4xl font-black text-center mb-8 text-cyan-electric italic">
           <i className="fas fa-trophy mr-3"></i>
           RANKINGS
         </h1>
@@ -134,16 +120,22 @@ const RankingsPage = () => {
               <div key={index} className="flex items-center justify-between bg-white/5 p-4 rounded-3xl border border-white/5 hover:border-cyan-electric/30 transition-all group">
                 <div className="flex items-center gap-4">
                   <i className={`fas ${getMedalIcon(index)} ${getMedalColor(index)} text-xl w-6 text-center`}></i>
-                  <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-gray-900">
-                    <img src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}`} className="w-full h-full object-cover" />
+                  <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-gray-900 shadow-inner">
+                    <img 
+                      src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}&background=0D0D0D&color=fff`} 
+                      className="w-full h-full object-cover" 
+                      alt={player.name}
+                    />
                   </div>
                   <div>
-                    <p className="font-black italic uppercase text-sm">{player.name}</p>
+                    <p className="font-black italic uppercase text-sm tracking-tighter">{player.name}</p>
                     <p className="text-[8px] font-bold text-cyan-electric opacity-50 uppercase">{player.position}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-black italic text-cyan-electric">{period === 'month' ? player.total_goals_month : player.total_goals_year}</p>
+                  <p className="text-2xl font-black italic text-cyan-electric">
+                    {period === 'month' ? player.total_goals_month : player.total_goals_year}
+                  </p>
                   <p className="text-[7px] font-black opacity-30 uppercase tracking-tighter">GOLS</p>
                 </div>
               </div>
@@ -166,15 +158,21 @@ const RankingsPage = () => {
                 <div className="flex items-center gap-4">
                   <i className={`fas ${getMedalIcon(index)} ${getMedalColor(index)} text-xl w-6 text-center`}></i>
                   <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-gray-900">
-                    <img src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}`} className="w-full h-full object-cover" />
+                    <img 
+                        src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}&background=0D0D0D&color=fff`} 
+                        className="w-full h-full object-cover" 
+                        alt={player.name}
+                    />
                   </div>
                   <div>
-                    <p className="font-black italic uppercase text-sm">{player.name}</p>
+                    <p className="font-black italic uppercase text-sm tracking-tighter">{player.name}</p>
                     <p className="text-[8px] font-bold text-green-neon opacity-50 uppercase">{player.position}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-black italic text-green-neon">{period === 'month' ? player.total_assists_month : player.total_assists_year}</p>
+                  <p className="text-2xl font-black italic text-green-neon">
+                    {period === 'month' ? player.total_assists_month : player.total_assists_year}
+                  </p>
                   <p className="text-[7px] font-black opacity-30 uppercase tracking-tighter">ASSISTS</p>
                 </div>
               </div>
@@ -183,12 +181,11 @@ const RankingsPage = () => {
         </div>
       </div>
 
-      {/* MODAL DE COMPARTILHAMENTO */}
       <ShareableCardModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         rankingType="Top Jogadores"
-        rankingData={rankings.goals} // Enviamos os artilheiros como padrão para o card
+        rankingData={rankings.goals} 
         babaName={currentBaba?.name || "MEU BABA"}
       />
     </div>
