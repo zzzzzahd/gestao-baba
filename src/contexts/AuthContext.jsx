@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
-const AuthContext = createContext({});
+const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -17,30 +17,44 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Verifica sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // 🔒 PROTEÇÃO CRÍTICA
+    if (!supabase) {
+      console.warn('Supabase não disponível. Auth desativado.');
+      setLoading(false);
+      return;
+    }
+
+    // Sessão atual
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data?.session?.user ?? null);
       setLoading(false);
     });
 
-    // Escuta mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listener de auth
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email, password, metadata = {}) => {
+    if (!supabase) {
+      toast.error('Serviço de autenticação indisponível');
+      return { data: null, error: 'Supabase indisponível' };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: metadata
-        }
+        options: { data: metadata }
       });
-      
+
       if (error) throw error;
       toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
@@ -51,12 +65,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signIn = async (email, password) => {
+    if (!supabase) {
+      toast.error('Serviço de autenticação indisponível');
+      return { data: null, error: 'Supabase indisponível' };
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-      
+
       if (error) throw error;
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
@@ -67,6 +86,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
+    if (!supabase) return;
+
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
