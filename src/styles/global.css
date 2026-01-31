@@ -12,97 +12,77 @@
   --text-white: #ffffff;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    @apply margin-0 padding-0 box-border;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-body {
-  background-color: var(--bg-dark);
-  color: var(--text-white);
-  background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
-  background-size: 30px 30px;
-  min-height: 100vh;
-  font-family: 'Rajdhani', sans-serif;
-  overflow-x: hidden;
-}
-
-/* Scrollbar personalizada */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--cyan-electric);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--green-neon);
+  body {
+    @apply min-h-screen overflow-x-hidden antialiased;
+    background-color: var(--bg-dark);
+    color: var(--text-white);
+    background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+    background-size: 30px 30px;
+    font-family: 'Rajdhani', sans-serif;
+  }
 }
 
 @layer components {
-  .btn-primary {
-    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
-    background: var(--cyan-electric);
-    color: #000;
-    box-shadow: 0 4px 15px rgba(0, 242, 255, 0.3);
-  }
-  
-  .btn-primary:hover {
-    box-shadow: 0 6px 25px rgba(0, 242, 255, 0.5);
-    transform: translateY(-2px);
-  }
-  
-  .btn-secondary {
-    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
-    background: transparent;
-    border: 1px solid var(--green-neon);
-    color: var(--green-neon);
-  }
-  
-  .btn-secondary:hover {
-    background: rgba(57, 255, 20, 0.1);
-  }
-  
-  .btn-visitor {
-    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
-    background: var(--card-glass);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
-  .btn-danger {
-    @apply w-full px-6 py-4 rounded-xl font-bold uppercase transition-all duration-200;
-    background: rgba(255, 68, 68, 0.1);
-    color: #ff4444;
-    border: 1px solid rgba(255, 68, 68, 0.3);
-  }
-  
+  /* Cards Estilo Vidro */
   .card-glass {
     background: var(--card-glass);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
+    @apply border border-white/10 rounded-[1.5rem] backdrop-blur-md shadow-lg;
   }
-  
+
+  /* Inputs Táticos */
   .input-tactical {
-    @apply w-full px-4 py-3 rounded-lg bg-transparent border border-cyan-electric/30 text-white outline-none;
-    transition: all 0.2s;
+    @apply w-full px-5 py-4 rounded-2xl bg-white/5 border border-cyan-electric/20 
+           text-white outline-none transition-all duration-200 font-tactical;
   }
-  
+
   .input-tactical:focus {
-    border-color: var(--cyan-electric);
-    box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+    @apply border-cyan-electric shadow-[0_0_15px_rgba(0,242,255,0.2)];
+  }
+
+  /* Botão Primário Neon */
+  .btn-primary {
+    @apply w-full px-6 py-4 rounded-2xl font-black uppercase italic tracking-tighter 
+           transition-all duration-300 flex items-center justify-center gap-2;
+    background: var(--cyan-electric);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  }
+
+  .btn-primary:hover {
+    @apply scale-[1.02];
+    box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  }
+
+  /* Botão Secundário Neon */
+  .btn-secondary {
+    @apply w-full px-6 py-4 rounded-2xl font-black uppercase italic tracking-tighter 
+           transition-all duration-300 border flex items-center justify-center gap-2;
+    border-color: var(--green-neon);
+    color: var(--green-neon);
+    background: transparent;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(57, 255, 20, 0.1);
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
   }
 }
 
-/* Animações */
+/* Utilitários de Animação Forwards (Impede o elemento de sumir após animar) */
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideInUp 0.5s ease-out forwards;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -111,7 +91,7 @@ body {
 @keyframes slideInUp {
   from { 
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(20px);
   }
   to { 
     opacity: 1;
@@ -119,10 +99,14 @@ body {
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+/* Scrollbar Futurista */
+::-webkit-scrollbar {
+  width: 6px;
 }
-
-.animate-slide-in {
-  animation: slideInUp 0.4s ease-out;
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cyan-electric);
+  border-radius: 10px;
 }
