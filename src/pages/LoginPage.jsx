@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth(); // Funções centralizadas no AuthContext
+  const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -21,27 +21,27 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
-        // O Contexto cuida do supabase.auth.signIn
+        // Realiza o Login
         const { error } = await signIn(formData.email, formData.password);
         if (error) throw error;
         
-        toast.success("Bem-vindo de volta!");
         navigate('/dashboard');
       } else {
-        // O Contexto cuida do supabase.auth.signUp
+        // Realiza o Cadastro
         const { error } = await signUp(formData.email, formData.password, {
           name: formData.name
         });
         
         if (error) throw error;
 
-        toast.success("Conta criada! Agora faça o login.");
+        toast.success("Conta criada! Agora você pode entrar.");
         setIsLogin(true);
         setFormData({ email: '', password: '', name: '' });
       }
     } catch (err) {
-      // Tratamento amigável de erro
-      toast.error(err.message || "Falha na autenticação");
+      const message = err.message || "Erro ao processar solicitação";
+      toast.error(message === "Invalid login credentials" ? "Email ou senha incorretos" : message);
+      console.error("Auth Error:", err);
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ const LoginPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4 animate-slide-in">
           {!isLogin && (
-            <div>
+            <div className="animate-fade-in">
               <input
                 type="text"
                 name="name"
@@ -104,12 +104,14 @@ const LoginPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary"
+            className="btn-primary flex items-center justify-center gap-2"
           >
             {loading ? (
-              <i className="fas fa-spinner fa-spin"></i>
+              <span className="flex items-center gap-2">
+                <i className="fas fa-spinner fa-spin"></i> PROCESSANDO...
+              </span>
             ) : (
-              isLogin ? 'ENTRAR' : 'CRIAR CONTA'
+              isLogin ? 'ENTRAR NO BABA' : 'CRIAR MINHA CONTA'
             )}
           </button>
 
@@ -118,19 +120,10 @@ const LoginPage = () => {
             onClick={() => setIsLogin(!isLogin)}
             className="btn-secondary"
           >
-            {isLogin ? 'CRIAR NOVA CONTA' : 'JÁ TENHO CONTA'}
+            {isLogin ? 'NÃO TENHO CONTA (CRIAR AGORA)' : 'JÁ TENHO CONTA (FAZER LOGIN)'}
           </button>
 
-          <button
-            type="button"
-            onClick={() => navigate('/visitor-match')} // Ajustado para bater com sua LandingPage
-            className="btn-visitor"
-          >
-            MODO VISITANTE
-          </button>
-        </form>
-
-        <div className="relative py-4">
+          <div className="relative py-4">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-white/10"></span>
             </div>
