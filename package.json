@@ -1,6 +1,6 @@
 {
   "name": "gestao-baba",
-   "private": true,
+  "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -16,7 +16,10 @@
     "@supabase/supabase-js": "^2.39.0",
     "date-fns": "^3.0.0",
     "qrcode.react": "^3.1.0",
-    "react-hot-toast": "^2.4.1"
+    "react-hot-toast": "^2.4.1",
+    "lucide-react": "^0.294.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -26,6 +29,5 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "vite": "^5.0.8"
-    
   }
 }
