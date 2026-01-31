@@ -1,23 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 
-// As variáveis de ambiente são carregadas automaticamente pelo Vite
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Se as variáveis não existirem, o cliente não será criado corretamente, 
-// o que causaria a tela branca. Adicionei uma proteção simples aqui.
+let supabase = null;
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("ERRO: Variáveis de ambiente do Supabase não encontradas!");
+  console.error(
+    'Supabase não inicializado: variáveis de ambiente ausentes'
+  );
+} else {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export { supabase };
 
-// Lista atualizada com TODAS as tabelas que vi no seu print do Supabase
 export const TABLES = {
   BABAS: 'babas',
   USERS: 'users',
-  PROFILES: 'profiles',         // Adicionado conforme seu print
-  OFFICIAL_TEAMS: 'official_teams', // Adicionado conforme seu print
+  PROFILES: 'profiles',
+  OFFICIAL_TEAMS: 'official_teams',
   PLAYERS: 'players',
   MATCHES: 'matches',
   MATCH_PLAYERS: 'match_players',
@@ -27,4 +29,3 @@ export const TABLES = {
   PAYMENTS: 'payments',
   PRESENCES: 'presences'
 };
-
