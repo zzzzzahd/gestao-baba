@@ -18,12 +18,13 @@ import MatchPage from './pages/MatchPage'; // Versão ADM
 import MatchPageVisitor from './pages/MatchPageVisitor'; // Versão Visitante
 import PlayersPage from './pages/PlayersPage';
 import TeamsPage from './pages/TeamsPage';
+// Se você tiver a página onde cria os babas, importe-a aqui. 
+// Exemplo: import DashboardPage from './pages/DashboardPage';
 
 function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        {/* Toaster gerencia os avisos flutuantes de erro/sucesso */}
         <Toaster position="top-center" reverseOrder={false} />
         
         <Routes>
@@ -33,7 +34,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
-          {/* Rotas Protegidas (Só entra logado) */}
+          {/* Rotas Protegidas */}
           <Route path="/home" element={
             <ProtectedRoute><HomePage /></ProtectedRoute>
           } />
@@ -58,7 +59,23 @@ function App() {
             <ProtectedRoute><MatchPage /></ProtectedRoute>
           } />
 
-          {/* Redirecionamento para 404 ou Home */}
+          {/* NOVA ROTA DE EDIÇÃO: 
+              Ela usa o mesmo componente que você usa para criar Babas, 
+              mas passando o ID na URL */}
+          <Route path="/edit-baba/:id" element={
+            <ProtectedRoute>
+               {/* Aqui você deve colocar a página que cria o Baba. 
+                   Se ainda não criou uma página separada, pode apontar para o seu Dashboard */}
+               <div className="bg-black min-h-screen text-white p-10">Página de Edição (Em construção)</div>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <div className="bg-black min-h-screen text-white p-10">Página de Criação/Dashboard</div>
+            </ProtectedRoute>
+          } />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BabaProvider>
