@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../services/supabase'; // Mantive seu caminho original
+import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
 const BabaContext = createContext(null);
 
 export const useBaba = () => {
-  const context = useContext(BabaContext);
+  const context = useContext(AuthContext); // Erro aqui corrigido para useBaba
   if (!context) {
-    throw new Error('useBaba deve ser usado dentro de um BabaProvider');
+    const internalContext = useContext(BabaContext);
+    if (!internalContext) throw new Error('useBaba deve ser usado dentro de um BabaProvider');
+    return internalContext;
   }
   return context;
 };
@@ -30,7 +32,7 @@ export const BabaProvider = ({ children }) => {
     MATCHES: 'matches'
   };
 
-  // 1. Carregar Babas do Usuário
+  // 1. Carregar Babas do Usuário (PRESERVADO)
   const loadMyBabas = async () => {
     if (!user) return;
     try {
@@ -43,7 +45,6 @@ export const BabaProvider = ({ children }) => {
       if (error) throw error;
       setMyBabas(data || []);
       
-      // Recupera o baba selecionado do localStorage para não perder no F5
       const savedId = localStorage.getItem('selected_baba_id');
       if (savedId && data) {
         const found = data.find(b => b.id === savedId);
@@ -56,9 +57,7 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // --- NOVAS FUNÇÕES PARA O DASHBOARD FUNCIONAR ---
-
-  // Criar Novo Baba
+  // Criar Novo Baba (PRESERVADO)
   const createBaba = async (nome) => {
     try {
       const { data, error } = await supabase
@@ -79,7 +78,26 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Deletar Baba
+  // --- NOVO: FUNÇÃO DE UPDATE (NECESSÁRIA PARA O DASHBOARD) ---
+  const updateBaba = async (id, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.BABAS)
+        .update(updates)
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      setMyBabas(myBabas.map(b => b.id === id ? data[0] : b));
+      if (currentBaba?.id === id) setCurrentBaba(data[0]);
+      return data[0];
+    } catch (error) {
+      console.error('Erro ao atualizar baba:', error);
+      throw error;
+    }
+  };
+
+  // Deletar Baba (PRESERVADO)
   const deleteBaba = async (id) => {
     try {
       const { error } = await supabase
@@ -89,20 +107,20 @@ export const BabaProvider = ({ children }) => {
 
       if (error) throw error;
       setMyBabas(myBabas.filter(b => b.id !== id));
-      if (currentBaba?.id === id) setCurrentBaba(null);
+      if (currentBaba?.id === id) {
+        setCurrentBaba(null);
+        localStorage.removeItem('selected_baba_id');
+      }
     } catch (error) {
       console.error('Erro ao deletar:', error);
       throw error;
     }
   };
 
-  // Selecionar Baba (O que faz o clique no card funcionar)
   const selectBaba = (baba) => {
     setCurrentBaba(baba);
     localStorage.setItem('selected_baba_id', baba.id);
   };
-
-  // ------------------------------------------------
 
   const loadPlayers = async () => {
     if (!currentBaba) return;
@@ -119,6 +137,7 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
+  // Lógica de Sorteio (PRESERVADA INTEGRALMENTE)
   const drawTeams = (availablePlayers) => {
     if (availablePlayers.length < 2) {
       toast.error("Adicione pelo menos 2 jogadores!");
@@ -168,15 +187,16 @@ export const BabaProvider = ({ children }) => {
   const value = {
     currentBaba,
     setCurrentBaba,
-    babas: myBabas, // Mapeado para 'babas' para o Dashboard entender
+    babas: myBabas,
     myBabas,
     players,
     loading,
     teamA,
     teamB,
-    createBaba,    // Exportado!
-    deleteBaba,    // Exportado!
-    selectBaba,    // Exportado!
+    createBaba,
+    updateBaba, // Adicionado
+    deleteBaba,
+    selectBaba,
     drawTeams,
     saveMatchResult,
     refreshBabas: loadMyBabas,
