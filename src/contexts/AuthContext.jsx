@@ -15,10 +15,16 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 1. BUSCA DE PERFIL (RECUPERADO)
   const fetchProfile = async (userId) => {
     if (!userId) return;
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
       if (error) throw error;
       if (data) setProfile(data);
     } catch (error) {
@@ -52,7 +58,7 @@ export function AuthProvider({ children }) {
         
         if (currentUser) {
           await fetchProfile(currentUser.id);
-          // Redirecionamento forçado para vencer o erro 404 da Vercel
+          // VACINA CONTRA 404 DA VERCEL
           if (event === 'SIGNED_IN' && window.location.pathname.includes('/login')) {
             window.location.replace('/dashboard');
           }
@@ -69,30 +75,82 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // --- MANTENDO TODAS AS SUAS FUNÇÕES ORIGINAIS ---
+  // 2. UPLOAD DE AVATAR (RECUPERADO - ESTAVA REMOVIDO)
   const uploadAvatar = async (file) => {
     try {
+      if (!user) throw new Error('Usuário não autenticado');
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
       return { url: publicUrl, error: null };
-    } catch (error) { return { url: null, error }; }
+    } catch (error) {
+      toast.error('Erro no upload: ' + error.message);
+      return { url: null, error };
+    }
   };
 
+  // 3. ATUALIZAÇÃO DE PERFIL (RECUPERADO - ESTAVA REMOVIDO)
   const updateProfile = async (updates) => {
     try {
-      const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...updates, updated_at: new Date().toISOString() }).select().single();
+      if (!user) throw new Error('Sessão inválida');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
       if (error) throw error;
       setProfile(data);
       toast.success('Perfil atualizado!');
       return { data, error: null };
-    } catch (error) { return { data: null, error }; }
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
   };
 
+  // 4. LOGIN E CADASTRO (COM TRATAMENTO DE ERRO DETALHADO)
   const signIn = async (email, password) => {
-    return await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      const msg = error.message === 'Invalid login credentials' ? 'Email ou senha incorretos' : error.message;
+      toast.error(msg);
+      return { data: null, error };
+    }
+  };
+
+  const signUp = async (email, password, metadata = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email, password, options: { data: metadata }
+      });
+      if (error) throw error;
+      toast.success('Verifique seu e-mail!');
+      return { data, error: null };
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
   };
 
   const signOut = async () => {
@@ -100,9 +158,17 @@ export function AuthProvider({ children }) {
     window.location.assign('/');
   };
 
-  return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, updateProfile, uploadAvatar, refreshProfile: () => fetchProfile(user?.id) }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    profile,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    uploadAvatar,
+    refreshProfile: () => fetchProfile(user?.id)
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
