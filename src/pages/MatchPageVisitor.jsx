@@ -136,7 +136,7 @@ const MatchPageVisitor = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-5 font-sans">
+    <div className="min-h-screen bg-black text-white p-5 font-sans pb-20">
       <div className="max-w-md mx-auto space-y-6">
         
         {/* Header */}
@@ -272,8 +272,35 @@ const MatchPageVisitor = () => {
           )}
         </div>
 
+        {/* --- NOVA SEÇÃO: LISTA DE TODOS OS TIMES --- */}
+        <div className="space-y-4 pt-4 border-t border-white/5">
+          <h3 className="text-[10px] font-black opacity-30 italic px-2 uppercase tracking-[0.2em]">
+            Escalações de todos os times:
+          </h3>
+          <div className="grid grid-cols-1 gap-4">
+            {allTeams.map((team, idx) => (
+              <div key={idx} className="card-glass p-5 rounded-[2rem] border border-white/5">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-black uppercase text-white/80 italic">{team.name}</span>
+                  <span className="text-[8px] font-bold opacity-30 tracking-widest uppercase">
+                    {idx === 0 || idx === 1 ? 'Em Campo' : idx === 2 ? 'Próximo' : 'Na Fila'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {team.players.map((p, i) => (
+                    <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
+                      <div className={`w-1 h-1 rounded-full ${p.position === 'goleiro' ? 'bg-green-500' : 'bg-white/20'}`}></div>
+                      <span className="text-[9px] font-bold uppercase opacity-60 tracking-tighter">{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Regras */}
-        <div className="text-center text-[9px] opacity-20 uppercase font-black tracking-wider">
+        <div className="text-center text-[9px] opacity-20 uppercase font-black tracking-wider pt-6 pb-10">
           <p>Regras: 2 Gols ou 10 Minutos</p>
           <p className="mt-1">Quem Ganha Fica • Empate Sai os Dois</p>
         </div>
