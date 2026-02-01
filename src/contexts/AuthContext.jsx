@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
         setUser(currentUser);
         if (currentUser) await fetchProfile(currentUser.id);
       } finally {
+        // PONTO CRÍTICO 1: Garante que o app saiba que a checagem inicial acabou
         if (mounted) setLoading(false);
       }
     }
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
           setProfile(null);
         }
 
+        // PONTO CRÍTICO 2: Libera o estado de carregamento após qualquer mudança de auth
         setLoading(false);
       }
     );
