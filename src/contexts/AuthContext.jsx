@@ -2,11 +2,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
+// Exportação nomeada para evitar ReferenceError
 export const AuthContext = createContext(null);
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
   return context;
 }
 
@@ -23,6 +26,7 @@ export function AuthProvider({ children }) {
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+      
       if (data) setProfile(data);
     } catch (error) {
       console.error('Erro ao buscar perfil:', error.message);
@@ -36,9 +40,15 @@ export function AuthProvider({ children }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
+
         const currentUser = session?.user || null;
         setUser(currentUser);
-        if (currentUser) await fetchProfile(currentUser.id);
+
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        }
+      } catch (error) {
+        console.error('Erro na inicialização:', error);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -51,12 +61,12 @@ export function AuthProvider({ children }) {
         if (!mounted) return;
         const currentUser = session?.user || null;
         setUser(currentUser);
-        
+
         if (currentUser) {
           await fetchProfile(currentUser.id);
-          // CORREÇÃO DO 404: Se logou e está preso na tela de login, força a entrada
+          // Redirecionamento forçado para garantir que saia da tela de login
           if (event === 'SIGNED_IN' && window.location.pathname.includes('/login')) {
-             window.location.assign('/dashboard');
+            window.location.assign('/dashboard');
           }
         } else {
           setProfile(null);
@@ -71,10 +81,9 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // RESTAURADO: Função de Upload de Imagem
   const uploadAvatar = async (file) => {
     try {
-      if (!user) throw new Error('Usuário não autenticado');
+      if (!user) throw new Error('Não autenticado');
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
@@ -89,7 +98,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // RESTAURADO: Função de Atualização de Dados
   const updateProfile = async (updates) => {
     try {
       if (!user) throw new Error('Não autenticado');
@@ -124,7 +132,7 @@ export function AuthProvider({ children }) {
         email, password, options: { data: metadata }
       });
       if (error) throw error;
-      toast.success('Conta criada com sucesso!');
+      toast.success('Verifique seu email!');
       return { data, error: null };
     } catch (error) {
       toast.error(error.message);
@@ -137,11 +145,21 @@ export function AuthProvider({ children }) {
     window.location.assign('/');
   };
 
-  const value = { 
-    user, profile, loading, signIn, signUp, signOut, 
-    updateProfile, uploadAvatar, 
-    refreshProfile: () => fetchProfile(user?.id) 
+  const value = {
+    user,
+    profile,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    uploadAvatar,
+    refreshProfile: () => fetchProfile(user?.id)
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
