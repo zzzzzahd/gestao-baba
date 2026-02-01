@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { useAuth } from '../contexts/AuthContext'; // Necessário para o ProtectedRoute saber que logou
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { refreshProfile } = useAuth(); // Apenas para atualizar o estado global após o login
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -14,7 +16,7 @@ const LoginPage = () => {
     name: ''
   });
 
-  // Funções de autenticação LOCAIS (sem usar useAuth)
+  // --- FUNÇÕES DE AUTENTICAÇÃO LOCAIS (PRESERVADAS INTEGRALMENTE) ---
   const handleSignIn = async (email, password) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -50,11 +52,14 @@ const LoginPage = () => {
     try {
       if (isLogin) {
         // LOGIN
-        const { error } = await handleSignIn(formData.email, formData.password);
+        const { data, error } = await handleSignIn(formData.email, formData.password);
         if (error) throw error;
         
-        // Redireciona para dashboard
-        navigate('/dashboard');
+        // Sincroniza o contexto global antes de navegar para não travar no "Loading"
+        if (data?.user) {
+          await refreshProfile(); 
+          navigate('/dashboard');
+        }
       } else {
         // CRIAR CONTA
         const { error } = await handleSignUp(
@@ -104,6 +109,7 @@ const LoginPage = () => {
             <input
               type="text"
               name="name"
+              autoComplete="name"
               placeholder="Nome completo"
               value={formData.name}
               onChange={handleChange}
@@ -116,6 +122,7 @@ const LoginPage = () => {
           <input
             type="email"
             name="email"
+            autoComplete="email"
             placeholder="Email"
             value={formData.email}
             onChange={handleChange}
@@ -127,6 +134,7 @@ const LoginPage = () => {
           <input
             type="password"
             name="password"
+            autoComplete={isLogin ? "current-password" : "new-password"}
             placeholder="Senha"
             value={formData.password}
             onChange={handleChange}
