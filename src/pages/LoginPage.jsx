@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  // SUBSTITUIÇÃO: Usamos o signIn/signUp do contexto para evitar que o formulário dê erro 404
   const { signIn, signUp } = useAuth(); 
   
   const [isLogin, setIsLogin] = useState(true);
@@ -18,24 +17,32 @@ const LoginPage = () => {
   });
 
   const handleSubmit = async (e) => {
-    // IMPORTANTE: preventDefault evita o erro 404 mostrado no seu print
-    e.preventDefault();
+    // Garantia dupla contra recarregamento e erro 404
+    if (e && e.preventDefault) e.preventDefault();
     if (loading) return;
+
+    // Validação Manual (Substituindo o 'required' nativo)
+    if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
+      toast.error("Preencha todos os campos corretamente");
+      return;
+    }
     
     setLoading(true);
 
     try {
       if (isLogin) {
-        // SUBSTITUIÇÃO: Chamada direta ao contexto para validar a sessão globalmente
-        const { error } = await signIn(formData.email, formData.password);
+        const { error, data } = await signIn(formData.email, formData.password);
         
         if (error) {
           setLoading(false);
           return;
         }
         
-        // Se logou, redirecionamos para a dashboard
-        navigate('/dashboard');
+        // Pequena pausa para garantir que a sessão foi gravada no navegador
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 600);
+
       } else {
         const { error } = await signUp(
           formData.email, 
@@ -52,7 +59,7 @@ const LoginPage = () => {
         setFormData({ email: '', password: '', name: '' });
       }
     } catch (err) {
-      console.error('Erro no Submit:', err);
+      console.error('Erro crítico no login:', err);
       setLoading(false);
     }
   };
@@ -71,7 +78,8 @@ const LoginPage = () => {
           <Logo size="large" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* MUDANÇA: Usando div em vez de form para matar o erro 404 de vez */}
+        <div className="space-y-4">
           {!isLogin && (
             <input
               type="text"
@@ -80,7 +88,6 @@ const LoginPage = () => {
               placeholder="Nome completo"
               value={formData.name}
               onChange={handleChange}
-              required
               className="input-tactical"
             />
           )}
@@ -92,7 +99,6 @@ const LoginPage = () => {
             placeholder="Email"
             value={formData.email}
             onChange={handleChange}
-            required
             className="input-tactical"
           />
 
@@ -103,13 +109,12 @@ const LoginPage = () => {
             placeholder="Senha"
             value={formData.password}
             onChange={handleChange}
-            required
-            minLength={6}
             className="input-tactical"
           />
 
           <button
-            type="submit"
+            type="button" // IMPORTANTE: type="button" não dispara reload
+            onClick={handleSubmit}
             disabled={loading}
             className="btn-primary flex items-center justify-center gap-2"
           >
@@ -138,7 +143,7 @@ const LoginPage = () => {
           >
             ← Voltar para Início
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );
