@@ -17,8 +17,8 @@ const DashboardPage = () => {
   const [newBaba, setNewBaba] = useState({ name: '', modality: 'futsal', is_private: false, game_time: '20:00' });
 
   // --- A TRAVA ANTI-TIMEOUT ---
-  // Se o contexto está carregando, mostramos essa tela. 
-  // Isso impede o erro de "Timeout" que você viu no console.
+  // Se o contexto ainda está buscando o perfil (Zharick Dias), 
+  // mostramos o loading aqui para o ProtectedRoute não quebrar.
   if (!auth || auth.loading || !babaCtx) {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center font-tactical">
@@ -35,7 +35,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (id && babas) {
-      const editTarget = babas.find(b => b.id === id);
+      const editTarget = babas.find(b => (b.id === id || b.uuid === id));
       if (editTarget) {
         setNewBaba({
           name: editTarget.nome || editTarget.name || '',
@@ -54,27 +54,27 @@ const DashboardPage = () => {
     try {
       if (isEditing) {
         await updateBaba(id, newBaba);
-        toast.success("Atualizado!");
+        toast.success("Baba atualizado!");
         navigate('/dashboard');
       } else {
         await createBaba(newBaba.name);
-        toast.success("Criado!");
+        toast.success("Novo baba criado!");
       }
       setShowCreateModal(false);
       setIsEditing(false);
       setNewBaba({ name: '', modality: 'futsal', is_private: false, game_time: '20:00' });
       if (refreshBabas) refreshBabas();
     } catch (err) {
-      toast.error("Erro na operação");
+      toast.error("Falha na operação técnica");
     }
   };
 
   const handleDelete = async (e, babaId) => {
     e.stopPropagation();
-    if (window.confirm("Deseja excluir este Baba?")) {
+    if (window.confirm("Confirmar exclusão definitiva?")) {
       try {
         await deleteBaba(babaId);
-        toast.success("Removido!");
+        toast.success("Registro removido");
       } catch (error) {
         toast.error("Erro ao excluir");
       }
@@ -92,21 +92,21 @@ const DashboardPage = () => {
           </button>
         </div>
 
-        {/* Card de Identificação */}
+        {/* Card de Perfil */}
         <div className="card-glass p-6 mb-8 rounded-3xl border border-white/5 flex items-center justify-between shadow-2xl">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center overflow-hidden">
               {profile?.avatar_url ? (
-                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="Perfil" />
               ) : (
                 <User className="text-cyan-electric" size={24} />
               )}
             </div>
             <div>
               <h2 className="text-lg font-black italic uppercase tracking-tighter">
-                {profile?.name || user?.user_metadata?.full_name || 'Comandante'}
+                {profile?.name || user?.user_metadata?.name || 'Comandante'}
               </h2>
-              <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">{user?.email}</p>
+              <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em]">{user?.email}</p>
             </div>
           </div>
           <button onClick={() => navigate('/profile')} className="p-3 bg-white/5 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all border border-white/5">
@@ -119,7 +119,7 @@ const DashboardPage = () => {
         </h1>
 
         {loading ? (
-          <div className="text-center py-20 animate-pulse">
+          <div className="text-center py-20">
             <Loader2 className="animate-spin text-cyan-electric mx-auto" size={40} />
           </div>
         ) : (
@@ -144,17 +144,17 @@ const DashboardPage = () => {
             
             <button 
               onClick={() => { setIsEditing(false); setShowCreateModal(true); }} 
-              className="w-full bg-white/5 border border-white/10 py-8 rounded-3xl font-black uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-cyan-electric/5 hover:border-cyan-electric/20 transition-all"
+              className="w-full bg-white/5 border border-white/10 py-8 rounded-3xl font-black uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-cyan-electric/5 hover:border-cyan-electric/20 transition-all active:scale-95"
             >
-              <Plus className="text-cyan-electric" size={16} strokeWidth={3} /> ADICIONAR NOVO PROJETO
+              <Plus className="text-cyan-electric" size={16} strokeWidth={3} /> NOVO PROJETO
             </button>
           </div>
         )}
 
-        {/* Modal de Cadastro */}
+        {/* Modal de Formulário */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
-            <div className="card-glass p-10 max-w-md w-full border border-cyan-electric/30 rounded-[3rem] shadow-neon-cyan/10">
+            <div className="card-glass p-10 max-w-md w-full border border-cyan-electric/30 rounded-[3rem]">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-black text-cyan-electric italic uppercase tracking-tighter">
                   {isEditing ? 'EDITAR BABA' : 'NOVO BABA'}
@@ -186,7 +186,7 @@ const DashboardPage = () => {
                     className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-bold" 
                   />
                 </div>
-                <button type="submit" className="w-full py-5 rounded-2xl font-black text-[10px] bg-cyan-electric text-black shadow-neon-cyan uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all">
+                <button type="submit" className="w-full py-5 rounded-2xl font-black text-[10px] bg-cyan-electric text-black shadow-neon-cyan uppercase tracking-widest hover:scale-[1.02] transition-all">
                   {isEditing ? 'SALVAR ALTERAÇÕES' : 'CONSOLIDAR BABA'}
                 </button>
               </form>
