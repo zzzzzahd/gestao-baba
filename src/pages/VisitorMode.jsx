@@ -21,7 +21,7 @@ const VisitorMode = () => {
 
     const player = {
       id: Date.now(),
-      name: newPlayerName.trim().toUpperCase(),
+      name: newPlayerName.trim(),
       position: newPlayerPosition
     };
 
@@ -44,135 +44,169 @@ const VisitorMode = () => {
     }
 
     // Separar goleiros e jogadores de linha
-    let goalies = players.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
-    let outfield = players.filter(p => p.position === 'linha').sort(() => Math.random() - 0.5);
+    let goalies = players.filter(p => p.position === 'goleiro');
+    let outfield = players.filter(p => p.position === 'linha');
 
+    // Embaralhar
+    goalies = goalies.sort(() => Math.random() - 0.5);
+    outfield = outfield.sort(() => Math.random() - 0.5);
+
+    // Calcular número de times
     const numTeams = Math.floor(players.length / playersPerTeam);
+    
+    if (numTeams < 2) {
+      toast.error('Jogadores insuficientes para formar 2 times!');
+      return;
+    }
+
+    // Criar times vazios
     const teams = Array.from({ length: numTeams }, (_, i) => ({
       id: Date.now() + i,
-      name: `TIME ${String.fromCharCode(65 + i)}`,
-      players: [],
-      score: 0
+      name: `TIME ${String.fromCharCode(65 + i)}`, // A, B, C, D...
+      players: []
     }));
 
-    // Distribuir goleiros
+    // Distribuir goleiros primeiro (1 por time)
     for (let i = 0; i < numTeams && goalies.length > 0; i++) {
       teams[i].players.push(goalies.shift());
     }
 
-    // Distribuir jogadores de linha
-    let remaining = [...outfield, ...goalies];
+    // Distribuir jogadores de linha (ciclicamente)
+    let remaining = [...outfield, ...goalies]; // Sobras de goleiros viram linha
+    
     while (remaining.length > 0) {
+      // Preencher até completar playersPerTeam
       for (let i = 0; i < numTeams && remaining.length > 0; i++) {
         if (teams[i].players.length < playersPerTeam) {
           teams[i].players.push(remaining.shift());
         }
       }
+      // Break de segurança para evitar loop infinito se todos os times estiverem cheios mas sobrar gente
+      if (teams.every(t => t.players.length >= playersPerTeam)) break;
     }
 
-    // AQUI ESTÁ A ÚNICA MUDANÇA: SALVAR E NAVEGAR IMEDIATAMENTE
+    // Salvar no localStorage
     localStorage.setItem('temp_teams', JSON.stringify(teams));
-    toast.success('Times sorteados com sucesso!');
-    navigate('/visitor-match'); // Sem o setTimeout para não falhar
+    
+    toast.success(`${numTeams} times sorteados!`);
+    
+    // CORREÇÃO: Navegação direta para evitar perda de estado
+    navigate('/visitor-match'); 
   };
 
   return (
-    <div className="min-h-screen p-5 bg-black text-white font-sans selection:bg-cyan-electric selection:text-black">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen p-6 flex flex-col bg-black text-white font-sans">
+      <div className="max-w-md w-full mx-auto space-y-6">
+        
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => navigate('/')}
-            className="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all active:scale-95"
-          >
-            <ArrowLeft size={20} />
-          </button>
+        <div className="flex justify-between items-center">
           <Logo size="small" />
+          <button
+            onClick={() => navigate('/')}
+            className="text-[10px] font-black opacity-40 hover:opacity-100 transition-all uppercase tracking-[0.2em] flex items-center gap-2"
+          >
+            <ArrowLeft size={12} /> Voltar
+          </button>
         </div>
 
         {/* Título */}
-        <div className="card-glass p-6 rounded-[2.5rem] border border-white/10 mb-6 relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 opacity-10">
-            <Users size={80} strokeWidth={1} />
-          </div>
-          <h1 className="text-2xl font-black italic text-cyan-electric mb-1 uppercase tracking-tighter">MODO VISITANTE</h1>
-          <p className="text-[10px] font-bold opacity-40 uppercase tracking-[0.3em]">Sorteio rápido offline</p>
+        <div className="text-center">
+          <h2 className="text-2xl font-black mb-2 uppercase italic tracking-tighter text-cyan-electric">
+            Modo Ferramenta Rápida
+          </h2>
+          <p className="text-xs font-medium opacity-50 uppercase tracking-wide">
+            Sorteie times sem precisar de conta!
+          </p>
         </div>
 
-        {/* Configurações */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="card-glass p-4 rounded-3xl border border-white/5">
-            <label className="text-[8px] font-black opacity-30 uppercase mb-2 block tracking-widest text-center">Jogadores/Time</label>
-            <div className="flex items-center justify-around">
-              {[5, 6].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setPlayersPerTeam(n)}
-                  className={`px-4 py-2 rounded-xl font-black text-xs transition-all ${
-                    playersPerTeam === n ? 'bg-cyan-electric text-black shadow-neon-cyan' : 'bg-white/5 opacity-40'
-                  }`}
-                >
-                  {n}x{n}
-                </button>
-              ))}
+        {/* Configuração: Jogadores por Time */}
+        <div className="card-glass p-6 border border-cyan-electric/30 rounded-[2rem]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="text-cyan-electric" size={20} />
+              <span className="text-xs font-black uppercase opacity-60">Jogadores por Time</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPlayersPerTeam(Math.max(2, playersPerTeam - 1))}
+                className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 font-black text-lg active:scale-90 transition-transform"
+              >
+                -
+              </button>
+              <span className="text-3xl font-black w-12 text-center">{playersPerTeam}</span>
+              <button
+                onClick={() => setPlayersPerTeam(Math.min(11, playersPerTeam + 1))}
+                className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 font-black text-lg active:scale-90 transition-transform"
+              >
+                +
+              </button>
             </div>
           </div>
-          <div className="card-glass p-4 rounded-3xl border border-white/5 flex flex-col items-center justify-center">
-            <label className="text-[8px] font-black opacity-30 uppercase mb-1 block tracking-widest">Times Possíveis</label>
-            <span className="text-xl font-black italic text-white">
-              {Math.floor(players.length / playersPerTeam)}
-            </span>
-          </div>
+          <p className="text-[9px] opacity-40 text-center uppercase tracking-wider">
+            Mínimo de {playersPerTeam * 2} jogadores necessários
+          </p>
         </div>
 
-        {/* Input */}
-        <div className="space-y-4 mb-8">
-          <div className="flex gap-2">
+        {/* Adicionar Jogador */}
+        <div className="card-glass p-4 border border-white/10 rounded-[2rem]">
+          <div className="flex gap-2 mb-3">
             <input
               type="text"
               value={newPlayerName}
-              onChange={(e) => setNewPlayerName(e.target.value.toUpperCase())}
+              onChange={(e) => setNewPlayerName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
-              placeholder="NOME DO ATLETA"
-              className="flex-1 bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-cyan-electric transition-all font-bold text-xs placeholder:opacity-20"
+              placeholder="Nome do jogador..."
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-cyan-electric transition-colors"
             />
             <select
               value={newPlayerPosition}
               onChange={(e) => setNewPlayerPosition(e.target.value)}
-              className="bg-black border border-white/10 p-4 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-cyan-electric transition-all"
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-black outline-none cursor-pointer"
             >
-              <option value="linha">Linha</option>
-              <option value="goleiro">Goleiro</option>
+              <option value="linha">⚽ LINHA</option>
+              <option value="goleiro">🧤 GOLEIRO</option>
             </select>
           </div>
           <button
             onClick={addPlayer}
-            className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:bg-white/10 transition-all active:scale-[0.98]"
+            className="w-full py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl font-black text-xs uppercase tracking-[3px] text-cyan-electric active:scale-95 transition-transform"
           >
-            Adicionar à Lista
+            + Adicionar
           </button>
         </div>
 
-        {/* Lista */}
+        {/* Lista de Jogadores */}
         {players.length > 0 && (
-          <div className="mb-10">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <span className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em]">Lista de Atletas</span>
-              <span className="text-[10px] font-black text-cyan-electric italic uppercase">{players.length} Inscritos</span>
+          <div className="card-glass p-4 border border-white/10 rounded-[2rem] max-h-[300px] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-black uppercase opacity-60">
+                Jogadores Cadastrados ({players.length})
+              </span>
+              <button
+                onClick={() => {
+                  setPlayers([]);
+                  toast.success('Lista limpa!');
+                }}
+                className="text-[9px] font-black text-red-500/60 hover:text-red-500 uppercase tracking-wider"
+              >
+                Limpar Todos
+              </button>
             </div>
-            <div className="grid grid-cols-1 gap-2 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-2">
               {players.map((player) => (
                 <div
                   key={player.id}
-                  className="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center group animate-slide-in"
+                  className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5"
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`w-2 h-2 rounded-full ${player.position === 'goleiro' ? 'bg-green-500' : 'bg-white/20'}`}></span>
-                    <span className="text-sm font-bold uppercase tracking-tight">{player.name}</span>
+                    <span className={`text-xs font-black ${player.position === 'goleiro' ? 'text-green-400' : 'text-cyan-electric'}`}>
+                      {player.position === 'goleiro' ? '🧤' : '⚽'}
+                    </span>
+                    <span className="text-sm font-bold">{player.name}</span>
                   </div>
                   <button
                     onClick={() => removePlayer(player.id)}
-                    className="text-red-500/40 hover:text-red-500 transition-colors p-2"
+                    className="text-red-500/60 hover:text-red-500 transition-colors"
                   >
                     <i className="fas fa-times text-sm"></i>
                   </button>
@@ -198,9 +232,9 @@ const VisitorMode = () => {
           </div>
         )}
 
-        {/* Footer original */}
-        <p className="text-[9px] font-bold opacity-20 uppercase tracking-[0.4em] text-center mt-10">
-          Gerenciador de Baba • Modo Visitante
+        {/* Footer */}
+        <p className="text-[9px] font-bold opacity-20 uppercase tracking-[0.4em] text-center">
+          Powered by Draft Baba v3.0
         </p>
       </div>
     </div>
