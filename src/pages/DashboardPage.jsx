@@ -9,13 +9,14 @@ import toast from 'react-hot-toast';
 const DashboardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth(); // Adicionado 'profile' para foto
   
-  // Pegamos as funções do contexto (Usando 'babas' que mapeamos no contexto anterior)
+  // Pegamos as funções do contexto
   const { 
     babas, 
     createBaba, 
-    deleteBaba, // Adicionado para funcionalidade de lixeira
+    updateBaba, // ADICIONADO: Agora usamos a função real
+    deleteBaba, 
     selectBaba, 
     loading, 
     refreshBabas 
@@ -39,7 +40,7 @@ const DashboardPage = () => {
       const babaParaEditar = babas.find(b => b.id === id);
       if (babaParaEditar) {
         setNewBaba({
-          name: babaParaEditar.nome || babaParaEditar.name, // Suporte a ambos os nomes de coluna
+          name: babaParaEditar.nome || babaParaEditar.name,
           modality: babaParaEditar.modality || 'futsal',
           is_private: babaParaEditar.is_private || false,
           game_time: babaParaEditar.game_time || '20:00',
@@ -55,19 +56,27 @@ const DashboardPage = () => {
     e.preventDefault();
     try {
       if (isEditing) {
-        // Lógica de update simplificada para bater com o banco
-        toast.error("Funcionalidade de update em manutenção");
-      } else {
-        // Criação usando a nova função do contexto
-        await createBaba(newBaba.name); // O contexto atualizado aceita o nome
-        
-        setShowCreateModal(false);
-        setNewBaba({
-          name: '', modality: 'futsal', is_private: false,
-          game_days: [], game_time: '20:00', match_duration: 10
+        // CORREÇÃO: Lógica de update agora funcional
+        await updateBaba(id, {
+          nome: newBaba.name,
+          modality: newBaba.modality,
+          game_time: newBaba.game_time,
+          is_private: newBaba.is_private
         });
+        toast.success("Baba atualizado com sucesso!");
+        navigate('/dashboard');
+      } else {
+        // Criação usando a função do contexto
+        await createBaba(newBaba.name); 
         toast.success("Novo baba criado!");
       }
+      
+      setShowCreateModal(false);
+      setNewBaba({
+        name: '', modality: 'futsal', is_private: false,
+        game_days: [], game_time: '20:00', match_duration: 10
+      });
+
       if (refreshBabas) refreshBabas();
     } catch (error) {
       toast.error(error.message || "Erro na operação");
@@ -75,7 +84,7 @@ const DashboardPage = () => {
   };
 
   const handleSelectBaba = (baba) => {
-    selectBaba(baba); // Passa o objeto completo para o contexto
+    selectBaba(baba);
     navigate('/home');
   };
 
@@ -102,23 +111,38 @@ const DashboardPage = () => {
           </button>
         </div>
 
-        {/* User Info Card (Preservado) */}
-        <div className="card-glass p-6 mb-8 rounded-3xl border border-white/5 shadow-2xl">
+        {/* User Info Card (Melhorado com link para Perfil) */}
+        <div className="card-glass p-6 mb-8 rounded-3xl border border-white/5 shadow-2xl flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20">
-              <User className="text-cyan-electric" size={24} />
+            <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+              ) : (
+                <User className="text-cyan-electric" size={24} />
+              )}
             </div>
             <div>
               <h2 className="text-lg font-black italic uppercase tracking-tighter">
-                {user?.user_metadata?.name || 'Comandante'}
+                {profile?.name || user?.user_metadata?.name || 'Comandante'}
               </h2>
               <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em]">{user?.email}</p>
             </div>
           </div>
+          <button 
+            onClick={() => navigate('/profile')}
+            className="p-3 bg-white/5 rounded-xl hover:bg-cyan-electric/20 text-cyan-electric transition-all border border-white/5"
+          >
+            <Settings size={18} />
+          </button>
         </div>
 
+        {/* CORREÇÃO: Título com HTML real em vez de texto sujo */}
         <h1 className="text-3xl font-black mb-6 text-white italic uppercase tracking-tighter">
-          {isEditing ? 'EDITANDO <span className="text-cyan-electric">BABA</span>' : 'MEUS <span className="text-cyan-electric">BABAS</span>'}
+          {isEditing ? (
+            <>EDITANDO <span className="text-cyan-electric">BABA</span></>
+          ) : (
+            <>MEUS <span className="text-cyan-electric">BABAS</span></>
+          )}
         </h1>
 
         {loading ? (
@@ -180,7 +204,7 @@ const DashboardPage = () => {
           </>
         )}
 
-        {/* Modal (Seu Modal original com design preservado) */}
+        {/* Modal Preservado com Lógica de Voltar corrigida */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
             <div className="card-glass p-10 max-w-md w-full border border-cyan-electric/30 rounded-[3rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
