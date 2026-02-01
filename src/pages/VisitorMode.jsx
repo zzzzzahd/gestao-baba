@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { Users, Play, ArrowLeft, Shuffle } from 'lucide-react';
+import { Users, Play, ArrowLeft, Shuffle, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VisitorMode = () => {
@@ -11,6 +11,9 @@ const VisitorMode = () => {
   const [players, setPlayers] = useState([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerPosition, setNewPlayerPosition] = useState('linha');
+  
+  // NOVA FUNÇÃO: Estratégia para jogadores que sobram
+  const [leftoverStrategy, setLeftoverStrategy] = useState('reserve'); // 'reserve' ou 'substitute'
 
   // Adicionar jogador
   const addPlayer = () => {
@@ -43,16 +46,19 @@ const VisitorMode = () => {
       return;
     }
 
-    // Separar goleiros e jogadores de linha
-    let goalies = players.filter(p => p.position === 'goleiro');
-    let outfield = players.filter(p => p.position === 'linha');
+    // Separar goleiros e jogadores de linha e embaralhar
+    let goalies = players.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
+    let outfield = players.filter(p => p.position === 'linha').sort(() => Math.random() - 0.5);
 
-    // Embaralhar
-    goalies = goalies.sort(() => Math.random() - 0.5);
-    outfield = outfield.sort(() => Math.random() - 0.5);
-
-    // Calcular número de times
-    const numTeams = Math.floor(players.length / playersPerTeam);
+    // LÓGICA DE DIVISÃO REVISADA
+    let numTeams;
+    if (leftoverStrategy === 'reserve') {
+      // Apenas times completos, o resto fica de fora (reserva)
+      numTeams = Math.floor(players.length / playersPerTeam);
+    } else {
+      // Cria um time extra mesmo que não esteja completo (precisará de suplente/empréstimo)
+      numTeams = Math.ceil(players.length / playersPerTeam);
+    }
     
     if (numTeams < 2) {
       toast.error('Jogadores insuficientes para formar 2 times!');
@@ -62,7 +68,7 @@ const VisitorMode = () => {
     // Criar times vazios
     const teams = Array.from({ length: numTeams }, (_, i) => ({
       id: Date.now() + i,
-      name: `TIME ${String.fromCharCode(65 + i)}`, // A, B, C, D...
+      name: `TIME ${String.fromCharCode(65 + i)}`,
       players: []
     }));
 
@@ -71,26 +77,33 @@ const VisitorMode = () => {
       teams[i].players.push(goalies.shift());
     }
 
-    // Distribuir jogadores de linha (ciclicamente)
-    let remaining = [...outfield, ...goalies]; // Sobras de goleiros viram linha
+    // Restante dos jogadores (linha + goleiros que sobraram)
+    let remaining = [...outfield, ...goalies]; 
     
+    // Distribuição cíclica respeitando o limite
+    let teamIndex = 0;
     while (remaining.length > 0) {
-      // Preencher até completar playersPerTeam
-      for (let i = 0; i < numTeams && remaining.length > 0; i++) {
-        if (teams[i].players.length < playersPerTeam) {
-          teams[i].players.push(remaining.shift());
-        }
+      // Se a estratégia for reserva e todos os times já atingiram o limite, para aqui
+      if (leftoverStrategy === 'reserve' && teams.every(t => t.players.length >= playersPerTeam)) {
+        break;
       }
-      // Break de segurança para evitar loop infinito se todos os times estiverem cheios mas sobrar gente
-      if (teams.every(t => t.players.length >= playersPerTeam)) break;
+
+      if (teams[teamIndex].players.length < playersPerTeam) {
+        teams[teamIndex].players.push(remaining.shift());
+      }
+      
+      teamIndex = (teamIndex + 1) % numTeams;
     }
 
-    // Salvar no localStorage
+    // Salvar no localStorage (O que sobru em 'remaining' são os reservas se a estratégia for 'reserve')
     localStorage.setItem('temp_teams', JSON.stringify(teams));
+    if (remaining.length > 0) {
+      localStorage.setItem('temp_reserves', JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem('temp_reserves');
+    }
     
     toast.success(`${numTeams} times sorteados!`);
-    
-    // CORREÇÃO: Navegação direta para evitar perda de estado
     navigate('/visitor-match'); 
   };
 
@@ -142,7 +155,38 @@ const VisitorMode = () => {
               </button>
             </div>
           </div>
-          <p className="text-[9px] opacity-40 text-center uppercase tracking-wider">
+
+          {/* NOVA FUNÇÃO: Seletor de Estratégia de Divisão */}
+          <div className="pt-4 border-t border-white/5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Settings2 size={14} className="text-cyan-electric opacity-50" />
+              <span className="text-[10px] font-black uppercase opacity-40 tracking-wider">Se a conta não for exata:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setLeftoverStrategy('reserve')}
+                className={`py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${
+                  leftoverStrategy === 'reserve' 
+                  ? 'bg-cyan-electric text-black border-cyan-electric' 
+                  : 'bg-white/5 text-white/40 border-white/10'
+                }`}
+              >
+                Ficar na Reserva
+              </button>
+              <button
+                onClick={() => setLeftoverStrategy('substitute')}
+                className={`py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${
+                  leftoverStrategy === 'substitute' 
+                  ? 'bg-cyan-electric text-black border-cyan-electric' 
+                  : 'bg-white/5 text-white/40 border-white/10'
+                }`}
+              >
+                Time com Suplente
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[9px] opacity-40 text-center uppercase tracking-wider mt-4">
             Mínimo de {playersPerTeam * 2} jogadores necessários
           </p>
         </div>
