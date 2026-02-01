@@ -25,9 +25,8 @@ import FinancialPage from './pages/FinancialPage'; // Gestão de Mensalidades e 
 function App() {
   return (
     <AuthProvider>
-      {/* O BabaProvider DEVE ficar dentro do AuthProvider para acessar o usuário logado */}
       <BabaProvider>
-        {/* Toaster: Estilizado para o tema Dark/Cyan do Draft Baba */}
+        {/* Toaster: Configuração completa preservada */}
         <Toaster 
           position="top-center" 
           reverseOrder={false}
@@ -64,19 +63,18 @@ function App() {
         />
         
         <Routes>
-          {/* --- ROTAS PÚBLICAS --- */}
-          {/* A LandingPage é a porta de entrada oficial (/) */}
+          {/* --- ROTAS PÚBLICAS (Acesso Total) --- */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage />} />
           
-          {/* Fluxo do Visitante (Ferramentas Rápidas - Sem Login) */}
+          {/* Fluxo do Visitante: Totalmente aberto e isolado */}
           <Route path="/visitor" element={<VisitorMode />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
           {/* --- ROTAS PROTEGIDAS (Necessitam Login via ProtectedRoute) --- */}
           
-          {/* HomePage: Agora protegida para garantir que o perfil do atleta seja carregado */}
+          {/* HomePage: Protegida para evitar que o visitante caia nela */}
           <Route path="/home" element={
             <ProtectedRoute>
               <HomePage />
@@ -90,7 +88,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Edição de Baba específico */}
+          {/* Edição de Baba específico (Dashboard com ID) */}
           <Route path="/edit-baba/:id" element={
             <ProtectedRoute>
               <DashboardPage />
@@ -132,7 +130,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Fallback de Segurança: Qualquer rota desconhecida volta para a Landing */}
+          {/* Fallback de Segurança */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BabaProvider>
