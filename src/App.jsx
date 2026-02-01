@@ -1,15 +1,11 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-
-// --- CONTEXTOS ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
-
-// --- COMPONENTES DE SEGURANÇA ---
 import ProtectedRoute from './components/ProtectedRoute';
 
-// --- PÁGINAS ---
+// Páginas
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
@@ -25,28 +21,28 @@ import FinancialPage from './pages/FinancialPage';
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  // Se loading for true, mostra fundo preto para evitar tela branca/erro
+  // Trava mestre: impede qualquer redirecionamento até o Supabase responder
   if (loading) {
-    return <div className="min-h-screen bg-black" />;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
     <Routes>
-      {/* Rota Raiz: Se logado -> Dashboard, Senão -> Landing */}
-      <Route path="/" element={
-        user ? <Navigate to="/dashboard" replace /> : <LandingPage />
-      } />
+      {/* Público: Landing Page */}
+      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      
+      {/* Login: Bloqueia se já estiver logado */}
+      <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
 
-      {/* Login: Se logado -> Dashboard */}
-      <Route path="/login" element={
-        !user ? <LoginPage /> : <Navigate to="/dashboard" replace />
-      } />
-
-      {/* MODO VISITANTE (Preservado) */}
+      {/* Modo Visitante (Totalmente Preservado) */}
       <Route path="/visitor" element={<VisitorMode />} />
       <Route path="/match-visitor" element={<MatchPageVisitor />} />
 
-      {/* ROTAS PROTEGIDAS */}
+      {/* Privado (Sincronizado com ProtectedRoute) */}
       <Route path="/dashboard" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
       <Route path="/edit-baba/:id" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -61,7 +57,7 @@ function AppRoutes() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <BabaProvider>
@@ -71,5 +67,3 @@ function App() {
     </AuthProvider>
   );
 }
-
-export default App;
