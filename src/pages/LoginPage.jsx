@@ -17,11 +17,11 @@ const LoginPage = () => {
   });
 
   // Redirecionamento seguro
-  useEffect(() => {
-    if (user && !authLoading) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, authLoading, navigate]);
+useEffect(() => {
+  if (user && !loading) { // O 'loading' aqui vem do useAuth()
+    navigate('/dashboard', { replace: true });
+  }
+}, [user, loading, navigate]);
 
   const handleAction = async () => {
     if (loading) return;
