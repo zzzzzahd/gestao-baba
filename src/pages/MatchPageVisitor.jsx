@@ -9,18 +9,28 @@ const MatchPageVisitor = () => {
   const [currentMatch, setCurrentMatch] = useState(null);
   const [timer, setTimer] = useState(600); // 10 minutos
   const [isActive, setIsActive] = useState(false);
+  
+  // NOVA STATE: Para jogadores que ficaram na reserva individual
+  const [reserves, setReserves] = useState([]);
 
-  // 1. Carregar times do localStorage
+  // 1. Carregar times e reservas do localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('temp_teams');
-    if (saved) {
+    const savedTeams = localStorage.getItem('temp_teams');
+    const savedReserves = localStorage.getItem('temp_reserves');
+
+    if (savedTeams) {
       try {
-        const parsed = JSON.parse(saved);
-        setAllTeams(parsed);
-        if (parsed.length >= 2) {
+        const parsedTeams = JSON.parse(savedTeams);
+        setAllTeams(parsedTeams);
+        
+        if (savedReserves) {
+          setReserves(JSON.parse(savedReserves));
+        }
+
+        if (parsedTeams.length >= 2) {
           setCurrentMatch({
-            teamA: parsed[0],
-            teamB: parsed[1],
+            teamA: parsedTeams[0],
+            teamB: parsedTeams[1],
             scoreA: 0,
             scoreB: 0
           });
@@ -29,9 +39,8 @@ const MatchPageVisitor = () => {
           navigate('/visitor');
         }
       } catch (e) {
-        console.error('Erro ao carregar times:', e);
+        console.error('Erro ao carregar dados:', e);
         localStorage.removeItem('temp_teams');
-        toast.error('Erro ao carregar times!');
         navigate('/visitor');
       }
     } else {
@@ -70,7 +79,6 @@ const MatchPageVisitor = () => {
     let winner = null;
     let queue = [...allTeams];
 
-    // Determinar vencedor
     if (scoreA > scoreB) {
       winner = "A";
       toast.success(`${teamA.name} VENCEU!`);
@@ -81,35 +89,29 @@ const MatchPageVisitor = () => {
       toast.error('EMPATE! Saem os dois times.');
     }
 
-    // Gerenciar a Fila (Quem ganha fica)
     if (winner === "A") {
-      // Time A fica, Time B vai pro final da fila
       const loser = queue.splice(1, 1)[0];
       queue.push(loser);
     } else if (winner === "B") {
-      // Time B fica, Time A vai pro final da fila
       const loser = queue.splice(0, 1)[0];
       queue.push(loser);
     } else {
-      // Empate: Ambos vão pro final da fila
       const team1 = queue.shift();
       const team2 = queue.shift();
       queue.push(team1, team2);
     }
 
-    // Verificar se ainda tem times suficientes
     if (queue.length < 2) {
       toast.success('Fim das partidas!');
       localStorage.removeItem('temp_teams');
+      localStorage.removeItem('temp_reserves');
       setTimeout(() => navigate('/visitor'), 2000);
       return;
     }
 
-    // Atualizar estado e storage
     setAllTeams(queue);
     localStorage.setItem('temp_teams', JSON.stringify(queue));
     
-    // Preparar próxima partida
     setTimer(600);
     setCurrentMatch({
       teamA: queue[0],
@@ -119,14 +121,12 @@ const MatchPageVisitor = () => {
     });
   };
 
-  // 5. Formatar tempo
   const formatTime = (s) => {
     const mins = Math.floor(s / 60);
     const secs = s % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Loading state
   if (!currentMatch) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white/20 uppercase font-black italic">
@@ -146,6 +146,7 @@ const MatchPageVisitor = () => {
               const confirm = window.confirm('Deseja sair? O progresso será perdido.');
               if (confirm) {
                 localStorage.removeItem('temp_teams');
+                localStorage.removeItem('temp_reserves');
                 navigate('/visitor');
               }
             }}
@@ -158,17 +159,13 @@ const MatchPageVisitor = () => {
 
         {/* Placar Principal */}
         <div className="card-glass p-8 border border-white/10 text-center relative overflow-hidden rounded-[2.5rem]">
-          
-          {/* Cronômetro */}
           <div className={`text-7xl font-black mb-6 font-mono tracking-tighter transition-colors ${
             timer < 60 ? 'text-red-500' : 'text-white'
           }`}>
             {formatTime(timer)}
           </div>
           
-          {/* Placar */}
           <div className="flex justify-between items-center gap-4">
-            {/* Time A */}
             <div className="flex-1">
               <p className="text-[10px] font-black mb-2 text-cyan-electric uppercase truncate tracking-tighter">
                 {currentMatch.teamA.name}
@@ -181,10 +178,8 @@ const MatchPageVisitor = () => {
               </button>
             </div>
             
-            {/* VS */}
             <div className="text-xl font-black opacity-10 italic mt-6">VS</div>
 
-            {/* Time B */}
             <div className="flex-1">
               <p className="text-[10px] font-black mb-2 text-yellow-500 uppercase truncate tracking-tighter">
                 {currentMatch.teamB.name}
@@ -198,7 +193,6 @@ const MatchPageVisitor = () => {
             </div>
           </div>
 
-          {/* Botão Cronômetro */}
           <button 
             onClick={() => setIsActive(!isActive)}
             className={`mt-10 w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[4px] transition-all ${
@@ -207,10 +201,9 @@ const MatchPageVisitor = () => {
                 : 'bg-cyan-electric text-black shadow-[0_0_20px_rgba(0,242,255,0.2)]'
             }`}
           >
-            {isActive ? '⏸ PAUSAR JOGO' : '▶ INICIAR CRONÔMETRO'}
+            {isActive ? '⏸ PAUSAR JOGO' : '▶ INICIAR JOGO'}
           </button>
 
-          {/* Botão Finalizar Manualmente */}
           <button
             onClick={handleMatchEnd}
             className="mt-3 w-full py-3 bg-white/5 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all"
@@ -219,11 +212,24 @@ const MatchPageVisitor = () => {
           </button>
         </div>
 
+        {/* --- NOVA SEÇÃO: RESERVAS INDIVIDUAIS (Se houver) --- */}
+        {reserves.length > 0 && (
+          <div className="card-glass p-4 border border-yellow-500/20 rounded-2xl bg-yellow-500/5">
+            <p className="text-[10px] font-black text-yellow-500 mb-2 uppercase tracking-widest">Reserva Individual (Sobras):</p>
+            <div className="flex flex-wrap gap-2">
+              {reserves.map((player, i) => (
+                <span key={i} className="text-[9px] font-bold bg-white/10 px-2 py-1 rounded border border-white/5 opacity-70">
+                  {player.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Times Jogando Agora */}
         <div className="card-glass p-4 border border-white/5 rounded-2xl">
           <p className="text-[10px] font-black opacity-40 mb-3 uppercase tracking-widest">Jogando Agora:</p>
           <div className="grid grid-cols-2 gap-4">
-            {/* Jogadores Time A */}
             <div>
               <p className="text-xs font-black text-cyan-electric mb-2">{currentMatch.teamA.name}</p>
               <div className="space-y-1">
@@ -236,7 +242,6 @@ const MatchPageVisitor = () => {
               </div>
             </div>
 
-            {/* Jogadores Time B */}
             <div>
               <p className="text-xs font-black text-yellow-500 mb-2">{currentMatch.teamB.name}</p>
               <div className="space-y-1">
@@ -261,9 +266,12 @@ const MatchPageVisitor = () => {
               <span className="font-black text-sm text-cyan-electric italic uppercase">
                 {allTeams[2].name}
               </span>
-              <span className="text-[8px] opacity-40 font-black uppercase tracking-tighter bg-white/10 px-2 py-1 rounded">
-                Aguardando
-              </span>
+              {/* ALERTA DE SUPLENTE CASO O TIME ESTEJA INCOMPLETO */}
+              {allTeams[2].players.length < 5 && (
+                 <span className="text-[7px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-black animate-pulse">
+                   PRECISA DE SUPLENTE
+                 </span>
+              )}
             </div>
           ) : (
             <p className="text-[10px] opacity-20 text-center uppercase font-black py-4 border border-dashed border-white/10 rounded-2xl">
@@ -272,19 +280,25 @@ const MatchPageVisitor = () => {
           )}
         </div>
 
-        {/* --- NOVA SEÇÃO: LISTA DE TODOS OS TIMES --- */}
+        {/* Escalações de todos os times */}
         <div className="space-y-4 pt-4 border-t border-white/5">
           <h3 className="text-[10px] font-black opacity-30 italic px-2 uppercase tracking-[0.2em]">
-            Escalações de todos os times:
+            Escalações Gerais:
           </h3>
           <div className="grid grid-cols-1 gap-4">
             {allTeams.map((team, idx) => (
               <div key={idx} className="card-glass p-5 rounded-[2rem] border border-white/5">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-xs font-black uppercase text-white/80 italic">{team.name}</span>
-                  <span className="text-[8px] font-bold opacity-30 tracking-widest uppercase">
-                    {idx === 0 || idx === 1 ? 'Em Campo' : idx === 2 ? 'Próximo' : 'Na Fila'}
-                  </span>
+                  {/* SEÇÃO DE STATUS DO TIME (Suplentes/Reserva) */}
+                  <div className="flex gap-2">
+                    {team.players.length < 5 && (
+                      <span className="text-[7px] text-yellow-500 font-black border border-yellow-500/30 px-2 py-1 rounded">SUB NECESSÁRIO</span>
+                    )}
+                    <span className="text-[8px] font-bold opacity-30 tracking-widest uppercase">
+                      {idx === 0 || idx === 1 ? 'Em Campo' : 'Na Fila'}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {team.players.map((p, i) => (
