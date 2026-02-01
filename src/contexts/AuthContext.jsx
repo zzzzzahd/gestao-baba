@@ -2,11 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
+// 1. DEFINIÇÃO DO CONTEXTO (Mover para o topo resolve o ReferenceError)
 const AuthContext = createContext(null);
 
+// 2. EXPORTAÇÃO DO HOOK
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (context === undefined || context === null) {
     throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
@@ -17,7 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Função de busca de Perfil com timeout (PRESERVADA E INTEGRAL)
+  // 3. Função de busca de Perfil com timeout (PRESERVADA E INTEGRAL)
   const fetchProfile = async (userId) => {
     if (!userId) return;
     
@@ -42,12 +44,10 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.warn("Erro ao buscar perfil (ignorado):", error.message);
-      // Não bloqueia o login se der erro no perfil
     }
   };
 
   useEffect(() => {
-    // Se Supabase não está configurado, para o loading imediatamente (PRESERVADO)
     if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
       console.warn('Supabase não configurado - modo offline');
       setLoading(false);
@@ -56,7 +56,6 @@ export const AuthProvider = ({ children }) => {
 
     let mounted = true;
 
-    // Pega sessão inicial
     const initAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -86,7 +85,6 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // Listener de mudanças (PRESERVADO)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
       
@@ -113,7 +111,6 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (updates) => {
     if (!user) return { error: 'Usuário não logado' };
     try {
-      // Upsert na tabela profiles (ADICIONADO: novos campos agora são salvos aqui)
       const { data, error } = await supabase
         .from('profiles')
         .upsert({ 
@@ -126,7 +123,7 @@ export const AuthProvider = ({ children }) => {
 
       if (!error) {
         setProfile(data);
-        // NOVO: Sincroniza também com o metadata do Auth para garantir persistência global
+        // Sincroniza também com o metadata do Auth
         await supabase.auth.updateUser({
           data: {
             name: updates.name,
@@ -136,7 +133,6 @@ export const AuthProvider = ({ children }) => {
             heart_team: updates.heart_team
           }
         });
-        toast.success('Perfil atualizado!');
       }
       return { data, error };
     } catch (e) {
@@ -198,7 +194,6 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Limpa o Baba selecionado ao sair para não dar conflito no próximo login
       localStorage.removeItem('selected_baba_id');
       await supabase.auth.signOut();
       setProfile(null);
