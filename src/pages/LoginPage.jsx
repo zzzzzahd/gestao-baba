@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabase';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -15,6 +14,35 @@ const LoginPage = () => {
     name: ''
   });
 
+  // Funções de autenticação LOCAIS (sem usar useAuth)
+  const handleSignIn = async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success('Bem-vindo!');
+      return { data, error: null };
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
+  };
+
+  const handleSignUp = async (email, password, metadata = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata }
+      });
+      if (error) throw error;
+      toast.success('Conta criada! Verifique seu email.');
+      return { data, error: null };
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -22,14 +50,14 @@ const LoginPage = () => {
     try {
       if (isLogin) {
         // LOGIN
-        const { error } = await signIn(formData.email, formData.password);
+        const { error } = await handleSignIn(formData.email, formData.password);
         if (error) throw error;
         
-        // Sempre vai pra dashboard depois do login
+        // Redireciona para dashboard
         navigate('/dashboard');
       } else {
         // CRIAR CONTA
-        const { error } = await signUp(
+        const { error } = await handleSignUp(
           formData.email,
           formData.password,
           { name: formData.name }
