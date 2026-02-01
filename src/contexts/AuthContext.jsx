@@ -2,149 +2,215 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
-// 1. DEFINIÇÃO DO CONTEXTO (Mover para o topo resolve o ReferenceError)
+// CRIAR O CONTEXTO PRIMEIRO (ISSO É CRÍTICO!)
 const AuthContext = createContext(null);
 
-// 2. EXPORTAÇÃO DO HOOK
-export const useAuth = () => {
+// HOOK PARA USAR O CONTEXTO
+export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined || context === null) {
-    throw new Error('useAuth must be used within AuthProvider');
+  
+  // Se o contexto for null ou undefined, significa que está sendo usado fora do Provider
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
-};
+}
 
-export const AuthProvider = ({ children }) => {
+// PROVIDER DO CONTEXTO
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 3. Função de busca de Perfil com timeout (PRESERVADA E INTEGRAL)
+  // Buscar perfil do usuário
   const fetchProfile = async (userId) => {
-    if (!userId) return;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
     
     try {
-      // Timeout de 5 segundos para evitar travamento
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-      
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
       
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-      
       if (data) {
         setProfile(data);
-      } else if (error && error.code !== 'PGRST116') {
-        console.warn("Perfil não encontrado ou erro:", error.message);
+      } else {
+        setProfile(null);
       }
     } catch (error) {
-      console.warn("Erro ao buscar perfil (ignorado):", error.message);
+      console.warn('Erro ao buscar perfil:', error.message);
+      setProfile(null);
     }
   };
 
+  // Inicializar autenticação
   useEffect(() => {
-    if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
-      console.warn('Supabase não configurado - modo offline');
+    // Verificar se Supabase está configurado
+    if (!supabase) {
+      console.error('Supabase não configurado!');
       setLoading(false);
       return;
     }
 
     let mounted = true;
 
-    const initAuth = async () => {
+    // Função para inicializar auth
+    async function initAuth() {
       try {
+        // Pegar sessão atual
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
-        
+
         if (error) {
-          console.error("Erro ao obter sessão:", error);
+          console.error('Erro ao obter sessão:', error);
+          setUser(null);
+          setProfile(null);
           setLoading(false);
           return;
         }
-        
-        const currentUser = session?.user ?? null;
+
+        const currentUser = session?.user || null;
         setUser(currentUser);
-        
+
         if (currentUser) {
           await fetchProfile(currentUser.id);
         }
+
+        setLoading(false);
       } catch (error) {
-        console.error("Erro na sessão inicial:", error);
-      } finally {
+        console.error('Erro na inicialização:', error);
         if (mounted) {
+          setUser(null);
+          setProfile(null);
           setLoading(false);
         }
       }
-    };
+    }
 
+    // Inicializar
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchProfile(currentUser.id);
-      } else {
-        setProfile(null);
-      }
-      
-      setLoading(false);
-    });
+    // Listener de mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
 
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        } else {
+          setProfile(null);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    // Cleanup
     return () => {
       mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
 
-  // --- FUNÇÕES DE PERFIL (MELHORADAS COM NOVOS CAMPOS) ---
+  // Função de login
+  const signIn = async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
+      if (error) throw error;
+
+      toast.success('Bem-vindo!');
+      return { data, error: null };
+    } catch (error) {
+      const message = error.message === 'Invalid login credentials'
+        ? 'Email ou senha incorretos'
+        : error.message;
+      
+      toast.error(message);
+      return { data: null, error };
+    }
+  };
+
+  // Função de cadastro
+  const signUp = async (email, password, metadata = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata }
+      });
+
+      if (error) throw error;
+
+      toast.success('Conta criada! Verifique seu email.');
+      return { data, error: null };
+    } catch (error) {
+      toast.error(error.message);
+      return { data: null, error };
+    }
+  };
+
+  // Função de logout
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      toast.success('Até logo!');
+    } catch (error) {
+      toast.error('Erro ao sair');
+      console.error('Erro no logout:', error);
+    }
+  };
+
+  // Função para atualizar perfil
   const updateProfile = async (updates) => {
-    if (!user) return { error: 'Usuário não logado' };
+    if (!user) {
+      return { error: 'Usuário não autenticado' };
+    }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: user.id, 
-          ...updates, 
-          updated_at: new Date() 
+        .upsert({
+          id: user.id,
+          ...updates,
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
 
-      if (!error) {
-        setProfile(data);
-        // Sincroniza também com o metadata do Auth
-        await supabase.auth.updateUser({
-          data: {
-            name: updates.name,
-            avatar_url: updates.avatar_url,
-            age: updates.age,
-            position: updates.position,
-            heart_team: updates.heart_team
-          }
-        });
-      }
-      return { data, error };
-    } catch (e) {
-      console.error('Erro ao atualizar perfil:', e);
-      return { data: null, error: e };
+      if (error) throw error;
+
+      setProfile(data);
+      toast.success('Perfil atualizado!');
+      return { data, error: null };
+    } catch (error) {
+      toast.error('Erro ao atualizar perfil');
+      console.error('Erro ao atualizar:', error);
+      return { data: null, error };
     }
   };
 
+  // Função para upload de avatar
   const uploadAvatar = async (userId, file) => {
     try {
       const fileExt = file.name.split('.').pop();
-      const filePath = `${userId}/${Math.random()}.${fileExt}`;
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
@@ -157,68 +223,31 @@ export const AuthProvider = ({ children }) => {
 
       return publicUrl;
     } catch (error) {
-      toast.error('Erro no upload da imagem');
+      toast.error('Erro ao fazer upload da imagem');
       throw error;
     }
   };
 
-  // --- FUNÇÕES DE AUTENTICAÇÃO (PRESERVADAS INTEGRALMENTE) ---
-
-  const signUp = async (email, password, metadata = {}) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: metadata }
-      });
-      if (error) throw error;
-      toast.success('Conta criada! Verifique seu email.');
-      return { data, error: null };
-    } catch (error) {
-      toast.error(error.message);
-      return { data: null, error };
-    }
-  };
-
-  const signIn = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      toast.success('Bem-vindo!');
-      return { data, error: null };
-    } catch (error) {
-      toast.error(error.message);
-      return { data: null, error };
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      localStorage.removeItem('selected_baba_id');
-      await supabase.auth.signOut();
-      setProfile(null);
-      setUser(null);
-      toast.success('Até a próxima!');
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
+  // Valor do contexto
   const value = {
     user,
     profile,
     loading,
-    signUp,
     signIn,
+    signUp,
     signOut,
     updateProfile,
     uploadAvatar,
     refreshProfile: () => fetchProfile(user?.id)
   };
 
+  // Renderizar provider
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
+
+// Exportação default (para compatibilidade)
+export default AuthProvider;
