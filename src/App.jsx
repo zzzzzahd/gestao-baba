@@ -6,11 +6,10 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
-// --- COMPONENTES ---
+// --- COMPONENTES DE SEGURANÇA ---
 import ProtectedRoute from './components/ProtectedRoute';
 
 // --- PÁGINAS ---
-// ATENÇÃO: Verifique se os nomes dos arquivos na pasta /pages começam com Letra Maiúscula
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
@@ -26,26 +25,28 @@ import FinancialPage from './pages/FinancialPage';
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  // Se a tela estiver preta aqui, é porque o AuthContext não está mudando o loading para false
+  // Se loading for true, mostra fundo preto para evitar tela branca/erro
   if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <div className="min-h-screen bg-black" />;
   }
 
   return (
     <Routes>
-      {/* Landing/Home */}
-      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-      <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
+      {/* Rota Raiz: Se logado -> Dashboard, Senão -> Landing */}
+      <Route path="/" element={
+        user ? <Navigate to="/dashboard" replace /> : <LandingPage />
+      } />
 
-      {/* Visitante */}
+      {/* Login: Se logado -> Dashboard */}
+      <Route path="/login" element={
+        !user ? <LoginPage /> : <Navigate to="/dashboard" replace />
+      } />
+
+      {/* MODO VISITANTE (Preservado) */}
       <Route path="/visitor" element={<VisitorMode />} />
       <Route path="/match-visitor" element={<MatchPageVisitor />} />
 
-      {/* Protegidas */}
+      {/* ROTAS PROTEGIDAS */}
       <Route path="/dashboard" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
       <Route path="/edit-baba/:id" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -54,19 +55,21 @@ function AppRoutes() {
       <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
       <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
 
-      {/* Fallback */}
+      {/* Fallback de Segurança */}
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />
     </Routes>
   );
 }
 
-export default function App() {
+function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        <Toaster position="top-center" reverseOrder={false} />
+        <Toaster position="top-center" />
         <AppRoutes />
       </BabaProvider>
     </AuthProvider>
   );
 }
+
+export default App;
