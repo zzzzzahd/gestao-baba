@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext'; 
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  // Importamos o refreshProfile para garantir que o contexto "acorde" após o login
-  const { refreshProfile } = useAuth(); 
+  // SUBSTITUIÇÃO: Usamos o signIn/signUp do contexto para evitar que o formulário dê erro 404
+  const { signIn, signUp } = useAuth(); 
+  
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -17,34 +17,8 @@ const LoginPage = () => {
     name: ''
   });
 
-  // --- FUNÇÕES DE AUTENTICAÇÃO LOCAIS (PRESERVADAS INTEGRALMENTE) ---
-  const handleSignIn = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      // Removido o toast daqui para não duplicar, pois o handleSubmit já trata
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
-  const handleSignUp = async (email, password, metadata = {}) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: metadata }
-      });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
   const handleSubmit = async (e) => {
-    // IMPORTANTE: O preventDefault evita que o navegador tente recarregar a página (o que causa o 404)
+    // IMPORTANTE: preventDefault evita o erro 404 mostrado no seu print
     e.preventDefault();
     if (loading) return;
     
@@ -52,41 +26,34 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
-        // LOGIN
-        const { data, error } = await handleSignIn(formData.email, formData.password);
+        // SUBSTITUIÇÃO: Chamada direta ao contexto para validar a sessão globalmente
+        const { error } = await signIn(formData.email, formData.password);
         
-        if (error) throw error;
-
-        if (data?.user) {
-          toast.success('Entrando no campo...');
-          // Sincroniza o contexto global antes de mudar de página
-          await refreshProfile(); 
-          // Redirecionamento forçado via React Router
-          navigate('/dashboard', { replace: true });
+        if (error) {
+          setLoading(false);
+          return;
         }
+        
+        // Se logou, redirecionamos para a dashboard
+        navigate('/dashboard');
       } else {
-        // CRIAR CONTA
-        const { error } = await handleSignUp(
-          formData.email,
-          formData.password,
+        const { error } = await signUp(
+          formData.email, 
+          formData.password, 
           { name: formData.name }
         );
-        if (error) throw error;
         
-        toast.success('Conta criada! Faça seu login.');
+        if (error) {
+          setLoading(false);
+          return;
+        }
+        
         setIsLogin(true);
-        setFormData({ ...formData, password: '' });
+        setFormData({ email: '', password: '', name: '' });
       }
     } catch (err) {
-      const message = err?.message === 'Invalid login credentials'
-          ? 'Email ou senha incorretos'
-          : err?.message || 'Erro ao processar';
-      toast.error(message);
-      console.error('Auth Error:', err);
-      setLoading(false); // Destrava o botão em caso de erro
-    } finally {
-      // O loading só deve ser false se NÃO navegarmos, 
-      // para evitar o flicker do botão voltando antes da página mudar
+      console.error('Erro no Submit:', err);
+      setLoading(false);
     }
   };
 
