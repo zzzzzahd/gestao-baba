@@ -1,32 +1,28 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute = ({ children }) => {
+export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  const location = useLocation();
 
-  // Enquanto o Supabase verifica a sessão, mantemos o usuário nesta tela.
-  // Sem o timer de 10 segundos, evitamos que o sistema "desista" da conexão.
+  // enquanto o Supabase restaura a sessão
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4 font-tactical">
-        <Loader2 className="animate-spin text-cyan-electric" size={40} />
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-electric animate-pulse">
-          VALIDANDO ACESSO TÁTICO...
-        </span>
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="loader" />
+          <p className="text-cyan-electric text-xs tracking-widest">
+            VALIDANDO ACESSO TÁTICO...
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Se o carregamento terminou e realmente não há usuário logado, vai para o login.
+  // sessão inexistente → login
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" replace />;
   }
 
-  // Se estiver logado, libera o acesso aos componentes filhos (Dashboard, etc).
+  // sessão OK → libera dashboard
   return children;
-};
-
-export default ProtectedRoute;
+}
