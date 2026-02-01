@@ -1,48 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  const [timeoutReached, setTimeoutReached] = useState(false);
+  const location = useLocation();
 
-  // Timeout de segurança: se ficar carregando mais de 10 segundos, para
-  useEffect(() => {
-    if (loading) {
-      const timeout = setTimeout(() => {
-        console.warn('Timeout atingido no ProtectedRoute');
-        setTimeoutReached(true);
-      }, 10000); // 10 segundos
-
-      return () => clearTimeout(timeout);
-    }
-  }, [loading]);
-
-  // Se atingiu timeout, trata como não autenticado
-  if (timeoutReached && loading) {
-    console.error('Loading travou - redirecionando para login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Enquanto verifica a sessão no Supabase, mostra um carregamento discreto
+  // Enquanto o Supabase verifica a sessão, mantemos o usuário nesta tela.
+  // Sem o timer de 10 segundos, evitamos que o sistema "desista" da conexão.
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4 font-tactical">
         <Loader2 className="animate-spin text-cyan-electric" size={40} />
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-          Autenticando Atleta...
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-electric animate-pulse">
+          VALIDANDO ACESSO TÁTICO...
         </span>
       </div>
     );
   }
 
-  // Se não houver usuário logado, redireciona para a tela de login
+  // Se o carregamento terminou e realmente não há usuário logado, vai para o login.
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se estiver logado, libera o acesso aos componentes filhos
+  // Se estiver logado, libera o acesso aos componentes filhos (Dashboard, etc).
   return children;
 };
 
