@@ -16,14 +16,13 @@ const LoginPage = () => {
     name: ''
   });
 
-  const handleSubmit = async (e) => {
-    // Garantia dupla contra recarregamento e erro 404
-    if (e && e.preventDefault) e.preventDefault();
+  // SUBSTITUIÇÃO: Função de ação direta sem depender de evento de formulário
+  const handleAction = async () => {
     if (loading) return;
 
-    // Validação Manual (Substituindo o 'required' nativo)
+    // Validação Manual
     if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
-      toast.error("Preencha todos os campos corretamente");
+      toast.error("Preencha todos os campos");
       return;
     }
     
@@ -31,19 +30,19 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
-        const { error, data } = await signIn(formData.email, formData.password);
+        // LOGIN
+        const { error } = await signIn(formData.email, formData.password);
         
         if (error) {
           setLoading(false);
           return;
         }
         
-        // Pequena pausa para garantir que a sessão foi gravada no navegador
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 600);
-
+        // Se chegou aqui, o console já deve mostrar "SIGNED_IN"
+        // Forçamos a navegação
+        navigate('/dashboard');
       } else {
+        // CADASTRO
         const { error } = await signUp(
           formData.email, 
           formData.password, 
@@ -56,11 +55,13 @@ const LoginPage = () => {
         }
         
         setIsLogin(true);
-        setFormData({ email: '', password: '', name: '' });
+        toast.success("Conta criada! Pode entrar.");
       }
     } catch (err) {
-      console.error('Erro crítico no login:', err);
-      setLoading(false);
+      console.error('Erro na ação:', err);
+    } finally {
+      // Importante: Não setamos loading como false aqui se navegarmos, 
+      // para o botão não "piscar" antes de mudar a página
     }
   };
 
@@ -78,7 +79,7 @@ const LoginPage = () => {
           <Logo size="large" />
         </div>
 
-        {/* MUDANÇA: Usando div em vez de form para matar o erro 404 de vez */}
+        {/* MUDANÇA: Usamos uma div para agrupar os campos, eliminando o risco de 404 por reload */}
         <div className="space-y-4">
           {!isLogin && (
             <input
@@ -113,8 +114,8 @@ const LoginPage = () => {
           />
 
           <button
-            type="button" // IMPORTANTE: type="button" não dispara reload
-            onClick={handleSubmit}
+            type="button" // MUDANÇA: Proteção contra reload involuntário
+            onClick={handleAction}
             disabled={loading}
             className="btn-primary flex items-center justify-center gap-2"
           >
