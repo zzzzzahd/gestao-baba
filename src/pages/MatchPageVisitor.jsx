@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 const MatchPageVisitor = () => {
   const navigate = useNavigate();
   
-  const [allTeams, setAllTeams] = useState([]); 
+  const [allTeams, setAllTeams] = useState([]);
   const [currentMatch, setCurrentMatch] = useState(null);
   const [timer, setTimer] = useState(600); // 10 minutos
   const [isActive, setIsActive] = useState(false);
