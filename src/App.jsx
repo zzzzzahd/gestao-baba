@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // --- CONTEXTOS ---
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
 // --- COMPONENTES DE SEGURANÇA ---
@@ -15,124 +15,83 @@ import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import RankingsPage from './pages/RankingsPage';
-import MatchPage from './pages/MatchPage';          // Painel de Jogo Oficial (ADM)
-import MatchPageVisitor from './pages/MatchPageVisitor'; // Painel de Jogo Rápido (Visitante)
-import TeamsPage from './pages/TeamsPage';          // Visualização de Times e Sorteio Oficial
-import DashboardPage from './pages/DashboardPage'; // Criação e Edição de Babas
-import VisitorMode from './pages/VisitorMode';      // Tela de boas-vindas ao Modo Visitante
-import FinancialPage from './pages/FinancialPage'; // Gestão de Mensalidades e PIX
+import MatchPage from './pages/MatchPage';          
+import TeamsPage from './pages/TeamsPage';          
+import DashboardPage from './pages/DashboardPage'; 
+import FinancialPage from './pages/FinancialPage'; 
+
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) return null; // Evita redirecionamento errado enquanto carrega sessão
+
+  return (
+    <Routes>
+      {/* Landing Page: Só acessível se não estiver logado */}
+      <Route path="/" element={
+        user ? <Navigate to="/dashboard" replace /> : <LandingPage />
+      } />
+
+      {/* Login: Se já estiver logado, vai direto para o dashboard */}
+      <Route path="/login" element={
+        !user ? <LoginPage /> : <Navigate to="/dashboard" replace />
+      } />
+
+      {/* Rota Protegida Principal */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <HomePage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/edit-baba/:id" element={
+        <ProtectedRoute>
+          <DashboardPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <ProfilePage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/financial" element={
+        <ProtectedRoute>
+          <FinancialPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/rankings" element={
+        <ProtectedRoute>
+          <RankingsPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teams" element={
+        <ProtectedRoute>
+          <TeamsPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/match" element={
+        <ProtectedRoute>
+          <MatchPage />
+        </ProtectedRoute>
+      } />
+
+      {/* Fallback inteligente */}
+      <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        {/* Toaster: Configuração completa preservada integralmente */}
-        <Toaster 
-          position="top-center" 
-          reverseOrder={false}
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#0a0a0a',
-              color: '#fff',
-              border: '1px solid rgba(0, 242, 255, 0.3)',
-              borderRadius: '1rem',
-              fontSize: '12px',
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              padding: '16px'
-            },
-            success: {
-              iconTheme: {
-                primary: '#00f2ff',
-                secondary: '#000',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ff4b4b',
-                secondary: '#fff',
-              },
-              style: {
-                border: '1px solid rgba(255, 75, 75, 0.3)',
-              }
-            }
-          }}
-        />
-        
-        <Routes>
-          {/* --- ROTAS PÚBLICAS (Acesso Livre) --- */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<LoginPage />} />
-          
-          {/* Fluxo do Visitante conforme seu checklist: /visitor -> /visitor-match */}
-          <Route path="/visitor" element={<VisitorMode />} />
-          <Route path="/visitor-match" element={<MatchPageVisitor />} />
-
-          {/* --- ROTAS PROTEGIDAS (Necessitam Login via ProtectedRoute) --- */}
-          
-          {/* Dashboard: Primeiro destino oficial após login */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          } />
-
-          {/* HomePage: Agora protegida e acessada via Dashboard */}
-          <Route path="/home" element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          } />
-
-          {/* Edição de Baba específico */}
-          <Route path="/edit-baba/:id" element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Perfil do Atleta e Estatísticas Pessoais */}
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          } />
-
-          {/* Financeiro: PIX e Controle de Caixa */}
-          <Route path="/financial" element={
-            <ProtectedRoute>
-              <FinancialPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Rankings: Artilharia e Assistências Oficiais */}
-          <Route path="/rankings" element={
-            <ProtectedRoute>
-              <RankingsPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Teams: Painel de Sorteio e Lista de Jogadores */}
-          <Route path="/teams" element={
-            <ProtectedRoute>
-              <TeamsPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Match: Controle de Tempo e Gols (Painel ADM) */}
-          <Route path="/match" element={
-            <ProtectedRoute>
-              <MatchPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Fallback de Segurança */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Toaster position="top-center" />
+        <AppRoutes />
       </BabaProvider>
     </AuthProvider>
   );
