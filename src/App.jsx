@@ -26,7 +26,7 @@ function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        {/* Toaster: Configuração completa preservada */}
+        {/* Toaster: Configuração completa preservada conforme sua versão */}
         <Toaster 
           position="top-center" 
           reverseOrder={false}
@@ -63,74 +63,77 @@ function App() {
         />
         
         <Routes>
-          {/* --- ROTAS PÚBLICAS (Acesso Total) --- */}
+          {/* --- 1. ROTAS PÚBLICAS (FLUXO VISITANTE E ACESSO) --- */}
+          {/* LandingPage: Ponto zero do app */}
           <Route path="/" element={<LandingPage />} />
+          
+          {/* Auth: Login e Cadastro */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage />} />
           
-          {/* Fluxo do Visitante: Totalmente aberto e isolado */}
+          {/* Fluxo do Visitante: Isolado conforme solicitado */}
           <Route path="/visitor" element={<VisitorMode />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
-          {/* --- ROTAS PROTEGIDAS (Necessitam Login via ProtectedRoute) --- */}
+          {/* --- 2. ROTAS PROTEGIDAS (FLUXO LOGADO - PROTECTEDROUTE) --- */}
           
-          {/* HomePage: Protegida para evitar que o visitante caia nela */}
-          <Route path="/home" element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          } />
-
-          {/* Dashboard: Gestão de Grupos de Baba */}
+          {/* Dashboard: Onde o usuário vê seus babas logo após o login */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
           } />
 
-          {/* Edição de Baba específico (Dashboard com ID) */}
-          <Route path="/edit-baba/:id" element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          } />
-
-          {/* Perfil do Atleta e Estatísticas Pessoais */}
+          {/* Profile: Onde o usuário preenche seus dados (Idade, Posição, etc) */}
           <Route path="/profile" element={
             <ProtectedRoute>
               <ProfilePage />
             </ProtectedRoute>
           } />
 
-          {/* Financeiro: PIX e Controle de Caixa */}
+          {/* HomePage: O coração do Baba selecionado */}
+          <Route path="/home" element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          } />
+
+          {/* Edição de Baba específico */}
+          <Route path="/edit-baba/:id" element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Financeiro */}
           <Route path="/financial" element={
             <ProtectedRoute>
               <FinancialPage />
             </ProtectedRoute>
           } />
 
-          {/* Rankings: Artilharia e Assistências Oficiais */}
+          {/* Rankings */}
           <Route path="/rankings" element={
             <ProtectedRoute>
               <RankingsPage />
             </ProtectedRoute>
           } />
 
-          {/* Teams: Painel de Sorteio e Lista de Jogadores */}
+          {/* Teams: Sorteio Oficial */}
           <Route path="/teams" element={
             <ProtectedRoute>
               <TeamsPage />
             </ProtectedRoute>
           } />
 
-          {/* Match: Controle de Tempo e Gols (Painel ADM) */}
+          {/* Match: Painel ADM Oficial */}
           <Route path="/match" element={
             <ProtectedRoute>
               <MatchPage />
             </ProtectedRoute>
           } />
 
-          {/* Fallback de Segurança */}
+          {/* Fallback de Segurança: Qualquer erro volta para a Landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BabaProvider>
