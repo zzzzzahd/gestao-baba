@@ -17,44 +17,70 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Função de busca de Perfil (Melhorada com tratamento de erro)
+  // 1. Função de busca de Perfil com timeout
   const fetchProfile = async (userId) => {
     if (!userId) return;
+    
     try {
-      const { data, error } = await supabase
+      // Timeout de 5 segundos para evitar travamento
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+      
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); // maybeSingle evita erro se o perfil ainda não existir
+        .maybeSingle();
+      
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
       
       if (data) {
         setProfile(data);
+      } else if (error && error.code !== 'PGRST116') {
+        console.warn("Perfil não encontrado ou erro:", error.message);
       }
     } catch (error) {
-      console.error("Erro ao buscar perfil:", error);
+      console.warn("Erro ao buscar perfil (ignorado):", error.message);
+      // Não bloqueia o login se der erro no perfil
     }
   };
 
   useEffect(() => {
-    if (!supabase) {
-      console.warn('Supabase não disponível.');
+    // Se Supabase não está configurado, para o loading imediatamente
+    if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
+      console.warn('Supabase não configurado - modo offline');
       setLoading(false);
       return;
     }
 
+    let mounted = true;
+
     // Pega sessão inicial
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error("Erro ao obter sessão:", error);
+          setLoading(false);
+          return;
+        }
+        
         const currentUser = session?.user ?? null;
         setUser(currentUser);
+        
         if (currentUser) {
           await fetchProfile(currentUser.id);
         }
       } catch (error) {
         console.error("Erro na sessão inicial:", error);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -62,6 +88,8 @@ export const AuthProvider = ({ children }) => {
 
     // Listener de mudanças
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       
@@ -70,10 +98,15 @@ export const AuthProvider = ({ children }) => {
       } else {
         setProfile(null);
       }
+      
+      // Garante que loading seja desligado
       setLoading(false);
     });
 
-    return () => subscription?.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   // --- FUNÇÕES DE PERFIL ---
@@ -93,6 +126,7 @@ export const AuthProvider = ({ children }) => {
       }
       return { data, error };
     } catch (e) {
+      console.error('Erro ao atualizar perfil:', e);
       return { data: null, error: e };
     }
   };
@@ -171,7 +205,6 @@ export const AuthProvider = ({ children }) => {
     refreshProfile: () => fetchProfile(user?.id)
   };
 
-  // MUDANÇA CRUCIAL: Sempre retornamos o Provider, mas passamos o loading dentro dele
   return (
     <AuthContext.Provider value={value}>
       {children}
