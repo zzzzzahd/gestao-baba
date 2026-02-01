@@ -6,10 +6,11 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
-// --- COMPONENTES DE SEGURANÇA ---
+// --- COMPONENTES ---
 import ProtectedRoute from './components/ProtectedRoute';
 
-// --- PÁGINAS (Verifique se os nomes dos arquivos na pasta /pages são EXATAMENTE estes) ---
+// --- PÁGINAS ---
+// ATENÇÃO: Verifique se os nomes dos arquivos na pasta /pages começam com Letra Maiúscula
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
@@ -25,24 +26,26 @@ import FinancialPage from './pages/FinancialPage';
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  // Se estiver carregando, mostra um fundo preto para não dar "flash" branco
+  // Se a tela estiver preta aqui, é porque o AuthContext não está mudando o loading para false
   if (loading) {
-    return <div className="min-h-screen bg-black" />;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
     <Routes>
-      {/* Landing Page: Ponto de entrada */}
+      {/* Landing/Home */}
       <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-      
-      {/* Login */}
       <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
 
-      {/* Modo Visitante (Preservado) */}
+      {/* Visitante */}
       <Route path="/visitor" element={<VisitorMode />} />
       <Route path="/match-visitor" element={<MatchPageVisitor />} />
 
-      {/* Rotas Protegidas */}
+      {/* Protegidas */}
       <Route path="/dashboard" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
       <Route path="/edit-baba/:id" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -57,16 +60,13 @@ function AppRoutes() {
   );
 }
 
-// O componente App PRECISA estar assim para os provedores funcionarem
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <BabaProvider>
-        <Toaster position="top-center" />
+        <Toaster position="top-center" reverseOrder={false} />
         <AppRoutes />
       </BabaProvider>
     </AuthProvider>
   );
 }
-
-export default App;
