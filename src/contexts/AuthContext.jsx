@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Função de busca de Perfil com timeout
+  // 1. Função de busca de Perfil com timeout (PRESERVADA E INTEGRAL)
   const fetchProfile = async (userId) => {
     if (!userId) return;
     
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Se Supabase não está configurado, para o loading imediatamente
+    // Se Supabase não está configurado, para o loading imediatamente (PRESERVADO)
     if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
       console.warn('Supabase não configurado - modo offline');
       setLoading(false);
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // Listener de mudanças
+    // Listener de mudanças (PRESERVADO)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
       
@@ -99,7 +99,6 @@ export const AuthProvider = ({ children }) => {
         setProfile(null);
       }
       
-      // Garante que loading seja desligado
       setLoading(false);
     });
 
@@ -109,19 +108,34 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // --- FUNÇÕES DE PERFIL ---
+  // --- FUNÇÕES DE PERFIL (MELHORADAS COM NOVOS CAMPOS) ---
 
   const updateProfile = async (updates) => {
     if (!user) return { error: 'Usuário não logado' };
     try {
+      // Upsert na tabela profiles (ADICIONADO: novos campos agora são salvos aqui)
       const { data, error } = await supabase
         .from('profiles')
-        .upsert({ id: user.id, ...updates, updated_at: new Date() })
+        .upsert({ 
+          id: user.id, 
+          ...updates, 
+          updated_at: new Date() 
+        })
         .select()
         .single();
 
       if (!error) {
         setProfile(data);
+        // NOVO: Sincroniza também com o metadata do Auth para garantir persistência global
+        await supabase.auth.updateUser({
+          data: {
+            name: updates.name,
+            avatar_url: updates.avatar_url,
+            age: updates.age,
+            position: updates.position,
+            heart_team: updates.heart_team
+          }
+        });
         toast.success('Perfil atualizado!');
       }
       return { data, error };
@@ -152,7 +166,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- FUNÇÕES DE AUTENTICAÇÃO ---
+  // --- FUNÇÕES DE AUTENTICAÇÃO (PRESERVADAS INTEGRALMENTE) ---
 
   const signUp = async (email, password, metadata = {}) => {
     try {
@@ -184,6 +198,8 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
+      // Limpa o Baba selecionado ao sair para não dar conflito no próximo login
+      localStorage.removeItem('selected_baba_id');
       await supabase.auth.signOut();
       setProfile(null);
       setUser(null);
