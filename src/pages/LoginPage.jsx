@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { useAuth } from '../contexts/AuthContext'; // Necessário para o ProtectedRoute saber que logou
+import { useAuth } from '../contexts/AuthContext'; 
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { refreshProfile } = useAuth(); // Apenas para atualizar o estado global após o login
+  // Importamos o refreshProfile para garantir que o contexto "acorde" após o login
+  const { refreshProfile } = useAuth(); 
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -21,10 +22,9 @@ const LoginPage = () => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      toast.success('Bem-vindo!');
+      // Removido o toast daqui para não duplicar, pois o handleSubmit já trata
       return { data, error: null };
     } catch (error) {
-      toast.error(error.message);
       return { data: null, error };
     }
   };
@@ -37,28 +37,32 @@ const LoginPage = () => {
         options: { data: metadata }
       });
       if (error) throw error;
-      toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
     } catch (error) {
-      toast.error(error.message);
       return { data: null, error };
     }
   };
 
   const handleSubmit = async (e) => {
+    // IMPORTANTE: O preventDefault evita que o navegador tente recarregar a página (o que causa o 404)
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
 
     try {
       if (isLogin) {
         // LOGIN
         const { data, error } = await handleSignIn(formData.email, formData.password);
-        if (error) throw error;
         
-        // Sincroniza o contexto global antes de navegar para não travar no "Loading"
+        if (error) throw error;
+
         if (data?.user) {
+          toast.success('Entrando no campo...');
+          // Sincroniza o contexto global antes de mudar de página
           await refreshProfile(); 
-          navigate('/dashboard');
+          // Redirecionamento forçado via React Router
+          navigate('/dashboard', { replace: true });
         }
       } else {
         // CRIAR CONTA
@@ -69,19 +73,20 @@ const LoginPage = () => {
         );
         if (error) throw error;
         
-        toast.success('Conta criada! Agora você pode entrar.');
+        toast.success('Conta criada! Faça seu login.');
         setIsLogin(true);
-        setFormData({ email: '', password: '', name: '' });
+        setFormData({ ...formData, password: '' });
       }
     } catch (err) {
-      const message =
-        err?.message === 'Invalid login credentials'
+      const message = err?.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos'
-          : err?.message || 'Erro ao processar solicitação';
+          : err?.message || 'Erro ao processar';
       toast.error(message);
       console.error('Auth Error:', err);
+      setLoading(false); // Destrava o botão em caso de erro
     } finally {
-      setLoading(false);
+      // O loading só deve ser false se NÃO navegarmos, 
+      // para evitar o flicker do botão voltando antes da página mudar
     }
   };
 
@@ -95,16 +100,11 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-5 bg-black">
       <div className="w-full max-w-md">
-        
-        {/* Logo */}
         <div className="mb-16">
           <Logo size="large" />
         </div>
 
-        {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* Campo Nome (só ao criar conta) */}
           {!isLogin && (
             <input
               type="text"
@@ -118,7 +118,6 @@ const LoginPage = () => {
             />
           )}
 
-          {/* Campo Email */}
           <input
             type="email"
             name="email"
@@ -130,7 +129,6 @@ const LoginPage = () => {
             className="input-tactical"
           />
 
-          {/* Campo Senha */}
           <input
             type="password"
             name="password"
@@ -143,7 +141,6 @@ const LoginPage = () => {
             className="input-tactical"
           />
 
-          {/* Botão Principal */}
           <button
             type="submit"
             disabled={loading}
@@ -159,18 +156,14 @@ const LoginPage = () => {
             )}
           </button>
 
-          {/* Toggle Login/Criar Conta */}
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
             className="btn-secondary"
           >
-            {isLogin
-              ? 'NÃO TENHO CONTA (CRIAR AGORA)'
-              : 'JÁ TENHO CONTA (FAZER LOGIN)'}
+            {isLogin ? 'NÃO TENHO CONTA (CRIAR AGORA)' : 'JÁ TENHO CONTA (FAZER LOGIN)'}
           </button>
 
-          {/* Botão Voltar */}
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -178,18 +171,6 @@ const LoginPage = () => {
           >
             ← Voltar para Início
           </button>
-
-          {/* Divisor */}
-          <div className="relative py-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
-              <span className="bg-black px-4 text-white/30">
-                Draft Baba System
-              </span>
-            </div>
-          </div>
         </form>
       </div>
     </div>
