@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 const LoginPage = () => {
   const navigate = useNavigate();
   const { signIn, signUp } = useAuth();
-
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,18 +21,21 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
+        // LOGIN
         const { error } = await signIn(formData.email, formData.password);
         if (error) throw error;
+        
+        // Sempre vai pra dashboard depois do login
         navigate('/dashboard');
       } else {
+        // CRIAR CONTA
         const { error } = await signUp(
           formData.email,
           formData.password,
           { name: formData.name }
         );
-
         if (error) throw error;
-
+        
         toast.success('Conta criada! Agora você pode entrar.');
         setIsLogin(true);
         setFormData({ email: '', password: '', name: '' });
@@ -43,7 +45,6 @@ const LoginPage = () => {
         err?.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos'
           : err?.message || 'Erro ao processar solicitação';
-
       toast.error(message);
       console.error('Auth Error:', err);
     } finally {
@@ -61,11 +62,16 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-5 bg-black">
       <div className="w-full max-w-md">
+        
+        {/* Logo */}
         <div className="mb-16">
           <Logo size="large" />
         </div>
 
+        {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* Campo Nome (só ao criar conta) */}
           {!isLogin && (
             <input
               type="text"
@@ -78,6 +84,7 @@ const LoginPage = () => {
             />
           )}
 
+          {/* Campo Email */}
           <input
             type="email"
             name="email"
@@ -88,6 +95,7 @@ const LoginPage = () => {
             className="input-tactical"
           />
 
+          {/* Campo Senha */}
           <input
             type="password"
             name="password"
@@ -99,6 +107,7 @@ const LoginPage = () => {
             className="input-tactical"
           />
 
+          {/* Botão Principal */}
           <button
             type="submit"
             disabled={loading}
@@ -114,6 +123,7 @@ const LoginPage = () => {
             )}
           </button>
 
+          {/* Toggle Login/Criar Conta */}
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
@@ -124,6 +134,16 @@ const LoginPage = () => {
               : 'JÁ TENHO CONTA (FAZER LOGIN)'}
           </button>
 
+          {/* Botão Voltar */}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="w-full py-3 bg-white/5 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all"
+          >
+            ← Voltar para Início
+          </button>
+
+          {/* Divisor */}
           <div className="relative py-4">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-white/10" />
