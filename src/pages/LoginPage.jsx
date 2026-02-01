@@ -16,11 +16,9 @@ const LoginPage = () => {
     name: ''
   });
 
-  // SUBSTITUIÇÃO: Função de ação direta sem depender de evento de formulário
   const handleAction = async () => {
     if (loading) return;
 
-    // Validação Manual
     if (!formData.email || !formData.password || (!isLogin && !formData.name)) {
       toast.error("Preencha todos os campos");
       return;
@@ -30,7 +28,6 @@ const LoginPage = () => {
 
     try {
       if (isLogin) {
-        // LOGIN
         const { error } = await signIn(formData.email, formData.password);
         
         if (error) {
@@ -38,11 +35,10 @@ const LoginPage = () => {
           return;
         }
         
-        // Se chegou aqui, o console já deve mostrar "SIGNED_IN"
-        // Forçamos a navegação
-        navigate('/dashboard');
+        // CORREÇÃO: Forçamos o redirecionamento nativo para limpar o estado 
+        // e garantir que a Vercel encontre a rota /dashboard
+        window.location.href = '/dashboard';
       } else {
-        // CADASTRO
         const { error } = await signUp(
           formData.email, 
           formData.password, 
@@ -55,13 +51,13 @@ const LoginPage = () => {
         }
         
         setIsLogin(true);
+        setLoading(false);
         toast.success("Conta criada! Pode entrar.");
       }
     } catch (err) {
       console.error('Erro na ação:', err);
-    } finally {
-      // Importante: Não setamos loading como false aqui se navegarmos, 
-      // para o botão não "piscar" antes de mudar a página
+      setLoading(false);
+      toast.error("Falha na comunicação com o servidor");
     }
   };
 
@@ -79,7 +75,6 @@ const LoginPage = () => {
           <Logo size="large" />
         </div>
 
-        {/* MUDANÇA: Usamos uma div para agrupar os campos, eliminando o risco de 404 por reload */}
         <div className="space-y-4">
           {!isLogin && (
             <input
@@ -89,7 +84,7 @@ const LoginPage = () => {
               placeholder="Nome completo"
               value={formData.name}
               onChange={handleChange}
-              className="input-tactical"
+              className="input-tactical w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-cyan-electric transition-all"
             />
           )}
 
@@ -100,7 +95,7 @@ const LoginPage = () => {
             placeholder="Email"
             value={formData.email}
             onChange={handleChange}
-            className="input-tactical"
+            className="input-tactical w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-cyan-electric transition-all"
           />
 
           <input
@@ -110,18 +105,18 @@ const LoginPage = () => {
             placeholder="Senha"
             value={formData.password}
             onChange={handleChange}
-            className="input-tactical"
+            className="input-tactical w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-cyan-electric transition-all"
           />
 
           <button
-            type="button" // MUDANÇA: Proteção contra reload involuntário
+            type="button"
             onClick={handleAction}
             disabled={loading}
-            className="btn-primary flex items-center justify-center gap-2"
+            className="w-full py-4 bg-cyan-electric text-black font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
-                <i className="fas fa-spinner fa-spin"></i>
+                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
                 PROCESSANDO...
               </>
             ) : (
@@ -132,7 +127,7 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            className="btn-secondary"
+            className="w-full py-3 text-xs font-black uppercase tracking-widest text-cyan-electric/60 hover:text-cyan-electric transition-colors"
           >
             {isLogin ? 'NÃO TENHO CONTA (CRIAR AGORA)' : 'JÁ TENHO CONTA (FAZER LOGIN)'}
           </button>
