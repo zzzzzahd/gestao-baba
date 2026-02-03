@@ -3,19 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Verificação de segurança no log para você debugar no Vercel
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'AVISO: Variáveis de ambiente do Supabase não encontradas. Verifique o arquivo .env ou as configurações do Vercel.'
+  throw new Error(
+    'Supabase não configurado: VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY ausentes.'
   );
 }
 
-// Exportamos a instância diretamente. 
-// Se as chaves forem undefined, o createClient não quebra o JS, 
-// ele apenas retornará erro nas requisições, o que é melhor que uma tela branca.
 export const supabase = createClient(
-  supabaseUrl || '', 
-  supabaseAnonKey || ''
+  supabaseUrl,
+  supabaseAnonKey
 );
 
 export const TABLES = {
