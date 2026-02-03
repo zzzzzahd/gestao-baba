@@ -2,21 +2,33 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
-export const AuthContext = createContext(null);
+// Criar contexto
+const AuthContext = createContext(null);
 
+// Hook para usar o contexto
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  
+  if (context === null || context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  
   return context;
 }
 
+// Provider do contexto
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Buscar perfil do usuário
   const fetchProfile = async (userId) => {
-    if (!userId) return;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -24,34 +36,63 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
-      if (data) setProfile(data);
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Erro ao buscar perfil:', error.message);
+      }
+      
+      if (data) {
+        setProfile(data);
+      } else {
+        setProfile(null);
+      }
     } catch (error) {
-      console.error('Erro ao buscar perfil:', error.message);
+      console.warn('Erro ao buscar perfil (catch):', error.message);
+      setProfile(null);
     }
   };
 
+  // Inicializar autenticação
   useEffect(() => {
     let mounted = true;
 
     async function initAuth() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Pegar sessão atual
+        const { data: { session }, error } = await supabase.auth.getSession();
+
         if (!mounted) return;
+
+        if (error) {
+          console.error('Erro ao obter sessão:', error);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
 
         const currentUser = session?.user || null;
         setUser(currentUser);
-        if (currentUser) await fetchProfile(currentUser.id);
-      } finally {
-        // PONTO CRÍTICO 1: Garante que o app saiba que a checagem inicial acabou
-        if (mounted) setLoading(false);
+
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro na inicialização:', error);
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
       }
     }
 
     initAuth();
 
+    // Listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         if (!mounted) return;
 
         const currentUser = session?.user || null;
@@ -63,85 +104,51 @@ export function AuthProvider({ children }) {
           setProfile(null);
         }
 
-        // PONTO CRÍTICO 2: Libera o estado de carregamento após qualquer mudança de auth
         setLoading(false);
       }
     );
 
+    // Cleanup
     return () => {
       mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
 
-  const uploadAvatar = async (file) => {
-    try {
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      return { url: publicUrl, error: null };
-    } catch (error) {
-      toast.error('Erro no upload: ' + error.message);
-      return { url: null, error };
-    }
-  };
-
-  const updateProfile = async (updates) => {
-    try {
-      if (!user) throw new Error('Sessão inválida');
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-      toast.success('Perfil atualizado!');
-      return { data, error: null };
-    } catch (error) {
-      toast.error(error.message);
-      return { data: null, error };
-    }
-  };
-
+  // Função de login
   const signIn = async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
       if (error) throw error;
+
+      toast.success('Bem-vindo!');
       return { data, error: null };
     } catch (error) {
-      toast.error(error.message);
+      const message = error.message === 'Invalid login credentials'
+        ? 'Email ou senha incorretos'
+        : error.message;
+      
+      toast.error(message);
       return { data: null, error };
     }
   };
 
+  // Função de cadastro
   const signUp = async (email, password, metadata = {}) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: metadata },
+        options: { data: metadata }
       });
+
       if (error) throw error;
-      toast.success('Verifique seu e-mail!');
+
+      toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
     } catch (error) {
       toast.error(error.message);
@@ -149,26 +156,90 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Função de logout
   const signOut = async () => {
-    await supabase.auth.signOut();
-    window.location.assign('/');
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      toast.success('Até logo!');
+    } catch (error) {
+      toast.error('Erro ao sair');
+      console.error('Erro no logout:', error);
+    }
+  };
+
+  // Função para atualizar perfil
+  const updateProfile = async (updates) => {
+    if (!user) {
+      return { error: 'Usuário não autenticado' };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      toast.success('Perfil atualizado!');
+      return { data, error: null };
+    } catch (error) {
+      toast.error('Erro ao atualizar perfil');
+      console.error('Erro:', error);
+      return { data: null, error };
+    }
+  };
+
+  // Função para upload de avatar
+  const uploadAvatar = async (userId, file) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      toast.error('Erro ao fazer upload');
+      throw error;
+    }
+  };
+
+  // Valor do contexto
+  const value = {
+    user,
+    profile,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    uploadAvatar,
+    refreshProfile: () => fetchProfile(user?.id)
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        updateProfile,
-        uploadAvatar,
-        refreshProfile: () => fetchProfile(user?.id),
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
+
+export default AuthProvider;
