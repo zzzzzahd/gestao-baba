@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -14,6 +14,13 @@ const LoginPage = () => {
     name: ''
   });
 
+  // ✅ SOLUÇÃO: useEffect controla navegação
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -21,7 +28,10 @@ const LoginPage = () => {
     try {
       if (isLogin) {
         const { error } = await signIn(formData.email, formData.password);
-        if (!error) navigate('/dashboard');
+        // ✅ NÃO navega aqui! useEffect vai navegar
+        if (error) {
+          setLoading(false);
+        }
       } else {
         const { error } = await signUp(formData.email, formData.password, {
           name: formData.name
@@ -30,8 +40,9 @@ const LoginPage = () => {
           setIsLogin(true);
           setFormData({ email: '', password: '', name: '' });
         }
+        setLoading(false);
       }
-    } finally {
+    } catch (err) {
       setLoading(false);
     }
   };
@@ -44,13 +55,13 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-5">
+    <div className="min-h-screen flex items-center justify-center p-5 bg-black">
       <div className="w-full max-w-md">
         <div className="mb-16">
           <Logo size="large" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 animate-slide-in">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
               <input
@@ -60,7 +71,7 @@ const LoginPage = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="input-tactical"
+                className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
               />
             </div>
           )}
@@ -73,7 +84,7 @@ const LoginPage = () => {
               value={formData.email}
               onChange={handleChange}
               required
-              className="input-tactical"
+              className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
             />
           </div>
 
@@ -86,17 +97,17 @@ const LoginPage = () => {
               onChange={handleChange}
               required
               minLength={6}
-              className="input-tactical"
+              className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary"
+            className="w-full p-4 bg-cyan-electric text-black font-bold rounded-xl hover:bg-cyan-400 disabled:opacity-50 transition-all"
           >
             {loading ? (
-              <i className="fas fa-spinner fa-spin"></i>
+              <span>Aguarde...</span>
             ) : (
               isLogin ? 'ENTRAR' : 'CRIAR CONTA'
             )}
@@ -105,24 +116,19 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            className="btn-secondary"
+            className="w-full p-2 text-cyan-electric text-sm hover:text-cyan-300 transition-colors"
           >
-            {isLogin ? 'CRIAR NOVA CONTA' : 'JÁ TENHO CONTA'}
+            {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
           </button>
 
           <button
             type="button"
-            onClick={() => navigate('/visitor')}
-            className="btn-visitor"
+            onClick={() => navigate('/')}
+            className="w-full p-2 text-white/50 text-sm hover:text-white transition-colors"
           >
-            MODO VISITANTE
+            ← Voltar
           </button>
         </form>
-
-        <div className="mt-8 text-center text-xs opacity-50">
-          <p>Gestão profissional de peladas</p>
-          <p className="mt-1">v1.0.0 - 2026</p>
-        </div>
       </div>
     </div>
   );
