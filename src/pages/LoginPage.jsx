@@ -14,10 +14,10 @@ const LoginPage = () => {
     name: ''
   });
 
-  // ✅ SOLUÇÃO: useEffect controla navegação
+  // Redireciona quando user existir
   useEffect(() => {
     if (user) {
-      navigate('/Dashboard');
+      navigate('/home');
     }
   }, [user, navigate]);
 
@@ -28,10 +28,10 @@ const LoginPage = () => {
     try {
       if (isLogin) {
         const { error } = await signIn(formData.email, formData.password);
-        // ✅ NÃO navega aqui! useEffect vai navegar
         if (error) {
           setLoading(false);
         }
+        // useEffect vai redirecionar quando user atualizar
       } else {
         const { error } = await signUp(formData.email, formData.password, {
           name: formData.name
