@@ -17,7 +17,7 @@ const LoginPage = () => {
   // ✅ SOLUÇÃO: useEffect controla navegação
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      navigate('/home');
     }
   }, [user, navigate]);
 
