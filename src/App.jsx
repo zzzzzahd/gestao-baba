@@ -7,7 +7,6 @@ import { BabaProvider } from './contexts/BabaContext';
 // Páginas
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import TeamsPage from './pages/TeamsPage';
@@ -17,7 +16,7 @@ import RankingsPage from './pages/RankingsPage';
 import FinancialPage from './pages/FinancialPage';
 import VisitorMode from './pages/VisitorMode';
 
-// ProtectedRoute inline (como no projeto antigo)
+// ProtectedRoute inline
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
@@ -57,14 +56,16 @@ function App() {
             <Route path="/visitor" element={<VisitorMode />} />
             <Route path="/visitor-match" element={<MatchPageVisitor />} />
             
-            {/* Rotas Protegidas */}
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            {/* Rotas Protegidas - TODAS vão para HomePage agora */}
             <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
             <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
             <Route path="/rankings" element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
             <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
+            
+            {/* Redirect antigos */}
+            <Route path="/dashboard" element={<Navigate to="/home" replace />} />
           </Routes>
         </BabaProvider>
       </AuthProvider>
