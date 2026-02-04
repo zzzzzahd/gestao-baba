@@ -6,11 +6,9 @@ import toast from 'react-hot-toast';
 const BabaContext = createContext(null);
 
 export const useBaba = () => {
-  const context = useContext(AuthContext); // Erro aqui corrigido para useBaba
+  const context = useContext(BabaContext);
   if (!context) {
-    const internalContext = useContext(BabaContext);
-    if (!internalContext) throw new Error('useBaba deve ser usado dentro de um BabaProvider');
-    return internalContext;
+    throw new Error('useBaba deve ser usado dentro de um BabaProvider');
   }
   return context;
 };
@@ -18,37 +16,40 @@ export const useBaba = () => {
 export const BabaProvider = ({ children }) => {
   const { user } = useAuth();
   const [currentBaba, setCurrentBaba] = useState(null);
-  const [myBabas, setMyBabas] = useState([]);
-  const [players, setPlayers] = useState([]);
+  const [babas, setBabas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [teamA, setTeamA] = useState([]);
-  const [teamB, setTeamB] = useState([]);
+  // Carregar babas do usuário
+  const loadBabas = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-  const TABLES = {
-    BABAS: 'babas',
-    PLAYERS: 'players',
-    PROFILES: 'profiles',
-    MATCHES: 'matches'
-  };
-
-  // 1. Carregar Babas do Usuário (PRESERVADO)
-  const loadMyBabas = async () => {
-    if (!user) return;
     try {
       setLoading(true);
+      
+      // Busca babas onde usuário é presidente OU participante
       const { data, error } = await supabase
-        .from(TABLES.BABAS)
+        .from('babas')
         .select('*')
-        .or(`president_id.eq.${user.id},coordinators.cs.{${user.id}}`);
+        .or(`president_id.eq.${user.id},players.cs.{${user.id}}`);
 
       if (error) throw error;
-      setMyBabas(data || []);
-      
-      const savedId = localStorage.getItem('selected_baba_id');
-      if (savedId && data) {
-        const found = data.find(b => b.id === savedId);
-        if (found) setCurrentBaba(found);
+
+      setBabas(data || []);
+
+      // Seleciona automaticamente se tiver apenas 1
+      if (data && data.length === 1) {
+        setCurrentBaba(data[0]);
+        localStorage.setItem('selected_baba_id', data[0].id);
+      } else {
+        // Tenta recuperar último selecionado
+        const savedId = localStorage.getItem('selected_baba_id');
+        if (savedId && data) {
+          const found = data.find(b => b.id === savedId);
+          if (found) setCurrentBaba(found);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar babas:', error);
@@ -57,151 +58,109 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Criar Novo Baba (PRESERVADO)
-  const createBaba = async (nome) => {
+  // Criar novo baba (LIMITE: 1 como presidente)
+  const createBaba = async (babaData) => {
+    if (!user) return { error: 'Usuário não autenticado' };
+
     try {
+      // Verifica limite
+      const myBabas = babas.filter(b => b.president_id === user.id);
+      if (myBabas.length >= 1) {
+        toast.error('Você já é presidente de 1 baba! Limite atingido.');
+        return { error: 'Limite de babas atingido' };
+      }
+
       const { data, error } = await supabase
-        .from(TABLES.BABAS)
-        .insert([{ 
-          nome, 
+        .from('babas')
+        .insert([{
+          ...babaData,
           president_id: user.id,
-          created_at: new Date()
+          created_at: new Date().toISOString()
         }])
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
-      setMyBabas([data[0], ...myBabas]);
-      return data[0];
+
+      toast.success('Baba criado com sucesso!');
+      await loadBabas();
+      return { data, error: null };
     } catch (error) {
-      console.error('Erro ao criar baba:', error);
-      throw error;
+      toast.error(error.message);
+      return { data: null, error };
     }
   };
 
-  // --- NOVO: FUNÇÃO DE UPDATE (NECESSÁRIA PARA O DASHBOARD) ---
+  // Atualizar baba
   const updateBaba = async (id, updates) => {
     try {
       const { data, error } = await supabase
-        .from(TABLES.BABAS)
+        .from('babas')
         .update(updates)
         .eq('id', id)
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
-      setMyBabas(myBabas.map(b => b.id === id ? data[0] : b));
-      if (currentBaba?.id === id) setCurrentBaba(data[0]);
-      return data[0];
+
+      toast.success('Baba atualizado!');
+      await loadBabas();
+      return { data, error: null };
     } catch (error) {
-      console.error('Erro ao atualizar baba:', error);
-      throw error;
+      toast.error(error.message);
+      return { data: null, error };
     }
   };
 
-  // Deletar Baba (PRESERVADO)
+  // Deletar baba
   const deleteBaba = async (id) => {
     try {
       const { error } = await supabase
-        .from(TABLES.BABAS)
+        .from('babas')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-      setMyBabas(myBabas.filter(b => b.id !== id));
+
+      toast.success('Baba deletado!');
+      
       if (currentBaba?.id === id) {
         setCurrentBaba(null);
         localStorage.removeItem('selected_baba_id');
       }
+      
+      await loadBabas();
+      return { error: null };
     } catch (error) {
-      console.error('Erro ao deletar:', error);
-      throw error;
+      toast.error(error.message);
+      return { error };
     }
   };
 
+  // Selecionar baba atual
   const selectBaba = (baba) => {
     setCurrentBaba(baba);
     localStorage.setItem('selected_baba_id', baba.id);
   };
 
-  const loadPlayers = async () => {
-    if (!currentBaba) return;
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.PLAYERS)
-        .select(`*, profile:profiles (name, avatar_url)`)
-        .eq('baba_id', currentBaba.id);
-
-      if (error) throw error;
-      setPlayers(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar jogadores:', error);
-    }
-  };
-
-  // Lógica de Sorteio (PRESERVADA INTEGRALMENTE)
-  const drawTeams = (availablePlayers) => {
-    if (availablePlayers.length < 2) {
-      toast.error("Adicione pelo menos 2 jogadores!");
-      return;
-    }
-    const goalies = availablePlayers.filter(p => p.position === 'goleiro');
-    const fieldPlayers = availablePlayers.filter(p => p.position !== 'goleiro');
-
-    const shuffle = (array) => {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
-    };
-
-    const shuffledGoalies = shuffle([...goalies]);
-    const shuffledField = shuffle([...fieldPlayers]);
-    const ta = []; const tb = [];
-
-    shuffledGoalies.forEach((g, i) => { if (i % 2 === 0) ta.push(g); else tb.push(g); });
-    shuffledField.forEach((p, i) => { if (i % 2 === 0) ta.push(p); else tb.push(p); });
-
-    setTeamA(ta);
-    setTeamB(tb);
-    toast.success("Times sorteados!");
-  };
-
-  const saveMatchResult = async (matchData) => {
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.MATCHES)
-        .insert([{ ...matchData, baba_id: currentBaba.id }])
-        .select();
-      if (error) throw error;
-      toast.success("Partida registrada!");
-      return data;
-    } catch (error) {
-      toast.error("Erro ao salvar partida");
-      return null;
-    }
-  };
-
-  useEffect(() => { loadMyBabas(); }, [user]);
-  useEffect(() => { loadPlayers(); }, [currentBaba]);
+  // Carregar ao montar
+  useEffect(() => {
+    loadBabas();
+  }, [user]);
 
   const value = {
+    babas,
     currentBaba,
     setCurrentBaba,
-    babas: myBabas,
-    myBabas,
-    players,
     loading,
-    teamA,
-    teamB,
     createBaba,
-    updateBaba, // Adicionado
+    updateBaba,
     deleteBaba,
     selectBaba,
-    drawTeams,
-    saveMatchResult,
-    refreshBabas: loadMyBabas,
-    refreshPlayers: loadPlayers
+    refreshBabas: loadBabas
   };
 
   return <BabaContext.Provider value={value}>{children}</BabaContext.Provider>;
 };
+
+export default BabaProvider;
