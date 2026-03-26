@@ -1,241 +1,399 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import { 
-  Trophy, Users, DollarSign, Settings, PlusCircle, LogOut, 
-  ChevronRight, LayoutDashboard, Share2, Play, CheckCircle2,
-  ListFilter, Star, Calendar, ShieldCheck
-} from 'lucide-react';
+import { useAuth } from '../contexts/MockAuthContext';
+import { PlusCircle, LogIn, Trophy, Users, Edit, Clock, MapPin } from 'lucide-react';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
-  const { myBabas, currentBaba, setCurrentBaba, players, drawTeams, loading } = useBaba();
+  const { myBabas, createBaba, joinBaba, setCurrentBaba, loading } = useBaba();
+  const { profile } = useAuth();
   
-  const [activeTab, setActiveTab] = useState('overview'); 
-  const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
-  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [mode, setMode] = useState(null); // 'create' ou 'join'
+  const [formData, setFormData] = useState({
+    name: '',
+    modality: 'futsal',
+    game_time: '20:00',
+    game_days: [],
+    match_duration: 10,
+    invite_code: '',
+  });
 
-  // Sincroniza jogadores selecionados para o sorteio
-  useEffect(() => {
-    if (players) {
-      setSelectedPlayers(players.map(p => p.id));
+  const handleCreateBaba = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      toast.error('Digite o nome do baba');
+      return;
     }
-  }, [players]);
+
+    if (formData.game_days.length === 0) {
+      toast.error('Selecione pelo menos um dia da semana');
+      return;
+    }
+
+    const result = await createBaba({
+      name: formData.name,
+      modality: formData.modality,
+      game_time: formData.game_time,
+      match_duration: formData.match_duration,
+      game_days: formData.game_days,
+    });
+
+    if (result) {
+      setMode(null); // Volta para tela inicial
+      toast.success('Baba criado! Clique nele abaixo para acessar.');
+    }
+  };
+
+  const handleJoinBaba = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.invite_code.trim()) {
+      toast.error('Digite o código do baba');
+      return;
+    }
+
+    const result = await joinBaba(formData.invite_code);
+
+    if (result) {
+      setMode(null); // Volta para tela inicial
+    }
+  };
+
+  const handleSelectBaba = (baba) => {
+    setCurrentBaba(baba);
+    navigate('/dashboard');
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sincronizando Dados...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Carregando Sistema...</p>
       </div>
     );
   }
 
-  const handleTogglePlayer = (id) => {
-    setSelectedPlayers(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
-  };
-
-  const handleStartDraw = () => {
-    const available = players.filter(p => selectedPlayers.includes(p.id));
-    if (available.length < 2) {
-      toast.error("Selecione pelo menos 2 atletas!");
-      return;
-    }
-    drawTeams(available);
-    setIsDrawModalOpen(false);
-    navigate('/match');
-  };
-
   return (
-    <div className="min-h-screen bg-black text-white pb-24 font-sans">
-      {/* HEADER SUPERIOR (Sincronizado com Perfil) */}
-      <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/profile')}>
-            <div className="relative">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-2xl font-black text-cyan-electric">
-                    {(profile?.name || user?.user_metadata?.name || 'C').charAt(0)}
-                  </span>
-                )}
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-black"></div>
-            </div>
-            <div>
-              <h2 className="text-xl font-black italic tracking-tighter uppercase leading-none">
-                {profile?.name || user?.user_metadata?.name || 'Comandante'}
-              </h2>
-              <p className="text-[9px] font-black uppercase tracking-widest text-cyan-electric mt-1">Status: Ativo na Arena</p>
-            </div>
-          </div>
-          <button onClick={() => signOut()} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all">
-            <LogOut size={20} />
-          </button>
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="w-full max-w-4xl mx-auto space-y-8">
+        {/* Logo */}
+        <div className="flex justify-center">
+          <Logo size="large" />
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-6">
-        {/* SELETOR DE BABA ATUAL (Correção de nomes) */}
-        <div className="mb-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-4">Seus Grupos de Elite</p>
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-            {myBabas.map((baba) => (
-              <button 
-                key={baba.id}
-                onClick={() => setCurrentBaba(baba)}
-                className={`flex-shrink-0 px-6 py-4 rounded-2xl border transition-all flex items-center gap-3 ${currentBaba?.id === baba.id ? 'border-cyan-electric bg-cyan-electric/10' : 'border-white/5 bg-white/5'}`}
-              >
-                <ShieldCheck size={18} className={currentBaba?.id === baba.id ? 'text-cyan-electric' : 'opacity-20'} />
-                <span className="font-black italic uppercase text-xs whitespace-nowrap">{baba.nome || baba.name}</span>
-              </button>
-            ))}
-            <button onClick={() => navigate('/dashboard')} className="flex-shrink-0 w-12 h-12 rounded-2xl border border-dashed border-white/20 flex items-center justify-center hover:border-cyan-electric transition-all">
-              <PlusCircle size={20} className="opacity-40" />
+        {/* Cabeçalho do Perfil */}
+        <div className="card-glass p-6 rounded-[2rem] animate-fade-in">
+          <div className="flex items-center gap-4">
+            {/* Círculo com Inicial */}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+              <span className="text-2xl font-black text-black">
+                {profile?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+
+            {/* Informações do Perfil */}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-black uppercase italic text-white truncate">
+                {profile?.name || 'Usuário'}
+              </h2>
+              
+              {/* Badge com Idade | Posição | Time */}
+              {(profile?.age || profile?.position || profile?.favorite_team) && (
+                <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
+                  {profile?.age && <span>{profile.age} anos</span>}
+                  {profile?.age && profile?.position && <span>•</span>}
+                  {profile?.position && <span>{profile.position}</span>}
+                  {(profile?.age || profile?.position) && profile?.favorite_team && <span>•</span>}
+                  {profile?.favorite_team && <span className="truncate max-w-[100px]">{profile.favorite_team}</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Botão Editar Perfil */}
+            <button
+              onClick={() => navigate('/profile')}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2 flex-shrink-0"
+            >
+              <Edit size={14} />
+              <span className="hidden sm:inline">Editar</span>
             </button>
           </div>
         </div>
 
-        {currentBaba ? (
-          <>
-            {/* TABS DE CONTEÚDO */}
-            <div className="flex border-b border-white/5 mb-8">
-              {['overview', 'ranking', 'presence'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === tab ? 'text-cyan-electric' : 'opacity-40'}`}
-                >
-                  {tab === 'overview' && 'Painel'}
-                  {tab === 'ranking' && 'Artilharia'}
-                  {tab === 'presence' && 'Confirmados'}
-                  {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-electric shadow-[0_0_10px_#00fff2]"></div>}
-                </button>
-              ))}
+        {/* Botões: Criar e Entrar */}
+        {mode === null && (
+          <div className="space-y-4 animate-fade-in">
+            <p className="text-center text-white/60 text-sm font-tactical">
+              Escolha uma opção para começar
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => setMode('create')}
+                className="p-6 rounded-[2rem] bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                <PlusCircle size={24} />
+                Criar Novo Baba
+              </button>
+
+              <button
+                onClick={() => setMode('join')}
+                className="p-6 rounded-[2rem] bg-white/5 border border-green-neon text-green-neon font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 hover:bg-green-neon/10 transition-all"
+              >
+                <LogIn size={24} />
+                Entrar com Convite
+              </button>
             </div>
+          </div>
+        )}
 
-            {/* CONTEÚDO DINÂMICO */}
-            <div className="space-y-6">
-              {activeTab === 'overview' && (
-                <div className="space-y-6 animate-in fade-in duration-500">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Horário</p>
-                      <h4 className="text-sm font-black italic">{currentBaba.game_time || '20:00'}</h4>
-                      <div className="mt-4 flex items-center gap-2 text-green-400">
-                        <Calendar size={14} /> <span className="text-[10px] font-black uppercase">Frequência Semanal</span>
-                      </div>
-                    </div>
-                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Modalidade</p>
-                      <h4 className="text-sm font-black italic uppercase">{currentBaba.modality || 'Futsal'}</h4>
-                      <div className="mt-4 flex items-center gap-2 text-cyan-electric">
-                        <Users size={14} /> <span className="text-[10px] font-black uppercase">{players?.length || 0} Atletas</span>
-                      </div>
-                    </div>
-                  </div>
+        {/* Formulário de Criar Baba */}
+        {mode === 'create' && (
+          <form onSubmit={handleCreateBaba} className="space-y-6 animate-fade-in">
+            <div className="card-glass p-8 rounded-[2rem]">
+              <div className="flex items-center gap-3 mb-6">
+                <Trophy className="text-cyan-electric" size={24} />
+                <h2 className="text-2xl font-black italic uppercase">Criar Baba</h2>
+              </div>
 
-                  <button 
-                    onClick={() => setIsDrawModalOpen(true)}
-                    className="w-full py-6 rounded-[2rem] bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all"
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Nome do Baba
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ex: Baba da Galera"
+                    className="input-tactical"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Modalidade
+                  </label>
+                  <select
+                    value={formData.modality}
+                    onChange={(e) => setFormData({ ...formData, modality: e.target.value })}
+                    className="input-tactical"
                   >
-                    <Play fill="black" size={20} /> Iniciar Sorteio de Times
-                  </button>
+                    <option value="futsal">Futsal</option>
+                    <option value="society">Society</option>
+                  </select>
+                </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Horário do Jogo
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.game_time}
+                    onChange={(e) => setFormData({ ...formData, game_time: e.target.value })}
+                    className="input-tactical"
+                  />
+                </div>
+
+                {/* ⭐ NOVO: Seleção de Dias da Semana */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
+                    Dias da Semana
+                  </label>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                     {[
-                      { icon: <Users size={20} />, label: 'Atletas', path: '/players' },
-                      { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
-                      { icon: <Settings size={20} />, label: 'Config', path: `/edit-baba/${currentBaba.id}` },
-                    ].map((item, i) => (
-                      <button key={i} onClick={() => navigate(item.path)} className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5">
-                        <div className="text-cyan-electric opacity-60">{item.icon}</div>
-                        <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+                      { day: 0, label: 'DOM' },
+                      { day: 1, label: 'SEG' },
+                      { day: 2, label: 'TER' },
+                      { day: 3, label: 'QUA' },
+                      { day: 4, label: 'QUI' },
+                      { day: 5, label: 'SEX' },
+                      { day: 6, label: 'SÁB' },
+                    ].map(({ day, label }) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const newDays = formData.game_days.includes(day)
+                            ? formData.game_days.filter(d => d !== day)
+                            : [...formData.game_days, day].sort((a, b) => a - b);
+                          setFormData({ ...formData, game_days: newDays });
+                        }}
+                        className={`py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${
+                          formData.game_days.includes(day)
+                            ? 'bg-cyan-electric text-black border-2 border-cyan-electric shadow-[0_0_15px_rgba(0,242,255,0.4)]'
+                            : 'bg-white/5 text-white/40 border-2 border-white/10 hover:bg-white/10 hover:text-white/60'
+                        }`}
+                      >
+                        {label}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {activeTab === 'ranking' && (
-                <div className="space-y-4 animate-in fade-in duration-500">
-                  {players.length > 0 ? (
-                    players.sort((a,b) => (b.total_goals || 0) - (a.total_goals || 0)).slice(0, 5).map((p, i) => (
-                      <div key={p.id} className="flex items-center justify-between p-4 card-glass rounded-2xl border border-white/5 bg-white/5">
-                        <div className="flex items-center gap-4">
-                          <span className="text-lg font-black italic opacity-20 w-4">#{i+1}</span>
-                          <span className="font-bold uppercase text-sm">{p.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-green-400 font-black italic">
-                          <Star size={14} /> {p.total_goals || 0} <span className="text-[9px] opacity-40">GOLS</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-center py-10 opacity-30 text-xs uppercase font-black tracking-widest">Nenhum dado de artilharia</p>
+                  {formData.game_days.length === 0 && (
+                    <p className="text-[9px] text-yellow-500 mt-2 flex items-center gap-1">
+                      <span>⚠️</span> Selecione pelo menos um dia
+                    </p>
+                  )}
+                  {formData.game_days.length > 0 && (
+                    <p className="text-[9px] text-cyan-electric mt-2">
+                      ✓ {formData.game_days.length} dia{formData.game_days.length > 1 ? 's' : ''} selecionado{formData.game_days.length > 1 ? 's' : ''}
+                    </p>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-          </>
-        ) : (
-          <div className="py-20 text-center space-y-6">
-            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-dashed border-white/20">
-              <LayoutDashboard className="opacity-20" size={40} />
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setMode(null)}
+                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all"
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-[2] py-5 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest shadow-neon-cyan hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loading ? 'Criando...' : 'Criar Baba'}
+              </button>
             </div>
-            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">Selecione um Baba para gerenciar</p>
-            <button onClick={() => navigate('/dashboard')} className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan">
-              Ir para Dashboard
-            </button>
+          </form>
+        )}
+
+        {/* Formulário de Entrar em Baba */}
+        {mode === 'join' && (
+          <form onSubmit={handleJoinBaba} className="space-y-6 animate-fade-in">
+            <div className="card-glass p-8 rounded-[2rem]">
+              <div className="flex items-center gap-3 mb-6">
+                <Users className="text-green-neon" size={24} />
+                <h2 className="text-2xl font-black italic uppercase">Entrar no Baba</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Código do Convite
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.invite_code}
+                    onChange={(e) => setFormData({ ...formData, invite_code: e.target.value.toUpperCase() })}
+                    placeholder="Ex: ABC12345"
+                    className="input-tactical text-center text-2xl font-black tracking-widest"
+                    maxLength={8}
+                    required
+                  />
+                  <p className="text-[9px] text-white/30 mt-2 text-center">
+                    Digite o código de 8 caracteres fornecido pelo presidente
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setMode(null)}
+                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all"
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-[2] py-5 rounded-2xl bg-green-neon text-black font-black uppercase text-[10px] tracking-widest shadow-neon-green hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Seção: Meus Babas */}
+        {mode === null && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent"></div>
+              <h2 className="text-xl font-black uppercase italic text-cyan-electric">
+                Meus Babas
+              </h2>
+              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent"></div>
+            </div>
+
+            {myBabas && myBabas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myBabas.map((baba) => (
+                  <button
+                    key={baba.id}
+                    onClick={() => handleSelectBaba(baba)}
+                    className="card-glass p-6 rounded-[2rem] hover:border-cyan-electric/50 transition-all group text-left"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-lg font-black uppercase italic text-white group-hover:text-cyan-electric transition-colors">
+                        {baba.name}
+                      </h3>
+                      <div className="w-2 h-2 rounded-full bg-green-neon animate-pulse"></div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
+                        <MapPin size={12} />
+                        <span>{baba.modality === 'futsal' ? 'Futsal' : 'Society'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
+                        <Clock size={12} />
+                        <span>{baba.game_time}</span>
+                      </div>
+
+                      {/* ⭐ NOVO: Dias da Semana */}
+                      {baba.game_days && baba.game_days.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {baba.game_days.sort((a, b) => a - b).map((day) => {
+                            const dayLabels = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+                            return (
+                              <span 
+                                key={day}
+                                className="w-6 h-6 rounded-md bg-cyan-electric/20 border border-cyan-electric/30 text-cyan-electric text-[8px] font-black flex items-center justify-center"
+                              >
+                                {dayLabels[day]}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="card-glass p-12 rounded-[2rem] text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                    <Trophy size={32} className="text-white/20" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black uppercase text-white/40 mb-2">
+                      Nenhum Baba Ainda
+                    </p>
+                    <p className="text-sm text-white/30">
+                      Crie um novo baba ou entre com código de convite
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* MODAL DE SORTEIO RÁPIDO */}
-      {isDrawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/95 backdrop-blur-md">
-          <div className="w-full max-w-lg bg-[#0a0a0a] border border-cyan-electric/20 rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <div className="p-8 border-b border-white/5 flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter">Sorteio Rápido</h3>
-                <p className="text-[10px] font-black uppercase text-cyan-electric tracking-widest">Convoque os atletas</p>
-              </div>
-              <div className="bg-cyan-electric text-black px-4 py-2 rounded-xl font-black">
-                {selectedPlayers.length}
-              </div>
-            </div>
-            
-            <div className="max-h-[40vh] overflow-y-auto p-6 grid grid-cols-1 gap-2 custom-scrollbar">
-              {players.map(player => (
-                <button
-                  key={player.id}
-                  onClick={() => handleTogglePlayer(player.id)}
-                  className={`flex items-center justify-between p-4 rounded-2xl transition-all ${selectedPlayers.includes(player.id) ? 'bg-cyan-electric/10 border border-cyan-electric/40' : 'bg-white/5 border border-transparent'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${player.position === 'Goleiro' ? 'bg-yellow-400' : 'bg-blue-400'}`}></div>
-                    <span className="text-sm font-bold uppercase">{player.name}</span>
-                  </div>
-                  {selectedPlayers.includes(player.id) && <CheckCircle2 className="text-cyan-electric" size={18} />}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-8 flex gap-3">
-              <button onClick={() => setIsDrawModalOpen(false)} className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest">Cancelar</button>
-              <button onClick={handleStartDraw} className="flex-[2] py-5 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest shadow-neon-cyan">Confirmar Sorteio</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
