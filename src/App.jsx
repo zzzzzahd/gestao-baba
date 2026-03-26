@@ -58,14 +58,39 @@ function App() {
             
             {/* Rotas Protegidas - TODAS vão para HomePage agora */}
             <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
             <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
             <Route path="/rankings" element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
             <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
-            
-            {/* Redirect antigos */}
-            <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+
+            <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#0d0d0d',
+                color: '#fff',
+                border: '1px solid rgba(0, 242, 255, 0.2)',
+                borderRadius: '1rem',
+                fontFamily: 'Rajdhani, sans-serif',
+                fontWeight: 'bold',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#00f2ff',
+                  secondary: '#0d0d0d',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ff003c',
+                  secondary: '#0d0d0d',
+                },
+              },
+            }}
+          />  
           </Routes>
         </BabaProvider>
       </AuthProvider>
