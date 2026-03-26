@@ -1,16 +1,20 @@
 -- =============================================
--- SCHEMA DO SUPABASE PARA GESTÃO DE BABA
+-- SCHEMA UNIFICADO - GESTÃO DE BABA
+-- Autenticação via auth.users do Supabase
+-- Perfil criado automaticamente via trigger no cadastro
 -- =============================================
 
--- Extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =============================================
--- TABELA: users (perfil estendido do auth.users)
+-- TABELA: users
+-- Perfil público vinculado ao auth.users
+-- Preenchido automaticamente no cadastro
 -- =============================================
 CREATE TABLE public.users (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   avatar_url TEXT,
   phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -27,6 +31,29 @@ CREATE POLICY "Users can view own profile"
 CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   USING (auth.uid() = id);
+
+-- =============================================
+-- TRIGGER: cria perfil automaticamente
+-- quando um novo usuário se cadastra no site
+-- =============================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, name, email, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    NEW.email,
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- =============================================
 -- TABELA: babas (grupos de pelada)
@@ -48,11 +75,9 @@ CREATE TABLE public.babas (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Índices
 CREATE INDEX idx_babas_president ON public.babas(president_id);
 CREATE INDEX idx_babas_invite_code ON public.babas(invite_code);
 
--- RLS para babas
 ALTER TABLE public.babas ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view public babas"
@@ -78,14 +103,13 @@ CREATE TABLE public.players (
   total_assists_month INTEGER DEFAULT 0,
   total_goals_year INTEGER DEFAULT 0,
   total_assists_year INTEGER DEFAULT 0,
-  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(baba_id, user_id)
 );
 
--- Índices
 CREATE INDEX idx_players_baba ON public.players(baba_id);
 CREATE INDEX idx_players_user ON public.players(user_id);
 
--- RLS para players
 ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Players can view baba members"
@@ -99,7 +123,7 @@ CREATE POLICY "Players can view baba members"
   );
 
 -- =============================================
--- TABELA: matches (partidas realizadas)
+-- TABELA: matches (partidas)
 -- =============================================
 CREATE TABLE public.matches (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -115,11 +139,9 @@ CREATE TABLE public.matches (
   finished_at TIMESTAMP WITH TIME ZONE
 );
 
--- Índices
 CREATE INDEX idx_matches_baba ON public.matches(baba_id);
 CREATE INDEX idx_matches_date ON public.matches(match_date);
 
--- RLS para matches
 ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view baba matches"
@@ -133,7 +155,7 @@ CREATE POLICY "Anyone can view baba matches"
   );
 
 -- =============================================
--- TABELA: match_players (jogadores em cada partida)
+-- TABELA: match_players (jogadores por partida)
 -- =============================================
 CREATE TABLE public.match_players (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -143,11 +165,9 @@ CREATE TABLE public.match_players (
   position TEXT CHECK (position IN ('goleiro', 'linha')) NOT NULL
 );
 
--- Índices
 CREATE INDEX idx_match_players_match ON public.match_players(match_id);
 CREATE INDEX idx_match_players_player ON public.match_players(player_id);
 
--- RLS para match_players
 ALTER TABLE public.match_players ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view match players"
@@ -166,11 +186,9 @@ CREATE TABLE public.goals (
   scored_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Índices
 CREATE INDEX idx_goals_match ON public.goals(match_id);
 CREATE INDEX idx_goals_player ON public.goals(player_id);
 
--- RLS para goals
 ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view goals"
@@ -189,11 +207,9 @@ CREATE TABLE public.cards (
   given_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Índices
 CREATE INDEX idx_cards_match ON public.cards(match_id);
 CREATE INDEX idx_cards_player ON public.cards(player_id);
 
--- RLS para cards
 ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view cards"
@@ -213,11 +229,9 @@ CREATE TABLE public.presences (
   UNIQUE(match_id, player_id)
 );
 
--- Índices
 CREATE INDEX idx_presences_match ON public.presences(match_id);
 CREATE INDEX idx_presences_player ON public.presences(player_id);
 
--- RLS para presences
 ALTER TABLE public.presences ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Players can manage own presence"
@@ -244,10 +258,8 @@ CREATE TABLE public.financials (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Índices
 CREATE INDEX idx_financials_baba ON public.financials(baba_id);
 
--- RLS para financials
 ALTER TABLE public.financials ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Members can view baba financials"
@@ -275,11 +287,9 @@ CREATE TABLE public.payments (
   UNIQUE(financial_id, player_id)
 );
 
--- Índices
 CREATE INDEX idx_payments_financial ON public.payments(financial_id);
 CREATE INDEX idx_payments_player ON public.payments(player_id);
 
--- RLS para payments
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Players can manage own payments"
@@ -293,10 +303,10 @@ CREATE POLICY "Players can manage own payments"
   );
 
 -- =============================================
--- FUNCTIONS E TRIGGERS
+-- FUNCTIONS E TRIGGERS UTILITÁRIOS
 -- =============================================
 
--- Função para atualizar updated_at
+-- Atualizar updated_at automaticamente
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -305,14 +315,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers de updated_at
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_babas_updated_at BEFORE UPDATE ON public.babas
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Função para gerar código de convite único
+-- Gerar código de convite único
 CREATE OR REPLACE FUNCTION generate_invite_code()
 RETURNS TEXT AS $$
 DECLARE
@@ -327,7 +336,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para gerar código de convite automaticamente
 CREATE OR REPLACE FUNCTION set_invite_code()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -341,7 +349,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER set_baba_invite_code BEFORE INSERT ON public.babas
   FOR EACH ROW EXECUTE FUNCTION set_invite_code();
 
--- Função para atualizar estatísticas mensais (resetar todo dia 1)
+-- Resetar estatísticas mensais (configurar via pg_cron todo dia 1)
 CREATE OR REPLACE FUNCTION reset_monthly_stats()
 RETURNS void AS $$
 BEGIN
@@ -351,7 +359,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Função para atualizar estatísticas anuais (resetar todo 1º de janeiro)
+-- Resetar estatísticas anuais (configurar via pg_cron todo 1º de janeiro)
 CREATE OR REPLACE FUNCTION reset_yearly_stats()
 RETURNS void AS $$
 BEGIN
@@ -360,17 +368,3 @@ BEGIN
   WHERE EXTRACT(MONTH FROM NOW()) = 1 AND EXTRACT(DAY FROM NOW()) = 1;
 END;
 $$ LANGUAGE plpgsql;
-
--- =============================================
--- INSERÇÃO DE DADOS DE EXEMPLO (OPCIONAL)
--- =============================================
-
--- Você pode descomentar e adaptar conforme necessário
-/*
-INSERT INTO public.users (id, name, avatar_url) VALUES
-  ('user-uuid-1', 'João Silva', NULL),
-  ('user-uuid-2', 'Maria Santos', NULL);
-
-INSERT INTO public.babas (name, president_id, modality, game_time) VALUES
-  ('Baba da Galera', 'user-uuid-1', 'futsal', '20:00');
-*/
