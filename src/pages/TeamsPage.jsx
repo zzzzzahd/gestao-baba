@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
-import { useAuth } from '../contexts/MockAuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { Trophy, Users, ArrowLeft, Play, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
