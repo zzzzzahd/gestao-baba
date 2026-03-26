@@ -1,253 +1,214 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, LogOut, PlusCircle, UserPlus, Save, Loader2, Trash2, Edit3, Settings, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useBaba } from '../contexts/BabaContext';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import { 
+  ArrowLeft, 
+  User, 
+  Mail, 
+  Calendar,
+  Target,
+  Heart,
+  Save,
+  X
+} from 'lucide-react';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, profile: authProfile, signOut, updateProfile, uploadAvatar } = useAuth(); 
-  const { getMyBabas, deleteBaba } = useBaba(); 
-  
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [myBabas, setMyBabas] = useState([]);
+  const { profile } = useAuth();
 
-  // Perfil local para o formulário
-  const [profile, setProfile] = useState({
-    name: '',
-    age: '',
-    position: 'Linha',
-    heart_team: '',
-    avatar_url: null
+  // Estado para controlar os dados do formulário
+  const [formData, setFormData] = useState({
+    name: profile?.name || '',
+    email: profile?.email || '',
+    age: profile?.age || '',
+    position: profile?.position || '',
+    favorite_team: profile?.favorite_team || '',
   });
 
-  // 1. Carregar dados sincronizados
-  useEffect(() => {
-    const getData = async () => {
-      try {
-        if (!user) return;
+  const [loading, setLoading] = useState(false);
 
-        // Busca Babas Criados
-        const babasData = await getMyBabas(user.id);
-        if (babasData) setMyBabas(babasData);
-
-        // Sincroniza com os detalhes do perfil vindos do AuthContext
-        if (authProfile) {
-          setProfile({
-            name: authProfile.name || user?.user_metadata?.name || '',
-            age: authProfile.age || '',
-            position: authProfile.position || 'Linha',
-            heart_team: authProfile.heart_team || '',
-            avatar_url: authProfile.avatar_url || null
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    getData();
-  }, [user, authProfile, getMyBabas]);
-
-  // 2. Salvar Dados do Perfil
-  const handleUpdateProfile = async () => {
-    setSaving(true);
-    try {
-      await updateProfile({
-        name: profile.name,
-        age: profile.age,
-        position: profile.position,
-        heart_team: profile.heart_team
-      });
-      toast.success("Perfil atualizado!");
-    } catch (error) {
-      toast.error("Erro ao salvar dados");
-    } finally {
-      setSaving(false);
-    }
+  // Atualizar campo do formulário
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  // 3. Upload de Foto
-  const handlePhotoUpload = async (file) => {
-    if (!file) return;
+  // Salvar alterações no Supabase
+  const handleSave = async () => {
+    // Validação: nome não pode estar vazio
+    if (!formData.name.trim()) {
+      toast.error('O nome é obrigatório');
+      return;
+    }
+
     try {
-      const loadingToast = toast.loading("Enviando foto...");
-      const publicUrl = await uploadAvatar(user.id, file);
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name.trim(),
+          age: formData.age ? parseInt(formData.age) : null,
+          position: formData.position || null,
+          favorite_team: formData.favorite_team.trim() || null,
+        })
+        .eq('id', profile.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Perfil atualizado com sucesso!');
       
-      if (publicUrl) {
-        setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
-        toast.dismiss(loadingToast);
-        toast.success("Foto atualizada!");
-      }
+      // Aguardar 1 segundo e voltar para página anterior
+      setTimeout(() => {
+        navigate(-1);
+      }, 1000);
+
     } catch (error) {
-      toast.dismiss();
-      toast.error("Erro no upload");
+      console.error('Error updating profile:', error);
+      toast.error('Erro ao atualizar perfil');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 4. Lógica para Apagar Baba
-  const handleDeleteBaba = async (babaId) => {
-    const confirmar = window.confirm("⚠️ ATENÇÃO: Apagar este Baba excluirá permanentemente todos os rankings e fotos vinculadas. Deseja continuar?");
-    
-    if (confirmar) {
-      try {
-        await deleteBaba(babaId);
-        setMyBabas(myBabas.filter(b => b.id !== babaId));
-        toast.success("Baba removido!");
-      } catch (error) {
-        toast.error("Erro ao remover Baba");
-      }
-    }
+  // Cancelar e voltar
+  const handleCancel = () => {
+    navigate(-1);
   };
-
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <Loader2 className="animate-spin text-cyan-electric" size={40} />
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-black text-white p-5 pb-24 font-sans">
-      {/* HEADER */}
-      <header className="flex justify-between items-center mb-8">
-        <button onClick={() => navigate(-1)} className="p-2 bg-white/5 rounded-xl text-white/50 hover:text-white transition-colors">
-          <ArrowLeft size={22}/>
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-2xl mx-auto">
+        {/* Botão Voltar */}
+        <button 
+          onClick={handleCancel}
+          className="flex items-center gap-2 text-white/60 hover:text-cyan-electric mb-8 transition-all"
+        >
+          <ArrowLeft size={20} />
+          <span className="text-sm font-black uppercase">Voltar</span>
         </button>
-        <h1 className="text-2xl font-black text-cyan-electric italic tracking-tighter">MEU PERFIL</h1>
-        <button onClick={signOut} className="text-red-500 opacity-50 hover:opacity-100 transition-opacity p-2 bg-red-500/10 rounded-xl">
-          <LogOut size={22}/>
-        </button>
-      </header>
 
-      {/* CARD DE IDENTIDADE */}
-      <div className="card-glass p-6 rounded-3xl border border-white/10 mb-6 relative overflow-hidden shadow-2xl">
-        <div className="flex flex-col items-center gap-4 relative z-10">
-          <div className="relative group">
-            <div className="w-28 h-28 rounded-full bg-white/5 border-2 border-cyan-electric flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(0,242,255,0.2)]">
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover"/>
-              ) : (
-                <Camera className="opacity-20 text-cyan-electric" size={40}/>
-              )}
+        {/* Card Principal */}
+        <div className="card-glass p-8 rounded-[2rem]">
+          <h1 className="text-3xl font-black italic uppercase mb-8">
+            Editar Perfil
+          </h1>
+          
+          <div className="space-y-6">
+            {/* Campo: Nome */}
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                <User size={14} /> Nome
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="input-tactical"
+                placeholder="Seu nome completo"
+                disabled={loading}
+              />
             </div>
-            <label className="absolute bottom-0 right-0 bg-cyan-electric p-2.5 rounded-full cursor-pointer shadow-lg hover:scale-110 transition-transform">
-              <PlusCircle size={18} className="text-black"/>
-              <input type="file" className="hidden" accept="image/*" onChange={(e) => handlePhotoUpload(e.target.files[0])}/>
-            </label>
-          </div>
 
-          <div className="text-center w-full">
-            <input 
-              type="text"
-              value={profile.name}
-              onChange={(e) => setProfile({...profile, name: e.target.value.toUpperCase()})}
-              className="bg-transparent text-xl font-black uppercase italic text-center w-full outline-none focus:text-cyan-electric transition-colors"
-              placeholder="SEU NOME"
-            />
-            <p className="text-[9px] text-cyan-electric font-bold tracking-[0.3em] uppercase mt-1 opacity-60">
-              Draft ID: #{user?.id?.slice(0, 8)}
-            </p>
+            {/* Campo: Email (não editável) */}
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                <Mail size={14} /> Email
+              </label>
+              <div className="input-tactical bg-white/10 cursor-not-allowed opacity-60">
+                {formData.email}
+              </div>
+              <p className="text-[10px] text-white/30 mt-1 ml-1">
+                O email não pode ser alterado
+              </p>
+            </div>
+
+            {/* Campo: Idade */}
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                <Calendar size={14} /> Idade
+              </label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age}
+                onChange={handleChange}
+                min="10"
+                max="99"
+                className="input-tactical"
+                placeholder="Ex: 28"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Campo: Posição */}
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                <Target size={14} /> Posição em Campo
+              </label>
+              <select
+                name="position"
+                value={formData.position}
+                onChange={handleChange}
+                className="input-tactical"
+                disabled={loading}
+              >
+                <option value="">Selecione uma posição</option>
+                <option value="goleiro">Goleiro</option>
+                <option value="zagueiro">Zagueiro</option>
+                <option value="meio-campo">Meio-campo</option>
+                <option value="atacante">Atacante</option>
+              </select>
+            </div>
+
+            {/* Campo: Time do Coração */}
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                <Heart size={14} /> Time do Coração
+              </label>
+              <input
+                type="text"
+                name="favorite_team"
+                value={formData.favorite_team}
+                onChange={handleChange}
+                className="input-tactical"
+                placeholder="Ex: Flamengo"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="pt-6 border-t border-white/10 grid grid-cols-2 gap-4">
+              {/* Botão Cancelar */}
+              <button
+                onClick={handleCancel}
+                disabled={loading}
+                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={18} />
+                Cancelar
+              </button>
+
+              {/* Botão Salvar */}
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={18} />
+                {loading ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* FORMULÁRIO COM CAMPOS ADICIONAIS */}
-        <div className="grid grid-cols-2 gap-4 mt-8">
-          <div className="space-y-1">
-            <label className="text-[9px] font-black opacity-40 uppercase ml-2 tracking-widest">Idade</label>
-            <input 
-              type="number" 
-              value={profile.age}
-              onChange={(e) => setProfile({...profile, age: e.target.value})}
-              placeholder="Ex: 25" 
-              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:border-cyan-electric transition-all"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] font-black opacity-40 uppercase ml-2 tracking-widest">Posição</label>
-            <select 
-              value={profile.position}
-              onChange={(e) => setProfile({...profile, position: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:border-cyan-electric appearance-none text-white"
-            >
-              <option value="Linha" className="bg-[#0a0a0a]">Linha</option>
-              <option value="Goleiro" className="bg-[#0a0a0a]">Goleiro</option>
-            </select>
-          </div>
-          <div className="col-span-2 space-y-1">
-            <label className="text-[9px] font-black opacity-40 uppercase ml-2 tracking-widest">Time do Coração</label>
-            <input 
-              type="text" 
-              value={profile.heart_team}
-              onChange={(e) => setProfile({...profile, heart_team: e.target.value})}
-              placeholder="Ex: Bahia" 
-              className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs outline-none focus:border-cyan-electric transition-all"
-            />
-          </div>
-        </div>
-
-        <button 
-          onClick={handleUpdateProfile}
-          disabled={saving}
-          className="w-full mt-6 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric transition-colors"
-        >
-          {saving ? <Loader2 className="animate-spin" size={14}/> : <Save size={14}/>}
-          Salvar Alterações
-        </button>
-      </div>
-
-      {/* GESTÃO DE BABAS (Preservada) */}
-      <div className="space-y-4">
-        <h3 className="text-[10px] font-black opacity-40 uppercase ml-4 tracking-widest flex items-center gap-2">
-          <Settings size={14} className="text-cyan-electric"/> Gestão de Babas
-        </h3>
-
-        {myBabas.length > 0 ? (
-          myBabas.map((baba) => (
-            <div key={baba.id} className="card-glass p-4 rounded-3xl border border-white/10 flex items-center justify-between">
-              <div className="text-left">
-                <h4 className="text-xs font-black uppercase italic tracking-tight">{baba.nome || baba.name}</h4>
-                <p className="text-[8px] opacity-50 font-bold uppercase">{baba.game_time || '20:00'}h</p>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => navigate(`/edit-baba/${baba.id}`)}
-                  className="p-3 bg-white/5 rounded-2xl text-white hover:bg-cyan-electric hover:text-black transition-all"
-                >
-                  <Edit3 size={16}/>
-                </button>
-                <button 
-                  onClick={() => handleDeleteBaba(baba.id)}
-                  className="p-3 bg-red-500/10 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all"
-                >
-                  <Trash2 size={16}/>
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-[10px] italic opacity-30 text-center py-4 bg-white/5 rounded-3xl border border-dashed border-white/10">
-            Você ainda não criou nenhum Baba.
-          </p>
-        )}
-
-        <button 
-          onClick={() => navigate('/dashboard')} 
-          className="w-full card-glass p-5 rounded-3xl border border-cyan-electric/20 flex items-center justify-between group hover:border-cyan-electric transition-all bg-cyan-electric/5"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-cyan-electric/10 rounded-2xl text-cyan-electric group-hover:bg-cyan-electric group-hover:text-black transition-all">
-              <PlusCircle size={20}/>
-            </div>
-            <div className="text-left">
-              <h3 className="text-sm font-black uppercase italic tracking-tight">Novo Baba</h3>
-              <p className="text-[9px] opacity-50 uppercase font-bold">Criar um novo grupo</p>
-            </div>
-          </div>
-          <span className="text-cyan-electric font-black group-hover:translate-x-1 transition-transform">→</span>
-        </button>
       </div>
     </div>
   );
