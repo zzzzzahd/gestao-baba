@@ -8,7 +8,6 @@ import { BabaProvider } from './contexts/BabaContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
-import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import TeamsPage from './pages/TeamsPage';
 import MatchPage from './pages/MatchPage';
@@ -16,6 +15,9 @@ import MatchPageVisitor from './pages/MatchPageVisitor';
 import RankingsPage from './pages/RankingsPage';
 import FinancialPage from './pages/FinancialPage';
 import VisitorMode from './pages/VisitorMode';
+
+// 🔥 CORREÇÃO: importar DashboardPage
+import DashboardPage from './pages/DashboardPage';
 
 // ProtectedRoute inline
 const ProtectedRoute = ({ children }) => {
@@ -37,36 +39,8 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <BabaProvider>
+          {/* 🔥 manter apenas UM Toaster e fora de Routes */}
           <Toaster
-            position="top-center"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: 'rgba(13, 13, 13, 0.95)',
-                color: '#fff',
-                border: '1px solid rgba(0, 242, 255, 0.3)',
-                borderRadius: '12px'
-              }
-            }}
-          />
-          
-          <Routes>
-            {/* Rotas Públicas */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/visitor" element={<VisitorMode />} />
-            <Route path="/visitor-match" element={<MatchPageVisitor />} />
-            
-            {/* Rotas Protegidas - TODAS vão para HomePage agora */}
-            <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
-            <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-            <Route path="/rankings" element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
-            <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
-
-            <Toaster
             position="top-center"
             toastOptions={{
               duration: 3000,
@@ -91,8 +65,25 @@ function App() {
                 },
               },
             }}
-          />  
+          />
+          
+          <Routes>
+            {/* Rotas Públicas */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/visitor" element={<VisitorMode />} />
+            <Route path="/visitor-match" element={<MatchPageVisitor />} />
+            
+            {/* Rotas Protegidas */}
+            <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
+            <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+            <Route path="/rankings" element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
+            <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
           </Routes>
+
         </BabaProvider>
       </AuthProvider>
     </BrowserRouter>
