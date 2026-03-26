@@ -1,199 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/MockAuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import Logo from '../components/Logo';
-import { LogOut, User, Clock, Users, Plus, X, Loader2, Trash2, Settings } from 'lucide-react';
+import { 
+  Trophy, Users, DollarSign, LogOut, 
+  ShieldCheck, Calendar, PlusCircle, Star, Edit, Copy, Settings
+} from 'lucide-react';
+import PresenceConfirmation from '../components/PresenceConfirmation';
+import BabaSettings from '../components/BabaSettings';
+import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
-  const { id } = useParams();
   const navigate = useNavigate();
-  const auth = useAuth();
-  const babaCtx = useBaba();
+  const { profile, signOut } = useAuth();
+  const { myBabas, currentBaba, setCurrentBaba, players, loading } = useBaba();
+  
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showSettings, setShowSettings] = useState(false);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [newBaba, setNewBaba] = useState({ name: '', modality: 'futsal', is_private: false, game_time: '20:00' });
+  // Copiar código de convite
+  const handleCopyInviteCode = () => {
+    if (currentBaba?.invite_code) {
+      navigator.clipboard.writeText(currentBaba.invite_code);
+      toast.success('Código copiado!');
+    }
+  };
 
-  // --- A TRAVA ANTI-TIMEOUT ---
-  // Se o contexto ainda está buscando o perfil (Zharick Dias), 
-  // mostramos o loading aqui para o ProtectedRoute não quebrar.
-  if (!auth || auth.loading || !babaCtx) {
+  // Verificar se usuário é presidente do baba atual
+  const isPresident = currentBaba?.president_id === profile?.id;
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center font-tactical">
-        <Loader2 className="animate-spin text-cyan-electric mb-4" size={40} />
-        <p className="text-[10px] font-black text-cyan-electric tracking-[0.5em] uppercase italic animate-pulse">
-          AUTENTICANDO COMANDANTE...
-        </p>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sincronizando Dados...</p>
       </div>
     );
   }
 
-  const { user, profile, signOut } = auth;
-  const { babas, createBaba, updateBaba, deleteBaba, selectBaba, loading, refreshBabas } = babaCtx;
-
-  useEffect(() => {
-    if (id && babas) {
-      const editTarget = babas.find(b => (b.id === id || b.uuid === id));
-      if (editTarget) {
-        setNewBaba({
-          name: editTarget.nome || editTarget.name || '',
-          modality: editTarget.modality || 'futsal',
-          is_private: editTarget.is_private || false,
-          game_time: editTarget.game_time || '20:00'
-        });
-        setIsEditing(true);
-        setShowCreateModal(true);
-      }
-    }
-  }, [id, babas]);
-
-  const handleAction = async (e) => {
-    e.preventDefault();
-    try {
-      if (isEditing) {
-        await updateBaba(id, newBaba);
-        toast.success("Baba atualizado!");
-        navigate('/dashboard');
-      } else {
-        await createBaba(newBaba.name);
-        toast.success("Novo baba criado!");
-      }
-      setShowCreateModal(false);
-      setIsEditing(false);
-      setNewBaba({ name: '', modality: 'futsal', is_private: false, game_time: '20:00' });
-      if (refreshBabas) refreshBabas();
-    } catch (err) {
-      toast.error("Falha na operação técnica");
-    }
-  };
-
-  const handleDelete = async (e, babaId) => {
-    e.stopPropagation();
-    if (window.confirm("Confirmar exclusão definitiva?")) {
-      try {
-        await deleteBaba(babaId);
-        toast.success("Registro removido");
-      } catch (error) {
-        toast.error("Erro ao excluir");
-      }
-    }
-  };
-
   return (
-    <div className="min-h-screen p-5 bg-[#050505] text-white font-tactical">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <Logo size="small" />
-          <button onClick={signOut} className="p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:scale-110 transition-all">
-            <LogOut size={20}/>
-          </button>
+    <div className="min-h-screen bg-black text-white pb-24 font-sans">
+      {/* HEADER - Cabeçalho do Perfil */}
+      <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/profile')}>
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+                  <span className="text-2xl font-black text-black">
+                    {profile?.name?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-black"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-black italic tracking-tighter uppercase leading-none">
+                  {profile?.name || 'Comandante'}
+                </h2>
+                {(profile?.age || profile?.position || profile?.favorite_team) && (
+                  <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
+                    {profile?.age && <span>{profile.age} anos</span>}
+                    {profile?.age && profile?.position && <span>•</span>}
+                    {profile?.position && <span>{profile.position}</span>}
+                    {(profile?.age || profile?.position) && profile?.favorite_team && <span>•</span>}
+                    {profile?.favorite_team && <span className="truncate max-w-[100px]">{profile.favorite_team}</span>}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/profile');
+                }}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2"
+              >
+                <Edit size={14} />
+                <span className="hidden sm:inline">Editar</span>
+              </button>
+            </div>
+            <button 
+              onClick={() => signOut()} 
+              className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6">
+        {/* SELETOR DE BABA */}
+        <div className="mb-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-4">Seus Grupos de Elite</p>
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            {myBabas.map((baba) => (
+              <button 
+                key={baba.id}
+                onClick={() => setCurrentBaba(baba)}
+                className={`flex-shrink-0 px-6 py-4 rounded-2xl border transition-all flex items-center gap-3 ${currentBaba?.id === baba.id ? 'border-cyan-electric bg-cyan-electric/10' : 'border-white/5 bg-white/5'}`}
+              >
+                <ShieldCheck size={18} className={currentBaba?.id === baba.id ? 'text-cyan-electric' : 'opacity-20'} />
+                <span className="font-black italic uppercase text-xs whitespace-nowrap">{baba.name}</span>
+              </button>
+            ))}
+            <button 
+              onClick={() => navigate('/')} 
+              className="flex-shrink-0 w-12 h-12 rounded-2xl border border-dashed border-white/20 flex items-center justify-center hover:border-cyan-electric transition-all"
+            >
+              <PlusCircle size={20} className="opacity-40" />
+            </button>
+          </div>
         </div>
 
-        {/* Card de Perfil */}
-        <div className="card-glass p-6 mb-8 rounded-3xl border border-white/5 flex items-center justify-between shadow-2xl">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center overflow-hidden">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="Perfil" />
-              ) : (
-                <User className="text-cyan-electric" size={24} />
+        {currentBaba ? (
+          <>
+            {/* TABS */}
+            <div className="flex border-b border-white/5 mb-8">
+              {['overview', 'ranking'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === tab ? 'text-cyan-electric' : 'opacity-40'}`}
+                >
+                  {tab === 'overview' && 'Painel'}
+                  {tab === 'ranking' && 'Artilharia'}
+                  {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-electric shadow-[0_0_10px_#00fff2]"></div>}
+                </button>
+              ))}
+            </div>
+
+            {/* CONTEÚDO */}
+            <div className="space-y-6">
+              {activeTab === 'overview' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  {/* Cards de Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Horário</p>
+                      <h4 className="text-sm font-black italic">{currentBaba.game_time || '20:00'}</h4>
+                      <div className="mt-4 flex items-center gap-2 text-green-400">
+                        <Calendar size={14} /> 
+                        <span className="text-[10px] font-black uppercase">Frequência Semanal</span>
+                      </div>
+                    </div>
+                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Modalidade</p>
+                      <h4 className="text-sm font-black italic uppercase">{currentBaba.modality || 'Futsal'}</h4>
+                      <div className="mt-4 flex items-center gap-2 text-cyan-electric">
+                        <Users size={14} /> 
+                        <span className="text-[10px] font-black uppercase">{players?.length || 0} Atletas</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ⭐ NOVO: Componente de Confirmação de Presença */}
+                  <PresenceConfirmation />
+
+                  {/* ⭐ NOVO: Painel de Configuração do Sorteio (Só Presidente) */}
+                  {isPresident && <DrawConfigPanel />}
+
+                  {/* Código de Convite - Só para Presidente */}
+                  {isPresident && currentBaba.invite_code && (
+                    <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
+                          <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
+                          <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
+                            {currentBaba.invite_code}
+                          </p>
+                        </div>
+                        <button
+                          onClick={handleCopyInviteCode}
+                          className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+                        >
+                          <Copy size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grid de Atalhos */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { icon: <Trophy size={20} />, label: 'Ranking', path: '/rankings' },
+                      { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
+                      { icon: <Users size={20} />, label: 'Times', path: '/teams' },
+                    ].map((item, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => navigate(item.path)} 
+                        className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5"
+                      >
+                        <div className="text-cyan-electric opacity-60">{item.icon}</div>
+                        <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Botão Configurações (só presidente) */}
+                  {isPresident && (
+                    <button
+                      onClick={() => setShowSettings(true)}
+                      className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 font-black uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white hover:border-cyan-electric/30 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Settings size={16} />
+                      Configurações do Baba
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'ranking' && (
+                <div className="space-y-4 animate-in fade-in duration-500">
+                  {players && players.length > 0 ? (
+                    players
+                      .sort((a,b) => (b.total_goals_month || 0) - (a.total_goals_month || 0))
+                      .slice(0, 5)
+                      .map((p, i) => (
+                        <div 
+                          key={p.id} 
+                          className="flex items-center justify-between p-4 card-glass rounded-2xl border border-white/5 bg-white/5"
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className="text-lg font-black italic opacity-20 w-4">#{i+1}</span>
+                            <span className="font-bold uppercase text-sm">{p.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-green-400 font-black italic">
+                            <Star size={14} /> {p.total_goals_month || 0} 
+                            <span className="text-[9px] opacity-40">GOLS</span>
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <p className="text-center py-10 opacity-30 text-xs uppercase font-black tracking-widest">
+                      Nenhum dado de artilharia
+                    </p>
+                  )}
+                </div>
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-black italic uppercase tracking-tighter">
-                {profile?.name || user?.user_metadata?.name || 'Comandante'}
-              </h2>
-              <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em]">{user?.email}</p>
-            </div>
-          </div>
-          <button onClick={() => navigate('/profile')} className="p-3 bg-white/5 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all border border-white/5">
-            <Settings size={18} />
-          </button>
-        </div>
-
-        <h1 className="text-3xl font-black mb-6 italic uppercase tracking-tighter">
-          {isEditing ? <>EDITAR <span className="text-cyan-electric">BABA</span></> : <>MEUS <span className="text-cyan-electric">BABAS</span></>}
-        </h1>
-
-        {loading ? (
-          <div className="text-center py-20">
-            <Loader2 className="animate-spin text-cyan-electric mx-auto" size={40} />
-          </div>
+          </>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
-            {babas?.map((baba) => (
-              <div 
-                key={baba.id} 
-                onClick={() => { selectBaba(baba); navigate('/home'); }} 
-                className="card-glass p-7 border border-white/5 rounded-[2rem] group relative cursor-pointer hover:border-cyan-electric/50 transition-all"
-              >
-                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); navigate(`/edit-baba/${baba.id}`); }} className="p-2 text-white/50 hover:text-white"><Settings size={14}/></button>
-                  <button onClick={(e) => handleDelete(e, baba.id)} className="p-2 text-red-500 hover:text-red-400"><Trash2 size={14}/></button>
-                </div>
-                <h3 className="text-xl font-black italic uppercase group-hover:text-cyan-electric transition-colors">{baba.nome || baba.name}</h3>
-                <div className="flex gap-4 text-[9px] font-black opacity-40 mt-4 uppercase tracking-widest">
-                  <span className="flex items-center gap-1.5"><Users size={12}/> {baba.member_count || 0} ATLETAS</span>
-                  <span className="flex items-center gap-1.5"><Clock size={12}/> {baba.game_time || '20:00'}</span>
-                </div>
-              </div>
-            ))}
-            
+          <div className="py-20 text-center space-y-6">
+            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-dashed border-white/20">
+              <Trophy className="opacity-20" size={40} />
+            </div>
+            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">Nenhum baba selecionado</p>
             <button 
-              onClick={() => { setIsEditing(false); setShowCreateModal(true); }} 
-              className="w-full bg-white/5 border border-white/10 py-8 rounded-3xl font-black uppercase text-[10px] tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-cyan-electric/5 hover:border-cyan-electric/20 transition-all active:scale-95"
+              onClick={() => navigate('/')} 
+              className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan"
             >
-              <Plus className="text-cyan-electric" size={16} strokeWidth={3} /> NOVO PROJETO
+              Criar ou Entrar em um Baba
             </button>
           </div>
         )}
-
-        {/* Modal de Formulário */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
-            <div className="card-glass p-10 max-w-md w-full border border-cyan-electric/30 rounded-[3rem]">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black text-cyan-electric italic uppercase tracking-tighter">
-                  {isEditing ? 'EDITAR BABA' : 'NOVO BABA'}
-                </h2>
-                <button onClick={() => setShowCreateModal(false)} className="text-white/20 hover:text-white"><X size={28}/></button>
-              </div>
-              <form onSubmit={handleAction} className="space-y-6">
-                <input 
-                  type="text" 
-                  value={newBaba.name} 
-                  onChange={(e) => setNewBaba({...newBaba, name: e.target.value.toUpperCase()})} 
-                  required 
-                  className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-cyan-electric transition-all font-bold" 
-                  placeholder="NOME DO GRUPO" 
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <select 
-                    value={newBaba.modality} 
-                    onChange={(e) => setNewBaba({...newBaba, modality: e.target.value})} 
-                    className="w-full bg-black border border-white/10 p-5 rounded-2xl outline-none text-xs font-black uppercase"
-                  >
-                    <option value="futsal">Futsal</option>
-                    <option value="society">Society</option>
-                  </select>
-                  <input 
-                    type="time" 
-                    value={newBaba.game_time} 
-                    onChange={(e) => setNewBaba({...newBaba, game_time: e.target.value})} 
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-bold" 
-                  />
-                </div>
-                <button type="submit" className="w-full py-5 rounded-2xl font-black text-[10px] bg-cyan-electric text-black shadow-neon-cyan uppercase tracking-widest hover:scale-[1.02] transition-all">
-                  {isEditing ? 'SALVAR ALTERAÇÕES' : 'CONSOLIDAR BABA'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Modal de Configurações */}
+      {showSettings && currentBaba && (
+        <BabaSettings 
+          baba={currentBaba} 
+          onClose={() => setShowSettings(false)} 
+        />
+      )}
     </div>
   );
 };
