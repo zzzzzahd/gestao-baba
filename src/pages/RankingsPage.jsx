@@ -1,193 +1,323 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
-import ShareableCardModal from '../components/ShareableCardModal';
+import { supabase } from '../services/supabase';
+import { ArrowLeft, Trophy, Target, UserPlus, Award, Calendar } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const RankingsPage = () => {
   const navigate = useNavigate();
-  const { currentBaba, getRankings } = useBaba(); // Centralizando a busca no Contexto
-  const [period, setPeriod] = useState('month'); // 'month' ou 'year'
-  const [rankings, setRankings] = useState({
-    goals: [],
-    assists: []
-  });
+  const { currentBaba } = useBaba();
+
+  const [activeTab, setActiveTab] = useState('artilheiros'); // artilheiros, garcons, mvps
+  const [period, setPeriod] = useState('all'); // 7days, 30days, all
+  const [rankings, setRankings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!currentBaba) {
-      navigate('/home');
-      return;
+    if (currentBaba) {
+      loadRankings();
     }
-    loadRankings();
-  }, [currentBaba, period]);
+  }, [currentBaba, activeTab, period]);
 
   const loadRankings = async () => {
+    if (!currentBaba) return;
+
     try {
       setLoading(true);
-      // Chamamos a função centralizada que injetaremos no BabaContext
-      // Ela retornará os dados já filtrados e ordenados
-      const data = await getRankings(currentBaba.id, period);
+
+      // Calcular data de início baseado no período
+      let dateFilter = null;
+      if (period === '7days') {
+        const date = new Date();
+        date.setDate(date.getDate() - 7);
+        dateFilter = date.toISOString().split('T')[0];
+      } else if (period === '30days') {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+        dateFilter = date.toISOString().split('T')[0];
+      }
+
+      let query = supabase
+        .from('match_players')
+        .select(`
+          player_id,
+          goals,
+          assists,
+          player:players(name, position),
+          match:matches(match_date, baba_id)
+        `)
+        .eq('match.baba_id', currentBaba.id);
+
+      if (dateFilter) {
+        query = query.gte('match.match_date', dateFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Agregar stats por jogador
+      const playerStats = {};
       
-      setRankings({
-        goals: data.goals || [],
-        assists: data.assists || []
+      data.forEach(mp => {
+        if (!mp.player) return;
+        
+        if (!playerStats[mp.player_id]) {
+          playerStats[mp.player_id] = {
+            id: mp.player_id,
+            name: mp.player.name,
+            position: mp.player.position,
+            goals: 0,
+            assists: 0,
+            matches: 0
+          };
+        }
+        
+        playerStats[mp.player_id].goals += mp.goals || 0;
+        playerStats[mp.player_id].assists += mp.assists || 0;
+        playerStats[mp.player_id].matches += 1;
       });
+
+      // Converter para array e ordenar
+      let rankingsArray = Object.values(playerStats);
+
+      if (activeTab === 'artilheiros') {
+        rankingsArray = rankingsArray
+          .filter(p => p.goals > 0)
+          .sort((a, b) => b.goals - a.goals)
+          .slice(0, 10);
+      } else if (activeTab === 'garcons') {
+        rankingsArray = rankingsArray
+          .filter(p => p.assists > 0)
+          .sort((a, b) => b.assists - a.assists)
+          .slice(0, 10);
+      } else if (activeTab === 'mvps') {
+        rankingsArray = rankingsArray
+          .map(p => ({
+            ...p,
+            total: p.goals + p.assists
+          }))
+          .filter(p => p.total > 0)
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10);
+      }
+
+      setRankings(rankingsArray);
     } catch (error) {
       console.error('Erro ao carregar rankings:', error);
+      toast.error('Erro ao carregar estatísticas');
     } finally {
       setLoading(false);
     }
   };
 
+  const getPeriodLabel = () => {
+    if (period === '7days') return 'Últimos 7 dias';
+    if (period === '30days') return 'Últimos 30 dias';
+    return 'Todo o período';
+  };
+
   const getMedalColor = (position) => {
-    switch(position) {
-      case 0: return 'text-yellow-400';
-      case 1: return 'text-gray-300';
-      case 2: return 'text-orange-600';
-      default: return 'text-cyan-electric opacity-30';
-    }
+    if (position === 0) return 'text-yellow-500'; // Ouro
+    if (position === 1) return 'text-gray-300'; // Prata
+    if (position === 2) return 'text-orange-600'; // Bronze
+    return 'text-white/40';
   };
-
-  const getMedalIcon = (position) => {
-    if (position < 3) return 'fa-medal';
-    return 'fa-circle';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <i className="fas fa-spinner fa-spin text-4xl text-cyan-electric"></i>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen p-5 bg-black text-white pb-24 font-sans">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <button onClick={() => navigate('/home')} className="text-cyan-electric hover:text-white transition-colors group">
-            <i className="fas fa-arrow-left text-xl mr-3 group-hover:-translate-x-1 transition-transform"></i>
-            <span className="font-black italic uppercase tracking-tighter">{currentBaba?.name}</span>
-          </button>
-          
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-cyan-electric/10 text-cyan-electric p-3 rounded-2xl border border-cyan-electric/20 flex items-center gap-2 hover:bg-cyan-electric hover:text-black transition-all"
-          >
-            <i className="fas fa-share-alt"></i>
-            <span className="text-[10px] font-black italic">DIVULGAR</span>
-          </button>
-        </div>
-
-        {/* Title */}
-        <h1 className="text-4xl font-black text-center mb-8 text-cyan-electric italic">
-          <i className="fas fa-trophy mr-3"></i>
-          RANKINGS
-        </h1>
-
-        {/* Period Toggle */}
-        <div className="flex gap-2 mb-8 bg-white/5 p-1 rounded-2xl border border-white/10">
+        <div className="flex items-center justify-between">
           <button
-            onClick={() => setPeriod('month')}
-            className={`flex-1 py-3 rounded-xl font-black italic text-xs transition-all ${period === 'month' ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-electric/20' : 'opacity-40'}`}
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 text-white/60 hover:text-white transition-all"
           >
-            MENSAL
+            <ArrowLeft size={20} />
+            <span className="text-xs font-black uppercase">Voltar</span>
           </button>
-          <button
-            onClick={() => setPeriod('year')}
-            className={`flex-1 py-3 rounded-xl font-black italic text-xs transition-all ${period === 'year' ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-electric/20' : 'opacity-40'}`}
-          >
-            ANUAL
-          </button>
-        </div>
 
-        {/* Goals Ranking */}
-        <div className="card-glass p-6 mb-6 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden relative">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-cyan-electric italic">
-              <i className="fas fa-futbol mr-2"></i>
-              ARTILHARIA
-            </h2>
-            <span className="text-[9px] font-black opacity-40 uppercase tracking-widest">
-              {period === 'month' ? 'Mensal' : 'Anual'}
-            </span>
+          {/* Filtro de Período */}
+          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+            <button
+              onClick={() => setPeriod('7days')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                period === '7days' 
+                  ? 'bg-cyan-electric text-black' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              7d
+            </button>
+            <button
+              onClick={() => setPeriod('30days')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                period === '30days' 
+                  ? 'bg-cyan-electric text-black' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              30d
+            </button>
+            <button
+              onClick={() => setPeriod('all')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                period === 'all' 
+                  ? 'bg-cyan-electric text-black' 
+                  : 'text-white/40 hover:text-white'
+              }`}
+            >
+              Tudo
+            </button>
           </div>
+        </div>
 
+        {/* Título */}
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-3">
+            <Trophy className="text-cyan-electric" size={32} />
+            <h1 className="text-3xl font-black uppercase italic">Rankings</h1>
+          </div>
+          <p className="text-sm text-white/60 uppercase tracking-widest">
+            {currentBaba?.name}
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-white/40">
+            <Calendar size={14} />
+            <span>{getPeriodLabel()}</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="grid grid-cols-3 gap-3">
+          <button
+            onClick={() => setActiveTab('artilheiros')}
+            className={`p-4 rounded-2xl border-2 transition-all ${
+              activeTab === 'artilheiros'
+                ? 'border-cyan-electric bg-cyan-electric/10'
+                : 'border-white/10 bg-white/5 hover:bg-white/10'
+            }`}
+          >
+            <Target className={`mx-auto mb-2 ${activeTab === 'artilheiros' ? 'text-cyan-electric' : 'text-white/40'}`} size={24} />
+            <p className={`text-xs font-black uppercase ${activeTab === 'artilheiros' ? 'text-cyan-electric' : 'text-white/60'}`}>
+              Artilheiros
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('garcons')}
+            className={`p-4 rounded-2xl border-2 transition-all ${
+              activeTab === 'garcons'
+                ? 'border-green-500 bg-green-500/10'
+                : 'border-white/10 bg-white/5 hover:bg-white/10'
+            }`}
+          >
+            <UserPlus className={`mx-auto mb-2 ${activeTab === 'garcons' ? 'text-green-500' : 'text-white/40'}`} size={24} />
+            <p className={`text-xs font-black uppercase ${activeTab === 'garcons' ? 'text-green-500' : 'text-white/60'}`}>
+              Garçons
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('mvps')}
+            className={`p-4 rounded-2xl border-2 transition-all ${
+              activeTab === 'mvps'
+                ? 'border-yellow-500 bg-yellow-500/10'
+                : 'border-white/10 bg-white/5 hover:bg-white/10'
+            }`}
+          >
+            <Award className={`mx-auto mb-2 ${activeTab === 'mvps' ? 'text-yellow-500' : 'text-white/40'}`} size={24} />
+            <p className={`text-xs font-black uppercase ${activeTab === 'mvps' ? 'text-yellow-500' : 'text-white/60'}`}>
+              MVPs
+            </p>
+          </button>
+        </div>
+
+        {/* Lista de Rankings */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-xs text-white/40 uppercase tracking-wider">Carregando...</p>
+          </div>
+        ) : rankings.length === 0 ? (
+          <div className="card-glass p-12 rounded-3xl border border-white/10 text-center">
+            <Trophy className="text-white/20 mx-auto mb-4" size={48} />
+            <p className="text-sm font-black uppercase text-white/40">
+              Nenhuma estatística encontrada
+            </p>
+            <p className="text-xs text-white/20 mt-2">
+              Comece a registrar gols nas partidas!
+            </p>
+          </div>
+        ) : (
           <div className="space-y-3">
-            {rankings.goals.map((player, index) => (
-              <div key={index} className="flex items-center justify-between bg-white/5 p-4 rounded-3xl border border-white/5 hover:border-cyan-electric/30 transition-all group">
-                <div className="flex items-center gap-4">
-                  <i className={`fas ${getMedalIcon(index)} ${getMedalColor(index)} text-xl w-6 text-center`}></i>
-                  <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-gray-900 shadow-inner">
-                    <img 
-                      src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}&background=0D0D0D&color=fff`} 
-                      className="w-full h-full object-cover" 
-                      alt={player.name}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-black italic uppercase text-sm tracking-tighter">{player.name}</p>
-                    <p className="text-[8px] font-bold text-cyan-electric opacity-50 uppercase">{player.position}</p>
+            {rankings.map((player, index) => (
+              <div
+                key={player.id}
+                className={`card-glass p-5 rounded-2xl border ${
+                  index < 3 
+                    ? 'border-cyan-electric/30 bg-cyan-electric/5' 
+                    : 'border-white/5'
+                } flex items-center gap-4`}
+              >
+                {/* Posição */}
+                <div className="flex flex-col items-center min-w-[3rem]">
+                  <span className={`text-2xl font-black ${getMedalColor(index)}`}>
+                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}º`}
+                  </span>
+                </div>
+
+                {/* Info do Jogador */}
+                <div className="flex-1">
+                  <p className="text-sm font-black uppercase">{player.name}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded ${
+                      player.position === 'goleiro' 
+                        ? 'bg-green-500/20 text-green-500' 
+                        : 'bg-white/10 text-white/60'
+                    }`}>
+                      {player.position}
+                    </span>
+                    <span className="text-[9px] text-white/40">
+                      {player.matches} {player.matches === 1 ? 'jogo' : 'jogos'}
+                    </span>
                   </div>
                 </div>
+
+                {/* Stats */}
                 <div className="text-right">
-                  <p className="text-2xl font-black italic text-cyan-electric">
-                    {period === 'month' ? player.total_goals_month : player.total_goals_year}
-                  </p>
-                  <p className="text-[7px] font-black opacity-30 uppercase tracking-tighter">GOLS</p>
+                  {activeTab === 'artilheiros' && (
+                    <div>
+                      <p className="text-3xl font-black text-cyan-electric">{player.goals}</p>
+                      <p className="text-[9px] text-white/40 uppercase tracking-wider">gols</p>
+                    </div>
+                  )}
+                  {activeTab === 'garcons' && (
+                    <div>
+                      <p className="text-3xl font-black text-green-500">{player.assists}</p>
+                      <p className="text-[9px] text-white/40 uppercase tracking-wider">assists</p>
+                    </div>
+                  )}
+                  {activeTab === 'mvps' && (
+                    <div>
+                      <p className="text-3xl font-black text-yellow-500">{player.total}</p>
+                      <p className="text-[9px] text-white/40 uppercase tracking-wider">
+                        {player.goals}G + {player.assists}A
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Assists Ranking */}
-        <div className="card-glass p-6 mb-24 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden relative">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-green-neon italic">
-              <i className="fas fa-hands-helping mr-2"></i>
-              ASSISTÊNCIAS
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {rankings.assists.map((player, index) => (
-              <div key={index} className="flex items-center justify-between bg-white/5 p-4 rounded-3xl border border-white/5 hover:border-green-neon/30 transition-all group">
-                <div className="flex items-center gap-4">
-                  <i className={`fas ${getMedalIcon(index)} ${getMedalColor(index)} text-xl w-6 text-center`}></i>
-                  <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-gray-900">
-                    <img 
-                        src={player.avatar_url || `https://ui-avatars.com/api/?name=${player.name}&background=0D0D0D&color=fff`} 
-                        className="w-full h-full object-cover" 
-                        alt={player.name}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-black italic uppercase text-sm tracking-tighter">{player.name}</p>
-                    <p className="text-[8px] font-bold text-green-neon opacity-50 uppercase">{player.position}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-black italic text-green-neon">
-                    {period === 'month' ? player.total_assists_month : player.total_assists_year}
-                  </p>
-                  <p className="text-[7px] font-black opacity-30 uppercase tracking-tighter">ASSISTS</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Info */}
+        <div className="text-center text-[10px] text-white/20 uppercase tracking-wider">
+          <p>Estatísticas atualizadas em tempo real</p>
         </div>
       </div>
-
-      <ShareableCardModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        rankingType="Top Jogadores"
-        rankingData={rankings.goals} 
-        babaName={currentBaba?.name || "MEU BABA"}
-      />
     </div>
   );
 };
