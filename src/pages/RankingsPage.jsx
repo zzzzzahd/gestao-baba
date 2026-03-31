@@ -149,7 +149,7 @@ const RankingsPage = () => {
                   : 'text-white/40 hover:text-white'
               }`}
             >
-              7d
+              Semana
             </button>
             <button
               onClick={() => setPeriod('30days')}
@@ -159,7 +159,7 @@ const RankingsPage = () => {
                   : 'text-white/40 hover:text-white'
               }`}
             >
-              30d
+              Mês
             </button>
             <button
               onClick={() => setPeriod('all')}
