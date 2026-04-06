@@ -1,21 +1,113 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { Users, Play, ArrowLeft, Shuffle, Settings2 } from 'lucide-react';
+import { Users, ArrowLeft, Shuffle, Settings2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const StarRating = ({ value, onChange }) => {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          className={`text-base leading-none transition-transform active:scale-90 ${
+            star <= value ? 'opacity-100' : 'opacity-20'
+          }`}
+          style={{ color: star <= value ? '#FFD700' : '#ffffff' }}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Algoritmo de equilíbrio: distribui jogadores por estrelas de forma balanceada
+const balanceTeams = (players, numTeams, playersPerTeam, leftoverStrategy) => {
+  // Separar goleiros e linha
+  let goalies = [...players.filter(p => p.position === 'goleiro')].sort(() => Math.random() - 0.5);
+  let outfield = [...players.filter(p => p.position === 'linha')];
+
+  // Criar times vazios com soma de estrelas
+  const teams = Array.from({ length: numTeams }, (_, i) => ({
+    id: Date.now() + i,
+    name: `TIME ${String.fromCharCode(65 + i)}`,
+    players: [],
+    starSum: 0,
+  }));
+
+  // Distribuir goleiros primeiro (1 por time, priorizando equilíbrio)
+  goalies.sort((a, b) => b.stars - a.stars);
+  for (let i = 0; i < numTeams && goalies.length > 0; i++) {
+    const g = goalies.shift();
+    teams[i].players.push(g);
+    teams[i].starSum += g.stars;
+  }
+  // Goleiros excedentes viram linha
+  outfield = [...outfield, ...goalies];
+
+  // Ordenar jogadores de linha por estrelas (desc) para snake draft
+  outfield.sort((a, b) => b.stars - a.stars);
+
+  // Snake draft: distribui em zigue-zague para equilibrar estrelas
+  let direction = 1;
+  let teamIndex = 0;
+  const reserves = [];
+
+  while (outfield.length > 0) {
+    // Checa se todos os times atingiram o limite
+    const allFull = teams.every(t => t.players.length >= playersPerTeam);
+    if (leftoverStrategy === 'reserve' && allFull) {
+      // O resto vira reserva
+      reserves.push(...outfield);
+      break;
+    }
+
+    const player = outfield.shift();
+
+    if (teams[teamIndex].players.length < playersPerTeam) {
+      teams[teamIndex].players.push(player);
+      teams[teamIndex].starSum += player.stars;
+    } else {
+      // Time cheio no snake draft — coloca no menos cheio
+      const targetTeam = teams.reduce((min, t) =>
+        t.players.length < min.players.length ? t : min
+      );
+      if (targetTeam.players.length < playersPerTeam) {
+        targetTeam.players.push(player);
+        targetTeam.starSum += player.stars;
+      } else {
+        reserves.push(player);
+        continue;
+      }
+    }
+
+    // Avança no zigue-zague
+    teamIndex += direction;
+    if (teamIndex >= numTeams) {
+      direction = -1;
+      teamIndex = numTeams - 1;
+    } else if (teamIndex < 0) {
+      direction = 1;
+      teamIndex = 0;
+    }
+  }
+
+  return { teams, reserves };
+};
 
 const VisitorMode = () => {
   const navigate = useNavigate();
-  
+
   const [playersPerTeam, setPlayersPerTeam] = useState(5);
   const [players, setPlayers] = useState([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerPosition, setNewPlayerPosition] = useState('linha');
-  
-  // NOVA FUNÇÃO: Estratégia para jogadores que sobram
-  const [leftoverStrategy, setLeftoverStrategy] = useState('reserve'); // 'reserve' ou 'substitute'
+  const [newPlayerStars, setNewPlayerStars] = useState(2); // padrão: 2 estrelas
+  const [leftoverStrategy, setLeftoverStrategy] = useState('reserve');
 
-  // Adicionar jogador
   const addPlayer = () => {
     if (!newPlayerName.trim()) {
       toast.error('Digite o nome do jogador!');
@@ -25,92 +117,58 @@ const VisitorMode = () => {
     const player = {
       id: Date.now(),
       name: newPlayerName.trim(),
-      position: newPlayerPosition
+      position: newPlayerPosition,
+      stars: newPlayerStars,
     };
 
     setPlayers([...players, player]);
     setNewPlayerName('');
+    setNewPlayerStars(2);
     toast.success(`${player.name} adicionado!`);
   };
 
-  // Remover jogador
   const removePlayer = (id) => {
     setPlayers(players.filter(p => p.id !== id));
     toast.success('Jogador removido!');
   };
 
-  // Sortear times
   const drawTeams = () => {
     if (players.length < playersPerTeam * 2) {
       toast.error(`Você precisa de pelo menos ${playersPerTeam * 2} jogadores!`);
       return;
     }
 
-    // Separar goleiros e jogadores de linha e embaralhar
-    let goalies = players.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
-    let outfield = players.filter(p => p.position === 'linha').sort(() => Math.random() - 0.5);
-
-    // LÓGICA DE DIVISÃO REVISADA
     let numTeams;
     if (leftoverStrategy === 'reserve') {
-      // Apenas times completos, o resto fica de fora (reserva)
       numTeams = Math.floor(players.length / playersPerTeam);
     } else {
-      // Cria um time extra mesmo que não esteja completo (precisará de suplente/empréstimo)
       numTeams = Math.ceil(players.length / playersPerTeam);
     }
-    
+
     if (numTeams < 2) {
       toast.error('Jogadores insuficientes para formar 2 times!');
       return;
     }
 
-    // Criar times vazios
-    const teams = Array.from({ length: numTeams }, (_, i) => ({
-      id: Date.now() + i,
-      name: `TIME ${String.fromCharCode(65 + i)}`,
-      players: []
-    }));
+    const { teams, reserves } = balanceTeams(players, numTeams, playersPerTeam, leftoverStrategy);
 
-    // Distribuir goleiros primeiro (1 por time)
-    for (let i = 0; i < numTeams && goalies.length > 0; i++) {
-      teams[i].players.push(goalies.shift());
-    }
-
-    // Restante dos jogadores (linha + goleiros que sobraram)
-    let remaining = [...outfield, ...goalies]; 
-    
-    // Distribuição cíclica respeitando o limite
-    let teamIndex = 0;
-    while (remaining.length > 0) {
-      // Se a estratégia for reserva e todos os times já atingiram o limite, para aqui
-      if (leftoverStrategy === 'reserve' && teams.every(t => t.players.length >= playersPerTeam)) {
-        break;
-      }
-
-      if (teams[teamIndex].players.length < playersPerTeam) {
-        teams[teamIndex].players.push(remaining.shift());
-      }
-      
-      teamIndex = (teamIndex + 1) % numTeams;
-    }
-
-    // Salvar no localStorage (O que sobru em 'remaining' são os reservas se a estratégia for 'reserve')
     localStorage.setItem('temp_teams', JSON.stringify(teams));
-    if (remaining.length > 0) {
-      localStorage.setItem('temp_reserves', JSON.stringify(remaining));
+    if (reserves.length > 0) {
+      localStorage.setItem('temp_reserves', JSON.stringify(reserves));
     } else {
       localStorage.removeItem('temp_reserves');
     }
-    
-    toast.success(`${numTeams} times sorteados!`);
-    navigate('/visitor-match'); 
+
+    toast.success(`${numTeams} times sorteados com equilíbrio!`);
+    navigate('/visitor-match');
   };
+
+  const starLabel = { 1: 'Abaixo da média', 2: 'Na média', 3: 'Acima da média' };
 
   return (
     <div className="min-h-screen p-6 flex flex-col bg-black text-white font-sans">
       <div className="max-w-md w-full mx-auto space-y-6">
-        
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <Logo size="small" />
@@ -156,7 +214,7 @@ const VisitorMode = () => {
             </div>
           </div>
 
-          {/* NOVA FUNÇÃO: Seletor de Estratégia de Divisão */}
+          {/* Estratégia de Divisão */}
           <div className="pt-4 border-t border-white/5 space-y-3">
             <div className="flex items-center gap-2">
               <Settings2 size={14} className="text-cyan-electric opacity-50" />
@@ -166,9 +224,9 @@ const VisitorMode = () => {
               <button
                 onClick={() => setLeftoverStrategy('reserve')}
                 className={`py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${
-                  leftoverStrategy === 'reserve' 
-                  ? 'bg-cyan-electric text-black border-cyan-electric' 
-                  : 'bg-white/5 text-white/40 border-white/10'
+                  leftoverStrategy === 'reserve'
+                    ? 'bg-cyan-electric text-black border-cyan-electric'
+                    : 'bg-white/5 text-white/40 border-white/10'
                 }`}
               >
                 Ficar na Reserva
@@ -176,9 +234,9 @@ const VisitorMode = () => {
               <button
                 onClick={() => setLeftoverStrategy('substitute')}
                 className={`py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${
-                  leftoverStrategy === 'substitute' 
-                  ? 'bg-cyan-electric text-black border-cyan-electric' 
-                  : 'bg-white/5 text-white/40 border-white/10'
+                  leftoverStrategy === 'substitute'
+                    ? 'bg-cyan-electric text-black border-cyan-electric'
+                    : 'bg-white/5 text-white/40 border-white/10'
                 }`}
               >
                 Time com Suplente
@@ -211,6 +269,16 @@ const VisitorMode = () => {
               <option value="goleiro">🧤 GOLEIRO</option>
             </select>
           </div>
+
+          {/* NOVO: Seletor de Estrelas */}
+          <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 mb-3 border border-white/5">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase opacity-40 tracking-widest mb-1">Nível do Jogador</span>
+              <span className="text-[10px] font-bold opacity-60">{starLabel[newPlayerStars]}</span>
+            </div>
+            <StarRating value={newPlayerStars} onChange={setNewPlayerStars} />
+          </div>
+
           <button
             onClick={addPlayer}
             className="w-full py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl font-black text-xs uppercase tracking-[3px] text-cyan-electric active:scale-95 transition-transform"
@@ -248,12 +316,26 @@ const VisitorMode = () => {
                     </span>
                     <span className="text-sm font-bold">{player.name}</span>
                   </div>
-                  <button
-                    onClick={() => removePlayer(player.id)}
-                    className="text-red-500/60 hover:text-red-500 transition-colors"
-                  >
-                    <i className="fas fa-times text-sm"></i>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {/* Estrelas do jogador na lista */}
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3].map(s => (
+                        <span
+                          key={s}
+                          className="text-xs leading-none"
+                          style={{ color: s <= player.stars ? '#FFD700' : 'rgba(255,255,255,0.15)' }}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => removePlayer(player.id)}
+                      className="text-red-500/60 hover:text-red-500 transition-colors"
+                    >
+                      <i className="fas fa-times text-sm"></i>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -268,7 +350,7 @@ const VisitorMode = () => {
             style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
           >
             <Shuffle size={20} />
-            Sortear Times
+            Sortear Times Equilibrados
           </button>
         ) : (
           <div className="w-full py-5 rounded-2xl font-black bg-white/5 border border-white/10 text-white/30 text-center uppercase text-xs tracking-widest">
