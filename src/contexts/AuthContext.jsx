@@ -14,19 +14,62 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null); // ✅ NOVO
   const [loading, setLoading] = useState(true);
 
+  // ✅ Função para carregar profile
+  const loadProfile = async (user) => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.warn('Profile não encontrado, usando fallback');
+        setProfile({ name: user.email }); // fallback seguro
+        return;
+      }
+
+      setProfile(data);
+    } catch (err) {
+      console.error('Erro ao carregar profile:', err);
+      setProfile({ name: user.email });
+    }
+  };
+
   useEffect(() => {
-    // Verifica sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // Sessão inicial
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        await loadProfile(currentUser);
+      }
+
       setLoading(false);
     });
 
-    // Escuta mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    // Listener de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          await loadProfile(currentUser);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -42,6 +85,7 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) throw error;
+
       toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
     } catch (error) {
@@ -58,6 +102,7 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) throw error;
+
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
     } catch (error) {
@@ -70,6 +115,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+
+      setProfile(null); // ✅ limpa profile
       toast.success('Logout realizado!');
     } catch (error) {
       toast.error(error.message);
@@ -78,6 +125,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    profile, // ✅ AGORA EXISTE
     loading,
     signUp,
     signIn,
