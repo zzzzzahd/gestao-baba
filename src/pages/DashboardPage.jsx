@@ -10,13 +10,14 @@ import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
 import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
+import { supabase } from '../lib/supabaseClient';
 
 const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { currentBaba, players, loading } = useBaba();
+  const { currentBaba, setCurrentBaba, players, loading } = useBaba();
   
   const [showSettings, setShowSettings] = useState(false);
 
@@ -28,8 +29,24 @@ const DashboardPage = () => {
     }
   };
 
-  // Verificar se usuário é presidente do baba atual
-  const isPresident = currentBaba?.president_id === profile?.id;
+  // Verificar se usuário é presidente do baba atual (comparação segura de tipos)
+  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
+
+  // Gerar código de convite e salvar no banco
+  const handleGenerateInviteCode = async () => {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { error } = await supabase
+      .from('babas')
+      .update({ invite_code: code })
+      .eq('id', currentBaba.id);
+
+    if (error) {
+      toast.error('Erro ao gerar código');
+    } else {
+      toast.success('Código gerado!');
+      setCurrentBaba({ ...currentBaba, invite_code: code });
+    }
+  };
 
   // Formatar dias da semana
   const formatGameDays = (days) => {
@@ -174,7 +191,7 @@ const DashboardPage = () => {
             {isPresident && <DrawConfigPanel />}
 
             {/* Código de Convite - Só para Presidente */}
-            {isPresident && currentBaba.invite_code && (
+            {isPresident && (
               <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
                 <div className="flex items-center justify-between mb-3">
                   <div>
@@ -182,19 +199,28 @@ const DashboardPage = () => {
                     <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
-                    <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
-                      {currentBaba.invite_code}
-                    </p>
+                {currentBaba.invite_code ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
+                      <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
+                        {currentBaba.invite_code}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleCopyInviteCode}
+                      className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+                    >
+                      <Copy size={20} />
+                    </button>
                   </div>
+                ) : (
                   <button
-                    onClick={handleCopyInviteCode}
-                    className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+                    onClick={handleGenerateInviteCode}
+                    className="w-full py-3 rounded-xl bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric font-black uppercase text-xs tracking-widest hover:bg-cyan-electric/20 transition-all"
                   >
-                    <Copy size={20} />
+                    Gerar Código de Convite
                   </button>
-                </div>
+                )}
               </div>
             )}
 
