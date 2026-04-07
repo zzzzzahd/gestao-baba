@@ -14,12 +14,12 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // ✅ NOVO
+  const [profile, setProfile] = useState(null); // ✅ ADICIONADO
   const [loading, setLoading] = useState(true);
 
-  // ✅ Função para carregar profile
-  const loadProfile = async (user) => {
-    if (!user) {
+  // ✅ Função para carregar perfil do usuário
+  const loadProfile = async (userId) => {
+    if (!userId) {
       setProfile(null);
       return;
     }
@@ -28,48 +28,46 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
 
-      if (error) {
-        console.warn('Profile não encontrado, usando fallback');
-        setProfile({ name: user.email }); // fallback seguro
-        return;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erro ao carregar perfil:', error);
       }
 
-      setProfile(data);
-    } catch (err) {
-      console.error('Erro ao carregar profile:', err);
-      setProfile({ name: user.email });
+      setProfile(data || null);
+    } catch (error) {
+      console.error('Erro ao carregar perfil (catch):', error);
+      setProfile(null);
     }
   };
 
   useEffect(() => {
-    // Sessão inicial
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Verifica sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-
+      
+      // ✅ Carrega perfil quando tiver usuário
       if (currentUser) {
-        await loadProfile(currentUser);
+        loadProfile(currentUser.id);
       }
-
+      
       setLoading(false);
     });
 
-    // Listener de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          await loadProfile(currentUser);
-        } else {
-          setProfile(null);
-        }
+    // Escuta mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      // ✅ Carrega perfil quando usuário muda
+      if (currentUser) {
+        loadProfile(currentUser.id);
+      } else {
+        setProfile(null);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -85,6 +83,22 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) throw error;
+
+      // ✅ Se cadastro bem-sucedido, cria perfil na tabela profiles
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: data.user.id,
+            email: email,
+            name: metadata.name || email.split('@')[0],
+            created_at: new Date().toISOString()
+          }]);
+
+        if (profileError) {
+          console.error('Erro ao criar perfil:', profileError);
+        }
+      }
 
       toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
@@ -102,7 +116,7 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (error) throw error;
-
+      
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
     } catch (error) {
@@ -115,21 +129,54 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-
-      setProfile(null); // ✅ limpa profile
+      
+      // ✅ Limpa estados
+      setUser(null);
+      setProfile(null);
+      
+      // ✅ Limpa localStorage (remove possíveis dados antigos)
+      localStorage.removeItem('selected_baba_id');
+      
       toast.success('Logout realizado!');
     } catch (error) {
       toast.error(error.message);
     }
   };
 
+  // ✅ Função para atualizar perfil
+  const updateProfile = async (updates) => {
+    if (!user) {
+      return { error: 'Usuário não autenticado' };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      toast.success('Perfil atualizado!');
+      return { data, error: null };
+    } catch (error) {
+      toast.error('Erro ao atualizar perfil');
+      return { data: null, error };
+    }
+  };
+
   const value = {
     user,
-    profile, // ✅ AGORA EXISTE
+    profile, // ✅ AGORA profile está incluído
     loading,
     signUp,
     signIn,
-    signOut
+    signOut,
+    updateProfile,
+    refreshProfile: () => loadProfile(user?.id)
   };
 
   return (
