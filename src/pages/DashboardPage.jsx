@@ -4,19 +4,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { 
   Trophy, Users, DollarSign, LogOut, 
-  ShieldCheck, Calendar, PlusCircle, Star, Edit, Copy, Settings
+  Calendar, Copy, Settings, MapPin, Clock
 } from 'lucide-react';
 import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
 import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
 
+const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { myBabas, currentBaba, setCurrentBaba, players, loading } = useBaba();
+  const { currentBaba, players, loading } = useBaba();
   
-  const [activeTab, setActiveTab] = useState('overview');
   const [showSettings, setShowSettings] = useState(false);
 
   // Copiar código de convite
@@ -30,6 +31,12 @@ const DashboardPage = () => {
   // Verificar se usuário é presidente do baba atual
   const isPresident = currentBaba?.president_id === profile?.id;
 
+  // Formatar dias da semana
+  const formatGameDays = (days) => {
+    if (!days || !Array.isArray(days) || days.length === 0) return null;
+    return days.map((d) => DAY_LABELS[d] ?? d).join(' · ');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
@@ -41,11 +48,12 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans">
+
       {/* HEADER - Cabeçalho do Perfil */}
       <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/profile')}>
+            <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
                   <span className="text-2xl font-black text-black">
@@ -68,16 +76,6 @@ const DashboardPage = () => {
                   </div>
                 )}
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/profile');
-                }}
-                className="px-3 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2"
-              >
-                <Edit size={14} />
-                <span className="hidden sm:inline">Editar</span>
-              </button>
             </div>
             <button 
               onClick={() => signOut()} 
@@ -89,162 +87,127 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6">
-        {/* SELETOR DE BABA */}
-        <div className="mb-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-4">Seus Grupos de Elite</p>
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-            {myBabas.map((baba) => (
-              <button 
-                key={baba.id}
-                onClick={() => setCurrentBaba(baba)}
-                className={`flex-shrink-0 px-6 py-4 rounded-2xl border transition-all flex items-center gap-3 ${currentBaba?.id === baba.id ? 'border-cyan-electric bg-cyan-electric/10' : 'border-white/5 bg-white/5'}`}
-              >
-                <ShieldCheck size={18} className={currentBaba?.id === baba.id ? 'text-cyan-electric' : 'opacity-20'} />
-                <span className="font-black italic uppercase text-xs whitespace-nowrap">{baba.name}</span>
-              </button>
-            ))}
-            <button 
-              onClick={() => navigate('/')} 
-              className="flex-shrink-0 w-12 h-12 rounded-2xl border border-dashed border-white/20 flex items-center justify-center hover:border-cyan-electric transition-all"
-            >
-              <PlusCircle size={20} className="opacity-40" />
-            </button>
-          </div>
-        </div>
+      <div className="max-w-5xl mx-auto px-6 space-y-6">
 
         {currentBaba ? (
           <>
-            {/* TABS */}
-            <div className="flex border-b border-white/5 mb-8">
-              {['overview', 'ranking'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === tab ? 'text-cyan-electric' : 'opacity-40'}`}
+            {/* ATALHOS PRINCIPAIS */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { icon: <Trophy size={20} />, label: 'Ranking', path: '/rankings' },
+                { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
+                { icon: <Users size={20} />, label: 'Times', path: '/teams' },
+              ].map((item, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => navigate(item.path)} 
+                  className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5"
                 >
-                  {tab === 'overview' && 'Painel'}
-                  {tab === 'ranking' && 'Artilharia'}
-                  {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-electric shadow-[0_0_10px_#00fff2]"></div>}
+                  <div className="text-cyan-electric opacity-60">{item.icon}</div>
+                  <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* CONTEÚDO */}
-            <div className="space-y-6">
-              {activeTab === 'overview' && (
-                <div className="space-y-6 animate-in fade-in duration-500">
-                  {/* Cards de Info */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Horário</p>
-                      <h4 className="text-sm font-black italic">{currentBaba.game_time || '20:00'}</h4>
-                      <div className="mt-4 flex items-center gap-2 text-green-400">
-                        <Calendar size={14} /> 
-                        <span className="text-[10px] font-black uppercase">Frequência Semanal</span>
-                      </div>
-                    </div>
-                    <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5">
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-2">Modalidade</p>
-                      <h4 className="text-sm font-black italic uppercase">{currentBaba.modality || 'Futsal'}</h4>
-                      <div className="mt-4 flex items-center gap-2 text-cyan-electric">
-                        <Users size={14} /> 
-                        <span className="text-[10px] font-black uppercase">{players?.length || 0} Atletas</span>
-                      </div>
-                    </div>
+            {/* INFO DO BABA */}
+            <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5 space-y-4">
+              <p className="text-[9px] font-black opacity-40 uppercase tracking-widest mb-2">
+                {currentBaba.name}
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Horário */}
+                <div className="flex items-start gap-3">
+                  <Clock size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Horário</p>
+                    <p className="text-sm font-black italic">{currentBaba.game_time || '—'}</p>
                   </div>
-
-                  {/* ⭐ NOVO: Componente de Confirmação de Presença */}
-                  <PresenceConfirmation />
-
-                  {/* ⭐ NOVO: Painel de Configuração do Sorteio (Só Presidente) */}
-                  {isPresident && <DrawConfigPanel />}
-
-                  {/* Código de Convite - Só para Presidente */}
-                  {isPresident && currentBaba.invite_code && (
-                    <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
-                          <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
-                          <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
-                            {currentBaba.invite_code}
-                          </p>
-                        </div>
-                        <button
-                          onClick={handleCopyInviteCode}
-                          className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
-                        >
-                          <Copy size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Grid de Atalhos */}
-                  <div className="grid grid-cols-3 gap-4">
-                    {[
-                      { icon: <Trophy size={20} />, label: 'Ranking', path: '/rankings' },
-                      { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
-                      { icon: <Users size={20} />, label: 'Times', path: '/teams' },
-                    ].map((item, i) => (
-                      <button 
-                        key={i} 
-                        onClick={() => navigate(item.path)} 
-                        className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5"
-                      >
-                        <div className="text-cyan-electric opacity-60">{item.icon}</div>
-                        <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Botão Configurações (só presidente) */}
-                  {isPresident && (
-                    <button
-                      onClick={() => setShowSettings(true)}
-                      className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 font-black uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white hover:border-cyan-electric/30 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Settings size={16} />
-                      Configurações do Baba
-                    </button>
-                  )}
                 </div>
-              )}
 
-              {activeTab === 'ranking' && (
-                <div className="space-y-4 animate-in fade-in duration-500">
-                  {players && players.length > 0 ? (
-                    players
-                      .sort((a,b) => (b.total_goals_month || 0) - (a.total_goals_month || 0))
-                      .slice(0, 5)
-                      .map((p, i) => (
-                        <div 
-                          key={p.id} 
-                          className="flex items-center justify-between p-4 card-glass rounded-2xl border border-white/5 bg-white/5"
-                        >
-                          <div className="flex items-center gap-4">
-                            <span className="text-lg font-black italic opacity-20 w-4">#{i+1}</span>
-                            <span className="font-bold uppercase text-sm">{p.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-green-400 font-black italic">
-                            <Star size={14} /> {p.total_goals_month || 0} 
-                            <span className="text-[9px] opacity-40">GOLS</span>
-                          </div>
-                        </div>
-                      ))
-                  ) : (
-                    <p className="text-center py-10 opacity-30 text-xs uppercase font-black tracking-widest">
-                      Nenhum dado de artilharia
+                {/* Modalidade */}
+                <div className="flex items-start gap-3">
+                  <Trophy size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Modalidade</p>
+                    <p className="text-sm font-black italic uppercase">{currentBaba.modality || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Dias da semana */}
+                {formatGameDays(currentBaba.game_days) && (
+                  <div className="flex items-start gap-3">
+                    <Calendar size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Dias</p>
+                      <p className="text-sm font-black italic">{formatGameDays(currentBaba.game_days)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Jogadores */}
+                <div className="flex items-start gap-3">
+                  <Users size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Atletas</p>
+                    <p className="text-sm font-black italic">{players?.length || 0} jogadores</p>
+                  </div>
+                </div>
+
+                {/* Local */}
+                <div className="flex items-start gap-3 col-span-2">
+                  <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Local</p>
+                    <p className="text-sm font-black italic text-white/40">
+                      {currentBaba.location || 'A definir'}
                     </p>
-                  )}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* Confirmação de Presença */}
+            <PresenceConfirmation />
+
+            {/* Painel de Configuração do Sorteio (Só Presidente) */}
+            {isPresident && <DrawConfigPanel />}
+
+            {/* Código de Convite - Só para Presidente */}
+            {isPresident && currentBaba.invite_code && (
+              <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
+                    <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
+                    <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
+                      {currentBaba.invite_code}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCopyInviteCode}
+                    className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+                  >
+                    <Copy size={20} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Botão Configurações (só presidente) */}
+            {isPresident && (
+              <button
+                onClick={() => setShowSettings(true)}
+                className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 font-black uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white hover:border-cyan-electric/30 transition-all flex items-center justify-center gap-2"
+              >
+                <Settings size={16} />
+                Configurações do Baba
+              </button>
+            )}
           </>
         ) : (
           <div className="py-20 text-center space-y-6">
