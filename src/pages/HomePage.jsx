@@ -65,8 +65,7 @@ const HomePage = () => {
 
   const handleSelectBaba = (baba) => {
     setCurrentBaba(baba);
-    // ✅ CORRIGIDO: Removido navigate - HomePage é página única
-    toast.success(`Baba "${baba.name}" selecionado!`);
+    navigate('/dashboard');
   };
 
   if (loading) {
