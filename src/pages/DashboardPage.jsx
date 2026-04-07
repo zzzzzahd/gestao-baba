@@ -10,7 +10,7 @@ import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
 import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../services/supabase';
 
 const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
