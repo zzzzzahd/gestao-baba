@@ -14,9 +14,6 @@ const BabaSettings = ({ baba, onClose }) => {
     game_time: baba.game_time || '20:00',
     game_days: baba.game_days || [],
     match_duration: baba.match_duration || 10,
-    players_per_team: baba.players_per_team || 5,
-    allow_reserves: baba.allow_reserves !== false,
-    min_players_to_start: baba.min_players_to_start || 4,
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -63,7 +60,7 @@ const BabaSettings = ({ baba, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center z-50 p-4 overflow-y-auto">
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -167,69 +164,6 @@ const BabaSettings = ({ baba, onClose }) => {
               min="5"
               max="120"
             />
-          </div>
-
-          {/* ⭐ NOVO: Configurações de Sorteio */}
-          <div className="border-t border-white/10 pt-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-cyan-electric mb-4">
-              Configurações de Sorteio
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Jogadores por Time */}
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                  Jogadores por Time
-                </label>
-                <input
-                  type="number"
-                  value={formData.players_per_team}
-                  onChange={(e) => setFormData({ ...formData, players_per_team: parseInt(e.target.value) })}
-                  className="input-tactical"
-                  min="3"
-                  max="11"
-                />
-                <p className="text-[8px] text-white/30 mt-1">
-                  Futsal: 5 | Society: 7
-                </p>
-              </div>
-
-              {/* Mínimo para Iniciar */}
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                  Mínimo para Sortear
-                </label>
-                <input
-                  type="number"
-                  value={formData.min_players_to_start}
-                  onChange={(e) => setFormData({ ...formData, min_players_to_start: parseInt(e.target.value) })}
-                  className="input-tactical"
-                  min="4"
-                  max="20"
-                />
-              </div>
-            </div>
-
-            {/* Permitir Reservas */}
-            <div className="mt-4 flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-              <div>
-                <p className="text-xs font-black uppercase">Permitir Reservas</p>
-                <p className="text-[8px] text-white/40 mt-1">
-                  Jogadores extras ficam como reservas
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, allow_reserves: !formData.allow_reserves })}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
-                  formData.allow_reserves ? 'bg-cyan-electric' : 'bg-white/20'
-                }`}
-              >
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-black rounded-full transition-transform ${
-                  formData.allow_reserves ? 'translate-x-6' : 'translate-x-0'
-                }`}></div>
-              </button>
-            </div>
           </div>
 
           {/* Botões */}
