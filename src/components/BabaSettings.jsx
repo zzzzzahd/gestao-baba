@@ -64,7 +64,7 @@ const BabaSettings = ({ baba, onClose }) => {
 
   return 
     (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-black uppercase italic text-cyan-electric">
