@@ -12,19 +12,37 @@
     <meta name="apple-mobile-web-app-title" content="DRAFT">
     <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- html2canvas para captura de tela -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 
     <style>
-      /* Reset tático */
+      /* --- VARIÁVEIS DO LOGO DRAFT PLAY --- */
+      :root {
+        /* Define o Azul Cyan Padrão que você usa no projeto */
+        --cyan-electric: #00f2ff; 
+      }
+
+      /* Classe para aplicar a fonte Rajdhani que você já carregou */
+      .font-display {
+        font-family: 'Rajdhani', sans-serif;
+      }
+
+      /* Animação de entrada suave para o logo */
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.6s ease-out forwards;
+      }
+      /* ------------------------------------ */
+
+      /* Reset tático original */
       * {
         -webkit-tap-highlight-color: transparent;
         box-sizing: border-box;
