@@ -10,8 +10,8 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { myBabas, createBaba, joinBaba, setCurrentBaba, loading } = useBaba();
   const { profile } = useAuth();
-  
-  const [mode, setMode] = useState(null); // 'create' ou 'join'
+
+  const [mode, setMode] = useState(null); // 'create' | 'join'
   const [formData, setFormData] = useState({
     name: '',
     modality: 'futsal',
@@ -23,7 +23,7 @@ const HomePage = () => {
 
   const handleCreateBaba = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       toast.error('Digite o nome do baba');
       return;
@@ -43,23 +43,31 @@ const HomePage = () => {
     });
 
     if (result) {
-      setMode(null); // Volta para tela inicial
+      setMode(null);
       toast.success('Baba criado! Clique nele abaixo para acessar.');
     }
   };
 
   const handleJoinBaba = async (e) => {
     e.preventDefault();
-    
-    if (!formData.invite_code.trim()) {
-      toast.error('Digite o código do baba');
+
+    const code = formData.invite_code.trim().toUpperCase();
+
+    if (!code) {
+      toast.error('Digite o código do convite');
       return;
     }
 
-    const result = await joinBaba(formData.invite_code);
+    if (code.length !== 6) {
+      toast.error('O código deve ter exatamente 6 caracteres');
+      return;
+    }
+
+    const result = await joinBaba(code);
 
     if (result) {
-      setMode(null); // Volta para tela inicial
+      setMode(null);
+      navigate('/dashboard');
     }
   };
 
@@ -80,6 +88,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-black text-white p-6">
       <div className="w-full max-w-4xl mx-auto space-y-8">
+
         {/* Logo */}
         <div className="flex justify-center">
           <Logo size="large" />
@@ -88,20 +97,17 @@ const HomePage = () => {
         {/* Cabeçalho do Perfil */}
         <div className="card-glass p-6 rounded-[2rem] animate-fade-in">
           <div className="flex items-center gap-4">
-            {/* Círculo com Inicial */}
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
               <span className="text-2xl font-black text-black">
                 {profile?.name?.charAt(0).toUpperCase() || 'U'}
               </span>
             </div>
 
-            {/* Informações do Perfil */}
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-black uppercase italic text-white truncate">
                 {profile?.name || 'Usuário'}
               </h2>
-              
-              {/* Badge com Idade | Posição | Time */}
+
               {(profile?.age || profile?.position || profile?.favorite_team) && (
                 <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
                   {profile?.age && <span>{profile.age} anos</span>}
@@ -113,7 +119,6 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Botão Editar Perfil */}
             <button
               onClick={() => navigate('/profile')}
               className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2 flex-shrink-0"
@@ -189,24 +194,40 @@ const HomePage = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                    Horário do Jogo
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.game_time}
-                    onChange={(e) => setFormData({ ...formData, game_time: e.target.value })}
-                    className="input-tactical"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                      Horário do Jogo
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.game_time}
+                      onChange={(e) => setFormData({ ...formData, game_time: e.target.value })}
+                      className="input-tactical"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                      Duração (min)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.match_duration}
+                      onChange={(e) => setFormData({ ...formData, match_duration: parseInt(e.target.value) })}
+                      className="input-tactical"
+                      min="5"
+                      max="120"
+                    />
+                  </div>
                 </div>
 
-                {/* ⭐ NOVO: Seleção de Dias da Semana */}
+                {/* Dias da Semana */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
                     Dias da Semana
                   </label>
-                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  <div className="grid grid-cols-7 gap-2">
                     {[
                       { day: 0, label: 'DOM' },
                       { day: 1, label: 'SEG' },
@@ -221,7 +242,7 @@ const HomePage = () => {
                         type="button"
                         onClick={() => {
                           const newDays = formData.game_days.includes(day)
-                            ? formData.game_days.filter(d => d !== day)
+                            ? formData.game_days.filter((d) => d !== day)
                             : [...formData.game_days, day].sort((a, b) => a - b);
                           setFormData({ ...formData, game_days: newDays });
                         }}
@@ -285,15 +306,28 @@ const HomePage = () => {
                   <input
                     type="text"
                     value={formData.invite_code}
-                    onChange={(e) => setFormData({ ...formData, invite_code: e.target.value.toUpperCase() })}
-                    placeholder="Ex: ABC12345"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        invite_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                      })
+                    }
+                    placeholder="Ex: AB12CD"
                     className="input-tactical text-center text-2xl font-black tracking-widest"
-                    maxLength={8}
+                    maxLength={6}
                     required
                   />
                   <p className="text-[9px] text-white/30 mt-2 text-center">
-                    Digite o código de 8 caracteres fornecido pelo presidente
+                    Digite o código de 6 caracteres fornecido pelo presidente
                   </p>
+                  {formData.invite_code.length > 0 && formData.invite_code.length < 6 && (
+                    <p className="text-[9px] text-yellow-500 mt-1 text-center">
+                      {6 - formData.invite_code.length} caractere{6 - formData.invite_code.length !== 1 ? 's' : ''} restante{6 - formData.invite_code.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                  {formData.invite_code.length === 6 && (
+                    <p className="text-[9px] text-cyan-electric mt-1 text-center">✓ Código completo</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -308,7 +342,7 @@ const HomePage = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || formData.invite_code.length !== 6}
                 className="flex-[2] py-5 rounded-2xl bg-green-neon text-black font-black uppercase text-[10px] tracking-widest shadow-neon-green hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
               >
                 {loading ? 'Entrando...' : 'Entrar'}
@@ -351,16 +385,16 @@ const HomePage = () => {
 
                       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
                         <Clock size={12} />
-                        <span>{baba.game_time}</span>
+                        <span>{baba.game_time || '—'}</span>
                       </div>
 
-                      {/* ⭐ NOVO: Dias da Semana */}
-                      {baba.game_days && baba.game_days.length > 0 && (
+                      {/* Dias da semana */}
+                      {Array.isArray(baba.game_days) && baba.game_days.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {baba.game_days.sort((a, b) => a - b).map((day) => {
                             const dayLabels = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
                             return (
-                              <span 
+                              <span
                                 key={day}
                                 className="w-6 h-6 rounded-md bg-cyan-electric/20 border border-cyan-electric/30 text-cyan-electric text-[8px] font-black flex items-center justify-center"
                               >
@@ -393,6 +427,7 @@ const HomePage = () => {
             )}
           </div>
         )}
+
       </div>
     </div>
   );
