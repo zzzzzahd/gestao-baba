@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { 
   ArrowLeft, DollarSign, Copy, Plus, 
-  CheckCircle, Clock, X, Loader2, AlertCircle, Upload 
+  CheckCircle, Clock, X, Loader2, AlertCircle 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,10 +16,6 @@ const FinancialPage = () => {
   
   const [financials, setFinancials] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showProofModal, setShowProofModal] = useState(false);
-  const [selectedFinancial, setSelectedFinancial] = useState(null);
-  const [proofFile, setProofFile] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [isPresident, setIsPresident] = useState(false);
   
@@ -58,7 +54,10 @@ const FinancialPage = () => {
             status,
             amount,
             paid_at,
-            proof_url
+            proof_url,
+            proof_uploaded_at,
+            confirmed_at,
+            confirmed_by
           )
         `)
         .eq('baba_id', currentBaba.id)
@@ -71,18 +70,6 @@ const FinancialPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const uploadProof = async (file, financialId) => {
-    const fileName = `${user.id}/${financialId}_${Date.now()}`;
-
-    const { data, error } = await supabase.storage
-      .from('payment-proofs')
-      .upload(fileName, file);
-
-    if (error) throw error;
-
-    return fileName;
   };
 
   const createFinancial = async (e) => {
@@ -107,7 +94,7 @@ const FinancialPage = () => {
     }
   };
 
-  const handleSendPayment = async () => {
+  const markAsPaid = async (financialId) => {
     try {
       const { data: player } = await supabase
         .from(TABLES.PLAYERS)
@@ -116,35 +103,62 @@ const FinancialPage = () => {
         .eq('user_id', user.id)
         .single();
 
-      const financial = selectedFinancial;
-
-      let proofPath = null;
-
-      if (proofFile) {
-        proofPath = await uploadProof(proofFile, financial.id);
+      if (!player) {
+        toast.error('Você não está vinculado a este baba!');
+        return;
       }
+
+      const financial = financials.find(f => f.id === financialId);
+      if (!financial) return;
 
       const { error } = await supabase
         .from(TABLES.PAYMENTS)
         .upsert([{
-          financial_id: financial.id,
+          financial_id: financialId,
           player_id: player.id,
           amount: financial.amount,
           status: 'pending',
-          paid_at: new Date().toISOString(),
-          proof_url: proofPath,
-          proof_uploaded_at: proofPath ? new Date().toISOString() : null
+          paid_at: new Date().toISOString()
         }], { onConflict: 'financial_id,player_id' });
 
       if (error) throw error;
-
-      toast.success('Pagamento enviado!');
-      setShowProofModal(false);
-      setProofFile(null);
+      toast.success('Solicitação de pagamento enviada!');
       loadFinancials();
-
     } catch (error) {
-      toast.error('Erro ao enviar pagamento');
+      toast.error('Erro ao processar pagamento');
+    }
+  };
+
+  // 🔥 NOVO: Upload de comprovante
+  const uploadProof = async (file, paymentId) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${paymentId}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment-proofs')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('payment-proofs')
+        .getPublicUrl(fileName);
+
+      const { error } = await supabase
+        .from(TABLES.PAYMENTS)
+        .update({
+          proof_url: data.publicUrl,
+          proof_uploaded_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      toast.success('Comprovante enviado!');
+      loadFinancials();
+    } catch (err) {
+      toast.error('Erro ao enviar comprovante');
     }
   };
 
@@ -177,102 +191,86 @@ const FinancialPage = () => {
   return (
     <div className="min-h-screen p-6 bg-black text-white font-sans">
       <div className="max-w-4xl mx-auto">
-
-        {/* HEADER */}
+        
+        {/* Header */}
         <div className="flex items-center justify-between mb-10">
-          <button onClick={() => navigate('/home')} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest opacity-50 hover:opacity-100">
+          <button 
+            onClick={() => navigate('/home')} 
+            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest opacity-50 hover:opacity-100 transition-all"
+          >
             <ArrowLeft size={16} /> {currentBaba?.name}
           </button>
-          <DollarSign size={20} className="text-green-500" />
+          <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
+            <DollarSign size={20} className="text-green-500" />
+          </div>
         </div>
 
-        {/* LISTA */}
-        <div className="space-y-6">
-          {financials.map((f) => {
-            const pending = f.payments?.filter(p => p.status === 'pending') || [];
-            const confirmed = f.payments?.filter(p => p.status === 'confirmed') || [];
+        <h1 className="text-4xl font-black mb-10 italic uppercase tracking-tighter">
+          Financeiro <span className="text-green-500">.</span>
+        </h1>
 
-            return (
-              <div key={f.id} className="card-glass p-6 rounded-2xl border border-white/5">
-
-                <h3 className="font-black">{f.title}</h3>
-                <p className="text-green-500">R$ {f.amount}</p>
-
-                {!isPresident && (
-                  <button
-                    onClick={() => {
-                      setSelectedFinancial(f);
-                      setShowProofModal(true);
-                    }}
-                    className="mt-4 w-full py-3 border border-green-500 text-green-500 rounded-xl"
-                  >
-                    Informar Pagamento
-                  </button>
-                )}
-
-                {isPresident && (
-                  <>
-                    {/* PENDENTES */}
-                    <div className="mt-4">
-                      <p className="text-xs opacity-50">Pendentes</p>
-                      {pending.map(p => (
-                        <div key={p.id} className="flex justify-between items-center mt-2">
-                          <div className="flex gap-2">
-                            {p.proof_url && (
-                              <a
-                                href={`https://itvfnargszozygcdhlrq.supabase.co/storage/v1/object/public/payment-proofs/${p.proof_url}`}
-                                target="_blank"
-                                className="text-blue-400 text-xs"
-                              >
-                                Ver comprovante
-                              </a>
-                            )}
-                          </div>
-                          <button onClick={() => confirmPayment(p.id)} className="text-green-500">
-                            Confirmar
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* CONFIRMADOS */}
-                    <div className="mt-4">
-                      <p className="text-xs opacity-50">Confirmados</p>
-                      {confirmed.map(p => (
-                        <div key={p.id} className="text-green-500 text-xs">
-                          Pago ✔
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* MODAL COMPROVANTE */}
-        {showProofModal && (
-          <div className="fixed inset-0 bg-black/90 flex items-center justify-center">
-            <div className="bg-black p-6 rounded-xl w-full max-w-md">
-              <h2 className="mb-4">Enviar Comprovante</h2>
-
-              <input
-                type="file"
-                onChange={(e) => setProofFile(e.target.files[0])}
-              />
-
-              <div className="flex gap-3 mt-4">
-                <button onClick={handleSendPayment} className="bg-green-500 px-4 py-2 rounded">
-                  Enviar
-                </button>
-                <button onClick={() => setShowProofModal(false)}>
-                  Cancelar
-                </button>
-              </div>
+        {/* PIX */}
+        {currentBaba.pix_key && (
+          <div className="card-glass p-6 mb-8 rounded-3xl border border-green-500/20">
+            <p className="text-[10px] text-green-500 font-black mb-3 uppercase tracking-widest">Chave PIX do Baba</p>
+            <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl">
+              <span className="font-mono text-sm">{currentBaba.pix_key}</span>
+              <button 
+                onClick={() => { navigator.clipboard.writeText(currentBaba.pix_key); toast.success('Chave copiada!'); }}
+              >
+                <Copy size={18} />
+              </button>
             </div>
           </div>
         )}
+
+        {isPresident && (
+          <button onClick={() => setShowCreateModal(true)}>
+            Nova Cobrança
+          </button>
+        )}
+
+        {/* LISTA */}
+        <div className="space-y-6">
+          {financials.map((f) => (
+            <div key={f.id}>
+              <h3>{f.title}</h3>
+              <p>R$ {f.amount}</p>
+
+              {!isPresident ? (
+                <>
+                  <button onClick={() => markAsPaid(f.id)}>
+                    Informar Pagamento
+                  </button>
+
+                  {/* Upload */}
+                  {f.payments?.[0] && (
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) uploadProof(file, f.payments[0].id);
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                f.payments?.map(p => (
+                  <div key={p.id}>
+                    {p.proof_url && (
+                      <a href={p.proof_url} target="_blank">
+                        Ver comprovante
+                      </a>
+                    )}
+                    <button onClick={() => confirmPayment(p.id)}>
+                      Confirmar
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ))}
+        </div>
 
       </div>
     </div>
