@@ -79,37 +79,50 @@ const FinancialPage = () => {
     }
   };
 
+  // FUNÇÃO DE ENCERRAR CORRIGIDA
   const toggleFinancialStatus = async (id, currentStatus) => {
     try {
       const nextStatus = currentStatus === 'active' ? 'closed' : 'active';
+      
       const { error } = await supabase
         .from('financials')
         .update({ status: nextStatus })
         .eq('id', id);
 
       if (error) throw error;
-      toast.success(nextStatus === 'closed' ? 'Cobrança Encerrada!' : 'Cobrança Reativada!');
-      loadFinancials();
+
+      // Atualiza o estado local imediatamente para refletir na tela
+      setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: nextStatus } : f));
+      
+      toast.success(nextStatus === 'closed' ? 'Cobrança Encerrada!' : 'Reativada!');
     } catch (error) {
-      toast.error('Erro ao mudar status');
+      console.error("Erro ao mudar status:", error);
+      toast.error('Erro técnico ao mudar status');
     }
   };
 
+  // FUNÇÃO DE EXCLUIR CORRIGIDA (LIMPA PAGAMENTOS ANTES)
   const deleteFinancial = async (id) => {
     if (!window.confirm("Isso apagará a cobrança e todos os pagamentos vinculados. Confirmar?")) return;
     
     try {
       setProcessing(true);
-      // Deleta pagamentos primeiro (necessário se não houver CASCADE no banco)
+      
+      // 1. Deleta os pagamentos vinculados primeiro (Evita erro de chave estrangeira)
       await supabase.from('payments').delete().eq('financial_id', id);
       
+      // 2. Agora deleta a cobrança
       const { error } = await supabase.from('financials').delete().eq('id', id);
       
       if (error) throw error;
+
+      // Remove da lista local na hora
+      setFinancials(prev => prev.filter(f => f.id !== id));
       toast.success('Excluído com sucesso');
-      loadFinancials();
+      
     } catch (error) {
-      toast.error('Erro ao excluir');
+      console.error("Erro ao excluir:", error);
+      toast.error('Erro ao excluir. Tente novamente.');
     } finally {
       setProcessing(false);
     }
@@ -175,7 +188,7 @@ const FinancialPage = () => {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
+    <div className="min-h-screen flex items-center justify-center bg-[#050505]">
       <Loader2 className="animate-spin text-green-500" size={40} />
     </div>
   );
@@ -186,8 +199,8 @@ const FinancialPage = () => {
         
         {/* Header */}
         <div className="flex items-center justify-between mb-12">
-          <button onClick={() => navigate('/home')} className="flex items-center gap-2 text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all">
-            <ArrowLeft size={14} /> Voltar ao Início
+          <button onClick={() => navigate('/home')} className="flex items-center gap-2 text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all tracking-tighter">
+            <ArrowLeft size={14} /> Voltar ao Painel
           </button>
           <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
             <DollarSign size={16} className="text-green-500" />
@@ -197,11 +210,11 @@ const FinancialPage = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none">Financeiro<span className="text-green-500">.</span></h1>
-            <p className="text-[10px] opacity-40 mt-2 font-black uppercase tracking-widest">Controle de Taxas</p>
+            <p className="text-[10px] opacity-40 mt-2 font-black uppercase tracking-widest">Gestão de Arrecadação</p>
           </div>
           {isPresident && (
             <button onClick={() => setShowCreateModal(true)} className="px-8 py-4 bg-green-500 text-black font-black uppercase text-[10px] tracking-widest rounded-full hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-green-500/20">
-              <Plus size={16} strokeWidth={3} /> Criar Cobrança
+              <Plus size={16} strokeWidth={3} /> Nova Cobrança
             </button>
           )}
         </div>
@@ -225,7 +238,7 @@ const FinancialPage = () => {
                     </div>
                     <p className="text-xs opacity-50 uppercase font-bold tracking-tight">{f.description}</p>
                     <div className="flex items-center gap-4 pt-2">
-                       <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Vence {new Date(f.due_date).toLocaleDateString()}</span>
+                       <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Vence em {new Date(f.due_date).toLocaleDateString()}</span>
                        <div className="h-1 w-1 rounded-full bg-green-500/30" />
                        <span className="text-[9px] font-black text-green-500/50 uppercase italic tracking-widest">PIX: {f.pix_key}</span>
                     </div>
@@ -239,11 +252,11 @@ const FinancialPage = () => {
                   <div>
                     {isClosed ? (
                        <div className="p-4 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-500 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                         <Ban size={16} /> Aposta Encerrada
+                         <Ban size={16} /> Cobrança Encerrada
                        </div>
                     ) : isExpired && !myPayment ? (
                       <div className="p-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 text-yellow-500 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                        <AlertTriangle size={16} /> Cobrança Vencida
+                        <AlertTriangle size={16} /> Prazo Expirado
                       </div>
                     ) : !myPayment ? (
                       <button 
@@ -253,13 +266,13 @@ const FinancialPage = () => {
                         <div className="flex items-center gap-3 uppercase font-black text-[10px] tracking-widest">
                           <CreditCard size={18} /> Pagar Agora
                         </div>
-                        <ChevronRight size={16} className="opacity-30 group-hover/btn:translate-x-1" />
+                        <ChevronRight size={16} className="opacity-30 group-hover/btn:translate-x-1 transition-transform" />
                       </button>
                     ) : (
                       <div className={`p-4 rounded-2xl border flex items-center gap-3 ${myPayment.status === 'confirmed' ? 'border-green-500/20 bg-green-500/5 text-green-500' : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-500'}`}>
                         {myPayment.status === 'confirmed' ? <CheckCircle size={18} /> : <Clock size={18} />}
                         <span className="text-[10px] font-black uppercase tracking-widest">
-                          {myPayment.status === 'confirmed' ? 'Confirmado' : 'Aguardando Aprovação'}
+                          {myPayment.status === 'confirmed' ? 'Confirmado' : 'Em Análise'}
                         </span>
                       </div>
                     )}
@@ -267,7 +280,7 @@ const FinancialPage = () => {
 
                   {isPresident && (
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => toggleFinancialStatus(f.id, f.status)} className={`p-4 rounded-2xl border border-white/5 transition-colors ${isClosed ? 'bg-green-500/10 text-green-500' : 'bg-white/5 hover:text-yellow-500'}`}>
+                      <button onClick={() => toggleFinancialStatus(f.id, f.status)} className={`p-4 rounded-2xl border border-white/5 transition-colors ${isClosed ? 'bg-green-500/10 text-green-500' : 'bg-white/5 hover:text-yellow-500'}`} title={isClosed ? "Reativar" : "Encerrar"}>
                         <Ban size={18} />
                       </button>
                       <button onClick={() => deleteFinancial(f.id)} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:text-red-500 transition-colors">
@@ -277,7 +290,7 @@ const FinancialPage = () => {
                   )}
                 </div>
 
-                {/* Confirmados */}
+                {/* Lista de Confirmados */}
                 {confirmedPayments.length > 0 && (
                   <div className="mt-8 pt-6 border-t border-white/5">
                     <p className="text-[8px] font-black uppercase opacity-20 ml-2 tracking-widest mb-3">Já Pagaram ({confirmedPayments.length})</p>
@@ -292,16 +305,16 @@ const FinancialPage = () => {
                   </div>
                 )}
 
-                {/* Pendentes */}
+                {/* Pendentes (Só para o Presidente) */}
                 {isPresident && f.payments?.some(p => p.status === 'pending') && (
                    <div className="mt-6 space-y-2">
-                      <p className="text-[8px] font-black uppercase text-yellow-500 ml-2 tracking-widest">Pendentes de Aprovação</p>
+                      <p className="text-[8px] font-black uppercase text-yellow-500 ml-2 tracking-widest italic">Aprovações Pendentes</p>
                       {f.payments.filter(p => p.status === 'pending').map(p => (
-                        <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                          <span className="text-[10px] font-bold uppercase">{p.player?.name}</span>
+                        <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                          <span className="text-[10px] font-bold uppercase tracking-tight">{p.player?.name}</span>
                           <div className="flex items-center gap-3">
-                            <a href={p.proof_url} target="_blank" rel="noreferrer" className="text-white/20 hover:text-white"><Eye size={18}/></a>
-                            <button onClick={() => confirmPayment(p.id)} className="px-4 py-2 bg-green-500 text-black rounded-xl text-[9px] font-black uppercase tracking-widest">Aprovar</button>
+                            <a href={p.proof_url} target="_blank" rel="noreferrer" className="text-white/20 hover:text-white transition-colors"><Eye size={18}/></a>
+                            <button onClick={() => confirmPayment(p.id)} className="px-4 py-2 bg-green-500 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all">Aprovar</button>
                           </div>
                         </div>
                       ))}
@@ -312,29 +325,30 @@ const FinancialPage = () => {
           })}
         </div>
 
-        {/* Modal Pagamento */}
+        {/* Modal de Pagamento */}
         {showPayModal && selectedFinancial && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
-            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem]">
-              <div className="flex justify-between items-center mb-10">
-                <h2 className="text-2xl font-black italic uppercase tracking-tighter">Pagamento</h2>
-                <button onClick={() => setShowPayModal(false)} className="p-2 bg-white/5 rounded-full"><X size={20}/></button>
+            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-8 opacity-5"><DollarSign size={120}/></div>
+              <div className="flex justify-between items-center mb-10 relative">
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter">Fazer Pagamento</h2>
+                <button onClick={() => setShowPayModal(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><X size={20}/></button>
               </div>
-              <div className="space-y-8">
+              <div className="space-y-8 relative">
                 <div className="p-6 bg-green-500/5 rounded-3xl border border-green-500/10 text-center">
                   <p className="text-[9px] font-black text-green-500 uppercase mb-4 tracking-widest opacity-60">Chave PIX</p>
-                  <p className="text-lg font-mono font-bold text-white mb-6 select-all">{selectedFinancial.pix_key}</p>
-                  <button onClick={() => { navigator.clipboard.writeText(selectedFinancial.pix_key); toast.success('Copiado!'); }} className="flex items-center gap-2 mx-auto px-6 py-3 bg-green-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest">
+                  <p className="text-lg font-mono font-bold text-white mb-6 select-all tracking-tighter">{selectedFinancial.pix_key}</p>
+                  <button onClick={() => { navigator.clipboard.writeText(selectedFinancial.pix_key); toast.success('Copiado!'); }} className="flex items-center gap-2 mx-auto px-6 py-3 bg-green-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all">
                     <Copy size={14} /> Copiar Chave
                   </button>
                 </div>
                 <div className="space-y-3">
-                  <p className="text-[9px] font-black opacity-30 uppercase ml-2 tracking-widest italic tracking-widest">Anexar Comprovante</p>
+                  <p className="text-[9px] font-black opacity-30 uppercase ml-2 tracking-widest italic tracking-widest">Passo 2: Enviar Comprovante</p>
                   <label className="flex flex-col items-center justify-center w-full h-40 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 hover:border-green-500/50 transition-all cursor-pointer group">
                     {processing ? <Loader2 className="animate-spin text-green-500" /> : (
                       <>
                         <Camera size={28} className="opacity-10 group-hover:opacity-100 transition-opacity mb-3" />
-                        <span className="text-[10px] font-black uppercase opacity-30">Selecionar Foto</span>
+                        <span className="text-[10px] font-black uppercase opacity-30 group-hover:opacity-100 transition-opacity tracking-widest">Selecionar Imagem</span>
                       </>
                     )}
                     <input type="file" accept="image/*" className="hidden" onChange={handleUploadProof} disabled={processing} />
@@ -345,21 +359,21 @@ const FinancialPage = () => {
           </div>
         )}
 
-        {/* Modal Criar */}
+        {/* Modal de Criação */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
             <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem]">
-              <h2 className="text-3xl font-black italic uppercase mb-10 tracking-tighter text-green-500">Nova Cobrança</h2>
+              <h2 className="text-3xl font-black italic uppercase mb-10 tracking-tighter text-green-500">Nova Taxa</h2>
               <form onSubmit={createFinancial} className="space-y-4">
-                <input placeholder="TÍTULO" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold uppercase text-xs" value={newFinancial.title} onChange={e => setNewFinancial({...newFinancial, title: e.target.value.toUpperCase()})} required />
+                <input placeholder="TÍTULO (EX: MENSALIDADE)" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold uppercase text-xs tracking-widest" value={newFinancial.title} onChange={e => setNewFinancial({...newFinancial, title: e.target.value.toUpperCase()})} required />
                 <div className="grid grid-cols-2 gap-4">
                   <input type="number" step="0.01" placeholder="VALOR R$" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold text-xs" value={newFinancial.amount} onChange={e => setNewFinancial({...newFinancial, amount: e.target.value})} required />
                   <input type="date" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold text-xs text-white uppercase" value={newFinancial.due_date} onChange={e => setNewFinancial({...newFinancial, due_date: e.target.value})} required />
                 </div>
-                <input placeholder="CHAVE PIX" className="w-full bg-green-500/5 p-5 rounded-2xl border border-green-500/20 outline-none focus:border-green-500 font-mono text-xs text-green-500" value={newFinancial.pix_key} onChange={e => setNewFinancial({...newFinancial, pix_key: e.target.value})} required />
+                <input placeholder="CHAVE PIX PARA RECEBIMENTO" className="w-full bg-green-500/5 p-5 rounded-2xl border border-green-500/20 outline-none focus:border-green-500 font-mono text-xs text-green-500" value={newFinancial.pix_key} onChange={e => setNewFinancial({...newFinancial, pix_key: e.target.value})} required />
                 <div className="flex gap-4 pt-10">
-                  <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase opacity-30 tracking-widest">Sair</button>
-                  <button type="submit" disabled={processing} className="flex-1 py-5 bg-green-500 text-black text-[10px] font-black uppercase rounded-2xl shadow-xl shadow-green-500/20 tracking-widest">Confirmar</button>
+                  <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase opacity-30 tracking-widest">Cancelar</button>
+                  <button type="submit" disabled={processing} className="flex-1 py-5 bg-green-500 text-black text-[10px] font-black uppercase rounded-2xl shadow-xl shadow-green-500/20 tracking-widest hover:scale-[1.02] transition-all">Lançar Agora</button>
                 </div>
               </form>
             </div>
