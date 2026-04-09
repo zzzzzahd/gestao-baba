@@ -53,11 +53,7 @@ const FinancialPage = () => {
             player_id,
             status,
             amount,
-            paid_at,
-            proof_url,
-            proof_uploaded_at,
-            confirmed_at,
-            confirmed_by
+            paid_at
           )
         `)
         .eq('baba_id', currentBaba.id)
@@ -109,8 +105,7 @@ const FinancialPage = () => {
       }
 
       const financial = financials.find(f => f.id === financialId);
-      if (!financial) return;
-
+      
       const { error } = await supabase
         .from(TABLES.PAYMENTS)
         .upsert([{
@@ -126,39 +121,6 @@ const FinancialPage = () => {
       loadFinancials();
     } catch (error) {
       toast.error('Erro ao processar pagamento');
-    }
-  };
-
-  // 🔥 NOVO: Upload de comprovante
-  const uploadProof = async (file, paymentId) => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${paymentId}_${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('payment-proofs')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from('payment-proofs')
-        .getPublicUrl(fileName);
-
-      const { error } = await supabase
-        .from(TABLES.PAYMENTS)
-        .update({
-          proof_url: data.publicUrl,
-          proof_uploaded_at: new Date().toISOString()
-        })
-        .eq('id', paymentId);
-
-      if (error) throw error;
-
-      toast.success('Comprovante enviado!');
-      loadFinancials();
-    } catch (err) {
-      toast.error('Erro ao enviar comprovante');
     }
   };
 
@@ -209,14 +171,18 @@ const FinancialPage = () => {
           Financeiro <span className="text-green-500">.</span>
         </h1>
 
-        {/* PIX */}
+        {/* PIX Key Section */}
         {currentBaba.pix_key && (
-          <div className="card-glass p-6 mb-8 rounded-3xl border border-green-500/20">
+          <div className="card-glass p-6 mb-8 rounded-3xl border border-green-500/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5">
+              <AlertCircle size={80} />
+            </div>
             <p className="text-[10px] text-green-500 font-black mb-3 uppercase tracking-widest">Chave PIX do Baba</p>
-            <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl">
-              <span className="font-mono text-sm">{currentBaba.pix_key}</span>
+            <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
+              <span className="font-mono text-sm tracking-tight">{currentBaba.pix_key}</span>
               <button 
                 onClick={() => { navigator.clipboard.writeText(currentBaba.pix_key); toast.success('Chave copiada!'); }}
+                className="p-2 hover:bg-green-500/20 rounded-xl transition-all text-green-500"
               >
                 <Copy size={18} />
               </button>
@@ -225,53 +191,138 @@ const FinancialPage = () => {
         )}
 
         {isPresident && (
-          <button onClick={() => setShowCreateModal(true)}>
-            Nova Cobrança
+          <button 
+            onClick={() => setShowCreateModal(true)} 
+            className="w-full py-5 mb-8 rounded-2xl bg-green-500 text-black font-black uppercase text-xs tracking-[0.2em] shadow-[0_10px_30px_rgba(34,197,94,0.2)] hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus size={18} strokeWidth={3} /> Nova Cobrança
           </button>
         )}
 
-        {/* LISTA */}
+        {/* Financial List */}
         <div className="space-y-6">
-          {financials.map((f) => (
-            <div key={f.id}>
-              <h3>{f.title}</h3>
-              <p>R$ {f.amount}</p>
-
-              {!isPresident ? (
-                <>
-                  <button onClick={() => markAsPaid(f.id)}>
-                    Informar Pagamento
-                  </button>
-
-                  {/* Upload */}
-                  {f.payments?.[0] && (
-                    <input
-                      type="file"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) uploadProof(file, f.payments[0].id);
-                      }}
-                    />
-                  )}
-                </>
-              ) : (
-                f.payments?.map(p => (
-                  <div key={p.id}>
-                    {p.proof_url && (
-                      <a href={p.proof_url} target="_blank">
-                        Ver comprovante
-                      </a>
-                    )}
-                    <button onClick={() => confirmPayment(p.id)}>
-                      Confirmar
-                    </button>
-                  </div>
-                ))
-              )}
+          {financials.length === 0 ? (
+            <div className="text-center py-20 opacity-20 italic font-black uppercase tracking-widest text-sm">
+              Nenhuma movimentação registrada
             </div>
-          ))}
+          ) : (
+            financials.map((f) => (
+              <div key={f.id} className="card-glass p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 transition-all group">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-black italic uppercase tracking-tighter group-hover:text-green-500 transition-colors">{f.title}</h3>
+                    <p className="text-xs opacity-40 font-medium uppercase tracking-wide">{f.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-black text-green-500 tracking-tighter leading-none">
+                      R$ {f.amount.toFixed(2)}
+                    </p>
+                    {f.due_date && <p className="text-[9px] font-black opacity-30 mt-2 uppercase tracking-widest">Vence em: {new Date(f.due_date).toLocaleDateString()}</p>}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5">
+                  {!isPresident ? (
+                    <button 
+                      onClick={() => markAsPaid(f.id)} 
+                      className="w-full py-4 rounded-xl border border-green-500/50 text-green-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-green-500 hover:text-black transition-all"
+                    >
+                      Informar Pagamento
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-[9px] font-black opacity-30 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Clock size={12} /> Pagamentos Pendentes
+                      </p>
+                      {f.payments?.filter(p => p.status === 'pending').length === 0 ? (
+                        <p className="text-[10px] italic opacity-20">Nenhum aguardando aprovação</p>
+                      ) : (
+                        f.payments?.filter(p => p.status === 'pending').map(p => (
+                          <div key={p.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Solicitação Recebida</span>
+                            <button 
+                              onClick={() => confirmPayment(p.id)} 
+                              className="bg-green-500 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:scale-105 transition-all flex items-center gap-2"
+                            >
+                              <CheckCircle size={14} /> Confirmar
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
+        {/* Modal de Criação */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-5 z-50">
+            <div className="card-glass p-8 max-w-md w-full border border-green-500/30 rounded-[2.5rem]">
+              <div className="flex items-center justify-between mb-10">
+                <h2 className="text-2xl font-black text-green-500 italic uppercase tracking-tighter">Nova Cobrança</h2>
+                <button onClick={() => setShowCreateModal(false)} className="text-white/20 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={createFinancial} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase opacity-40 ml-2 tracking-widest">O que é?</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Mensalidade Fevereiro" 
+                    value={newFinancial.title} 
+                    onChange={e => setNewFinancial({...newFinancial, title: e.target.value.toUpperCase()})} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-green-500 transition-all font-bold text-sm uppercase" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase opacity-40 ml-2 tracking-widest">Valor (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="0.00" 
+                    value={newFinancial.amount} 
+                    onChange={e => setNewFinancial({...newFinancial, amount: e.target.value})} 
+                    required 
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-green-500 transition-all font-bold text-sm" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase opacity-40 ml-2 tracking-widest">Vencimento</label>
+                  <input 
+                    type="date" 
+                    value={newFinancial.due_date} 
+                    onChange={e => setNewFinancial({...newFinancial, due_date: e.target.value})} 
+                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none focus:border-green-500 transition-all font-bold text-sm" 
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-6">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowCreateModal(false)} 
+                    className="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase bg-white/5 tracking-widest"
+                  >
+                    Voltar
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase bg-green-500 text-black shadow-[0_10px_20px_rgba(34,197,94,0.3)] tracking-widest"
+                  >
+                    Lançar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
