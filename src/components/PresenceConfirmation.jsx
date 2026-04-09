@@ -5,30 +5,28 @@ import { Clock, CheckCircle2, XCircle, Users, AlertCircle } from 'lucide-react';
 
 const PresenceConfirmation = () => {
   const navigate = useNavigate();
-  const { 
-    currentBaba, 
-    gameConfirmations, 
-    myConfirmation, 
-    canConfirm, 
+  const {
+    currentBaba,
+    gameConfirmations,
+    myConfirmation,
+    canConfirm,
     confirmationDeadline,
     confirmPresence,
     cancelConfirmation,
     loading,
-    // ⭐ Sorteio
     currentMatch,
     isDrawing,
-    drawTeamsIntelligent, // ⭐ CORRETO: drawTeamsIntelligent
+    drawTeamsIntelligent,
   } = useBaba();
 
   const [timeRemaining, setTimeRemaining] = useState('');
 
-  // Calcular tempo restante até o deadline
+  // Contador de tempo restante até o deadline
   useEffect(() => {
     if (!confirmationDeadline) return;
 
-    const updateTimeRemaining = () => {
-      const now = new Date();
-      const diff = confirmationDeadline - now;
+    const update = () => {
+      const diff = confirmationDeadline - new Date();
 
       if (diff <= 0) {
         setTimeRemaining('Encerrado');
@@ -48,46 +46,60 @@ const PresenceConfirmation = () => {
       }
     };
 
-    updateTimeRemaining();
-    const interval = setInterval(updateTimeRemaining, 1000);
-
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [confirmationDeadline]);
 
-  // ⭐ NOVO: Auto-sorteio após deadline
+  // Auto-sorteio após deadline (quando há jogadores suficientes)
   useEffect(() => {
     if (!canConfirm && gameConfirmations.length >= 4 && !currentMatch && !isDrawing) {
-      // Deadline passou, tem jogadores suficientes, e ainda não sorteou
-      const timer = setTimeout(() => {
-        drawTeamsIntelligent().then((match) => {
-          if (match) {
-            // Navegar para tela de times após 2 segundos
-            setTimeout(() => {
-              navigate('/teams');
-            }, 2000);
-          }
-        });
-      }, 3000); // Aguarda 3 segundos após deadline
+      const timer = setTimeout(async () => {
+        const result = await drawTeamsIntelligent();
+        if (result) {
+          setTimeout(() => navigate('/teams'), 2000);
+        }
+      }, 3000);
 
       return () => clearTimeout(timer);
     }
   }, [canConfirm, gameConfirmations, currentMatch, isDrawing, drawTeamsIntelligent, navigate]);
 
-  // Calcular horário do jogo e deadline
   const getGameTime = () => {
     if (!currentBaba?.game_time) return '--:--';
-    return currentBaba.game_time.substring(0, 5); // HH:MM
+    return currentBaba.game_time.substring(0, 5);
   };
 
   const getDeadlineTime = () => {
     if (!confirmationDeadline) return '--:--';
-    return confirmationDeadline.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    return confirmationDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // ESTADO: ANTES DO DEADLINE
+  // Se hoje não é dia de jogo (deadline nulo e canConfirm false)
+  if (!confirmationDeadline && !canConfirm) {
+    return (
+      <div className="card-glass p-6 rounded-[2rem] border border-white/10 bg-white/5">
+        <div className="flex items-center gap-2 mb-3">
+          <Clock className="text-white/30" size={18} />
+          <h3 className="text-sm font-black uppercase tracking-wider text-white/40">
+            Confirmação de Presença
+          </h3>
+        </div>
+        <p className="text-xs text-white/30 text-center py-4">
+          Hoje não é dia de jogo. Volte no próximo dia configurado.
+        </p>
+        {Array.isArray(currentBaba?.game_days) && currentBaba.game_days.length > 0 && (
+          <p className="text-[9px] text-white/20 text-center">
+            Dias de jogo: {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+              .filter((_, i) => currentBaba.game_days.includes(i))
+              .join(', ')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // ── ESTADO: ANTES DO DEADLINE ──
   if (canConfirm) {
     return (
       <div className="card-glass p-6 rounded-[2rem] border border-cyan-electric/20 bg-cyan-electric/5">
@@ -123,11 +135,11 @@ const PresenceConfirmation = () => {
         <div className="mb-4 p-4 bg-black/20 rounded-xl border border-white/5 text-center">
           <p className="text-[9px] font-black text-white/40 uppercase mb-2">Tempo Restante</p>
           <p className={`text-2xl font-black font-mono ${
-            timeRemaining.includes('min') || timeRemaining.includes('h') 
-              ? 'text-green-400' 
+            timeRemaining.includes('h') || (timeRemaining.includes('min') && !timeRemaining.includes('s'))
+              ? 'text-green-400'
               : 'text-red-500 animate-pulse'
           }`}>
-            {timeRemaining}
+            {timeRemaining || '--:--'}
           </p>
         </div>
 
@@ -166,7 +178,7 @@ const PresenceConfirmation = () => {
             </p>
             <div className="flex flex-wrap gap-2">
               {gameConfirmations.slice(0, 8).map((conf, i) => (
-                <div 
+                <div
                   key={i}
                   className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5"
                 >
@@ -190,7 +202,7 @@ const PresenceConfirmation = () => {
     );
   }
 
-  // ESTADO: APÓS O DEADLINE
+  // ── ESTADO: APÓS O DEADLINE ──
   return (
     <div className="card-glass p-6 rounded-[2rem] border border-yellow-500/20 bg-yellow-500/5">
       {/* Header */}
@@ -214,7 +226,7 @@ const PresenceConfirmation = () => {
         </div>
       </div>
 
-      {/* Status de sorteio */}
+      {/* Status do sorteio */}
       {isDrawing ? (
         <div className="p-4 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-center">
           <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -241,9 +253,13 @@ const PresenceConfirmation = () => {
             Sorteio automático em andamento...
           </p>
           <div className="flex items-center justify-center gap-2">
-            <div className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse"></div>
-            <div className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-            <div className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+            {[0, 0.2, 0.4].map((delay, i) => (
+              <div
+                key={i}
+                className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse"
+                style={{ animationDelay: `${delay}s` }}
+              ></div>
+            ))}
           </div>
         </div>
       ) : (
@@ -283,7 +299,7 @@ const PresenceConfirmation = () => {
           </p>
           <div className="flex flex-wrap gap-2">
             {gameConfirmations.map((conf, i) => (
-              <div 
+              <div
                 key={i}
                 className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5"
               >
