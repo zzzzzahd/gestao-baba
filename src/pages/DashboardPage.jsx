@@ -1,25 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import { 
-  Trophy, Users, DollarSign, LogOut, 
-  Calendar, Copy, Settings, MapPin, Clock
+import {
+  Trophy, Users, DollarSign, LogOut,
+  Calendar, Copy, Settings, MapPin, Clock, RefreshCw, Timer,
 } from 'lucide-react';
 import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
 import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
-import { supabase } from '../services/supabase';
 
 const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
+// Calcula label de expiração a partir de uma data ISO string
+const computeExpiryLabel = (expiresAt) => {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt) - new Date();
+  if (diff <= 0) return 'Expirado';
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `Expira em ${hours}h ${minutes}min`;
+  return `Expira em ${minutes}min`;
+};
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { currentBaba, setCurrentBaba, players, loading } = useBaba();
-  
+  const { currentBaba, setCurrentBaba, players, loading, generateInviteCode } = useBaba();
+
   const [showSettings, setShowSettings] = useState(false);
+  // Fix 6: contador reativo de expiração do convite
+  const [inviteExpiry, setInviteExpiry] = useState(() => computeExpiryLabel(currentBaba?.invite_expires_at));
+
+  useEffect(() => {
+    setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
+
+    if (!currentBaba?.invite_expires_at) return;
+
+    // Intervalo adaptativo: 1s no último minuto, 60s o restante
+    // → precisão máxima quando o contador está crítico, performance no restante
+    let intervalId;
+
+    const tick = () => {
+      const label = computeExpiryLabel(currentBaba.invite_expires_at);
+      setInviteExpiry(label);
+
+      if (label === 'Expirado') {
+        clearInterval(intervalId);
+        return;
+      }
+
+      // Calcula tempo restante para decidir frequência do próximo tick
+      const diff = new Date(currentBaba.invite_expires_at) - new Date();
+      const nextDelay = diff < 60_000 ? 1_000 : 60_000;
+
+      // Re-agenda com o delay correto (intervalo dinâmico via setTimeout recursivo)
+      clearInterval(intervalId);
+      intervalId = setInterval(tick, nextDelay);
+    };
+
+    const diff = new Date(currentBaba.invite_expires_at) - new Date();
+    const initialDelay = diff < 60_000 ? 1_000 : 60_000;
+    intervalId = setInterval(tick, initialDelay);
+
+    return () => clearInterval(intervalId);
+  }, [currentBaba?.invite_expires_at]);
 
   // Copiar código de convite
   const handleCopyInviteCode = () => {
@@ -29,30 +75,34 @@ const DashboardPage = () => {
     }
   };
 
-  // Verificar se usuário é presidente do baba atual (comparação segura de tipos)
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
-
-  // Gerar código de convite e salvar no banco
+  // Gerar / regenerar código de convite via BabaContext
   const handleGenerateInviteCode = async () => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const { error } = await supabase
-      .from('babas')
-      .update({ invite_code: code })
-      .eq('id', currentBaba.id);
-
-    if (error) {
-      toast.error('Erro ao gerar código');
-    } else {
-      toast.success('Código gerado!');
-      setCurrentBaba({ ...currentBaba, invite_code: code });
-    }
+    await generateInviteCode();
   };
 
-  // Formatar dias da semana
+  // Verificar se usuário é presidente (comparação segura de tipos)
+  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
+
+  // Formatar dias da semana (legado)
   const formatGameDays = (days) => {
     if (!days || !Array.isArray(days) || days.length === 0) return null;
     return days.map((d) => DAY_LABELS[d] ?? d).join(' · ');
   };
+
+  // Formatar game_days_config (novo formato)
+  const formatGameDaysConfig = (config) => {
+    if (!Array.isArray(config) || config.length === 0) return null;
+    return config.map((c) => {
+      const label = DAY_LABELS[c.day] ?? c.day;
+      return c.time ? `${label} ${c.time.substring(0, 5)}` : label;
+    }).join(' · ');
+  };
+
+  const gameDaysDisplay = currentBaba?.game_days_config
+    ? formatGameDaysConfig(currentBaba.game_days_config)
+    : formatGameDays(currentBaba?.game_days);
+
+  const inviteExpired = inviteExpiry === 'Expirado';
 
   if (loading) {
     return (
@@ -66,7 +116,7 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans">
 
-      {/* HEADER - Cabeçalho do Perfil */}
+      {/* HEADER */}
       <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between">
@@ -94,8 +144,8 @@ const DashboardPage = () => {
                 )}
               </div>
             </div>
-            <button 
-              onClick={() => signOut()} 
+            <button
+              onClick={() => signOut()}
               className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all"
             >
               <LogOut size={20} />
@@ -115,9 +165,9 @@ const DashboardPage = () => {
                 { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
                 { icon: <Users size={20} />, label: 'Times', path: '/teams' },
               ].map((item, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => navigate(item.path)} 
+                <button
+                  key={i}
+                  onClick={() => navigate(item.path)}
                   className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5"
                 >
                   <div className="text-cyan-electric opacity-60">{item.icon}</div>
@@ -152,12 +202,12 @@ const DashboardPage = () => {
                 </div>
 
                 {/* Dias da semana */}
-                {formatGameDays(currentBaba.game_days) && (
+                {gameDaysDisplay && (
                   <div className="flex items-start gap-3">
                     <Calendar size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Dias</p>
-                      <p className="text-sm font-black italic">{formatGameDays(currentBaba.game_days)}</p>
+                      <p className="text-sm font-black italic">{gameDaysDisplay}</p>
                     </div>
                   </div>
                 )}
@@ -190,7 +240,7 @@ const DashboardPage = () => {
             {/* Painel de Configuração do Sorteio (Só Presidente) */}
             {isPresident && <DrawConfigPanel />}
 
-            {/* Código de Convite - Só para Presidente */}
+            {/* Código de Convite — Só para Presidente */}
             {isPresident && (
               <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
                 <div className="flex items-center justify-between mb-3">
@@ -198,28 +248,55 @@ const DashboardPage = () => {
                     <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
                     <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
                   </div>
-                </div>
-                {currentBaba.invite_code ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
-                      <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
-                        {currentBaba.invite_code}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleCopyInviteCode}
-                      className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
-                    >
-                      <Copy size={20} />
-                    </button>
-                  </div>
-                ) : (
+                  {/* Botão regenerar sempre visível para o presidente */}
                   <button
                     onClick={handleGenerateInviteCode}
-                    className="w-full py-3 rounded-xl bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric font-black uppercase text-xs tracking-widest hover:bg-cyan-electric/20 transition-all"
+                    disabled={loading}
+                    className="p-2 bg-white/5 border border-white/10 rounded-xl text-white/40 hover:text-cyan-electric hover:border-cyan-electric/30 transition-all disabled:opacity-50"
+                    title="Gerar novo código"
                   >
-                    Gerar Código de Convite
+                    <RefreshCw size={16} />
                   </button>
+                </div>
+
+                {currentBaba.invite_code && !inviteExpired ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
+                        <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
+                          {currentBaba.invite_code}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleCopyInviteCode}
+                        className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+                      >
+                        <Copy size={20} />
+                      </button>
+                    </div>
+                    {/* Contador de expiração */}
+                    {inviteExpiry && (
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40">
+                        <Timer size={12} />
+                        <span>{inviteExpiry}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    {inviteExpired && (
+                      <p className="text-[10px] text-red-400 font-black uppercase text-center mb-2">
+                        Código expirado — gere um novo
+                      </p>
+                    )}
+                    <button
+                      onClick={handleGenerateInviteCode}
+                      disabled={loading}
+                      className="w-full py-3 rounded-xl bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric font-black uppercase text-xs tracking-widest hover:bg-cyan-electric/20 transition-all disabled:opacity-50"
+                    >
+                      {loading ? 'Gerando...' : 'Gerar Código de Convite'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -241,8 +318,8 @@ const DashboardPage = () => {
               <Trophy className="opacity-20" size={40} />
             </div>
             <p className="text-sm font-bold opacity-40 uppercase tracking-widest">Nenhum baba selecionado</p>
-            <button 
-              onClick={() => navigate('/')} 
+            <button
+              onClick={() => navigate('/')}
               className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan"
             >
               Criar ou Entrar em um Baba
@@ -253,9 +330,9 @@ const DashboardPage = () => {
 
       {/* Modal de Configurações */}
       {showSettings && currentBaba && (
-        <BabaSettings 
-          baba={currentBaba} 
-          onClose={() => setShowSettings(false)} 
+        <BabaSettings
+          baba={currentBaba}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
