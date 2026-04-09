@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { 
   ArrowLeft, DollarSign, Copy, Plus, 
-  CheckCircle, Clock, X, Loader2, AlertCircle 
+  CheckCircle, Clock, X, Loader2, AlertCircle,
+  FileText, Image as ImageIcon, ExternalLink, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,9 +17,14 @@ const FinancialPage = () => {
   
   const [financials, setFinancials] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [isPresident, setIsPresident] = useState(false);
   
+  const [selectedFinancial, setSelectedFinancial] = useState(null);
+  const [proofFile, setProofFile] = useState(null);
+
   const [newFinancial, setNewFinancial] = useState({
     title: '',
     description: '',
@@ -53,7 +59,10 @@ const FinancialPage = () => {
             player_id,
             status,
             amount,
-            paid_at
+            paid_at,
+            proof_url,
+            confirmed_at,
+            players:player_id(name)
           )
         `)
         .eq('baba_id', currentBaba.id)
@@ -65,6 +74,95 @@ const FinancialPage = () => {
       toast.error('Erro ao carregar dados financeiros');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadProof = async (file, financialId) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${financialId}_${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('payment-proofs')
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    // Retorna a URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from('payment-proofs')
+      .getPublicUrl(filePath);
+      
+    return publicUrl;
+  };
+
+  const markAsPaid = async (financialId, file = null) => {
+    try {
+      setUploading(true);
+      const { data: player } = await supabase
+        .from(TABLES.PLAYERS)
+        .select('id')
+        .eq('baba_id', currentBaba.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!player) {
+        toast.error('Você não está vinculado a este baba!');
+        return;
+      }
+
+      const financial = financials.find(f => f.id === financialId);
+      let proofUrl = null;
+
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          toast.error('O arquivo deve ter menos de 2MB');
+          return;
+        }
+        proofUrl = await uploadProof(file, financialId);
+      }
+      
+      const { error } = await supabase
+        .from(TABLES.PAYMENTS)
+        .upsert([{
+          financial_id: financialId,
+          player_id: player.id,
+          amount: financial.amount,
+          status: 'pending',
+          paid_at: new Date().toISOString(),
+          proof_url: proofUrl,
+          proof_uploaded_at: proofUrl ? new Date().toISOString() : null
+        }], { onConflict: 'financial_id,player_id' });
+
+      if (error) throw error;
+      toast.success('Solicitação de pagamento enviada!');
+      setShowProofModal(false);
+      setProofFile(null);
+      loadFinancials();
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao processar pagamento');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const confirmPayment = async (paymentId) => {
+    try {
+      const { error } = await supabase
+        .from(TABLES.PAYMENTS)
+        .update({
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString(),
+          confirmed_by: user.id
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
+      toast.success('Pagamento confirmado!');
+      loadFinancials();
+    } catch (error) {
+      toast.error('Erro ao confirmar pagamento');
     }
   };
 
@@ -87,59 +185,6 @@ const FinancialPage = () => {
       loadFinancials();
     } catch (error) {
       toast.error('Erro ao criar cobrança');
-    }
-  };
-
-  const markAsPaid = async (financialId) => {
-    try {
-      const { data: player } = await supabase
-        .from(TABLES.PLAYERS)
-        .select('id')
-        .eq('baba_id', currentBaba.id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (!player) {
-        toast.error('Você não está vinculado a este baba!');
-        return;
-      }
-
-      const financial = financials.find(f => f.id === financialId);
-      
-      const { error } = await supabase
-        .from(TABLES.PAYMENTS)
-        .upsert([{
-          financial_id: financialId,
-          player_id: player.id,
-          amount: financial.amount,
-          status: 'pending',
-          paid_at: new Date().toISOString()
-        }], { onConflict: 'financial_id,player_id' });
-
-      if (error) throw error;
-      toast.success('Solicitação de pagamento enviada!');
-      loadFinancials();
-    } catch (error) {
-      toast.error('Erro ao processar pagamento');
-    }
-  };
-
-  const confirmPayment = async (paymentId) => {
-    try {
-      const { error } = await supabase
-        .from(TABLES.PAYMENTS)
-        .update({
-          status: 'confirmed',
-          confirmed_at: new Date().toISOString(),
-          confirmed_by: user.id
-        })
-        .eq('id', paymentId);
-
-      if (error) throw error;
-      toast.success('Pagamento confirmado!');
-      loadFinancials();
-    } catch (error) {
-      toast.error('Erro ao confirmar pagamento');
     }
   };
 
@@ -206,58 +251,109 @@ const FinancialPage = () => {
               Nenhuma movimentação registrada
             </div>
           ) : (
-            financials.map((f) => (
-              <div key={f.id} className="card-glass p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 transition-all group">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-black italic uppercase tracking-tighter group-hover:text-green-500 transition-colors">{f.title}</h3>
-                    <p className="text-xs opacity-40 font-medium uppercase tracking-wide">{f.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-black text-green-500 tracking-tighter leading-none">
-                      R$ {f.amount.toFixed(2)}
-                    </p>
-                    {f.due_date && <p className="text-[9px] font-black opacity-30 mt-2 uppercase tracking-widest">Vence em: {new Date(f.due_date).toLocaleDateString()}</p>}
-                  </div>
-                </div>
+            financials.map((f) => {
+              const pendingPayments = f.payments?.filter(p => p.status === 'pending') || [];
+              const confirmedPayments = f.payments?.filter(p => p.status === 'confirmed') || [];
 
-                <div className="pt-6 border-t border-white/5">
-                  {!isPresident ? (
-                    <button 
-                      onClick={() => markAsPaid(f.id)} 
-                      className="w-full py-4 rounded-xl border border-green-500/50 text-green-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-green-500 hover:text-black transition-all"
-                    >
-                      Informar Pagamento
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-[9px] font-black opacity-30 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Clock size={12} /> Pagamentos Pendentes
-                      </p>
-                      {f.payments?.filter(p => p.status === 'pending').length === 0 ? (
-                        <p className="text-[10px] italic opacity-20">Nenhum aguardando aprovação</p>
-                      ) : (
-                        f.payments?.filter(p => p.status === 'pending').map(p => (
-                          <div key={p.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Solicitação Recebida</span>
-                            <button 
-                              onClick={() => confirmPayment(p.id)} 
-                              className="bg-green-500 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:scale-105 transition-all flex items-center gap-2"
-                            >
-                              <CheckCircle size={14} /> Confirmar
-                            </button>
-                          </div>
-                        ))
-                      )}
+              return (
+                <div key={f.id} className="card-glass p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 transition-all group">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-black italic uppercase tracking-tighter group-hover:text-green-500 transition-colors">{f.title}</h3>
+                      <p className="text-xs opacity-40 font-medium uppercase tracking-wide">{f.description}</p>
                     </div>
-                  )}
+                    <div className="text-right">
+                      <p className="text-3xl font-black text-green-500 tracking-tighter leading-none">
+                        R$ {f.amount.toFixed(2)}
+                      </p>
+                      {f.due_date && <p className="text-[9px] font-black opacity-30 mt-2 uppercase tracking-widest">Vence em: {new Date(f.due_date).toLocaleDateString()}</p>}
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-white/5">
+                    {!isPresident ? (
+                      <button 
+                        onClick={() => {
+                          setSelectedFinancial(f);
+                          setShowProofModal(true);
+                        }} 
+                        className="w-full py-4 rounded-xl border border-green-500/50 text-green-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-green-500 hover:text-black transition-all"
+                      >
+                        Informar Pagamento
+                      </button>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* Pendentes */}
+                        <div>
+                          <p className="text-[9px] font-black text-yellow-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <Clock size={12} /> Pagamentos Pendentes ({pendingPayments.length})
+                          </p>
+                          <div className="space-y-2">
+                            {pendingPayments.length === 0 ? (
+                              <p className="text-[10px] italic opacity-20">Nenhum aguardando aprovação</p>
+                            ) : (
+                              pendingPayments.map(p => (
+                                <div key={p.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 gap-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-black uppercase">
+                                      {p.players?.name?.substring(0, 2) || '??'}
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                                      {p.players?.name || 'Jogador'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    {p.proof_url && (
+                                      <a 
+                                        href={p.proof_url} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white/50 hover:text-white"
+                                        title="Ver Comprovante"
+                                      >
+                                        <ImageIcon size={18} />
+                                      </a>
+                                    )}
+                                    <button 
+                                      onClick={() => confirmPayment(p.id)} 
+                                      className="bg-green-500 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:scale-105 transition-all flex items-center gap-2"
+                                    >
+                                      <CheckCircle size={14} /> Confirmar
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Confirmados */}
+                        {confirmedPayments.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-black text-green-500/50 uppercase tracking-widest mb-4 flex items-center gap-2">
+                              <CheckCircle size={12} /> Confirmados ({confirmedPayments.length})
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {confirmedPayments.map(p => (
+                                <div key={p.id} className="bg-green-500/5 border border-green-500/10 px-3 py-2 rounded-lg flex items-center gap-2">
+                                  <span className="text-[9px] font-black uppercase opacity-60">{p.players?.name}</span>
+                                  <span className="text-[8px] opacity-30 italic">{new Date(p.confirmed_at).toLocaleDateString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {/* Modal de Criação */}
+        {/* Modal de Criação de Cobrança */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-5 z-50">
             <div className="card-glass p-8 max-w-md w-full border border-green-500/30 rounded-[2.5rem]">
@@ -323,6 +419,73 @@ const FinancialPage = () => {
             </div>
           </div>
         )}
+
+        {/* Modal de Comprovante (Informar Pagamento) */}
+        {showProofModal && selectedFinancial && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-5 z-50">
+            <div className="card-glass p-8 max-w-md w-full border border-green-500/30 rounded-[2.5rem]">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-green-500 italic uppercase tracking-tighter">Pagamento</h2>
+                  <p className="text-[10px] opacity-40 uppercase font-black">{selectedFinancial.title}</p>
+                </div>
+                <button onClick={() => { setShowProofModal(false); setProofFile(null); }} className="text-white/20 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-white/5 p-6 rounded-2xl border border-dashed border-white/10 text-center">
+                  {proofFile ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-2 text-green-500">
+                        <FileText size={24} />
+                        <span className="text-xs font-bold truncate max-w-[200px]">{proofFile.name}</span>
+                      </div>
+                      <button 
+                        onClick={() => setProofFile(null)}
+                        className="text-[9px] uppercase font-black text-red-500 tracking-widest hover:opacity-70"
+                      >
+                        Remover arquivo
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-2 text-green-500">
+                        <ImageIcon size={20} />
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-widest">Anexar Comprovante</p>
+                      <p className="text-[8px] opacity-30 uppercase">JPG, PNG ou PDF (Máx 2MB)</p>
+                      <input 
+                        type="file" 
+                        accept="image/*,application/pdf" 
+                        className="hidden" 
+                        onChange={(e) => setProofFile(e.target.files[0])}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    disabled={uploading}
+                    onClick={() => markAsPaid(selectedFinancial.id, proofFile)}
+                    className="w-full py-4 rounded-2xl font-black text-[10px] uppercase bg-green-500 text-black shadow-[0_10px_20px_rgba(34,197,94,0.3)] tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {uploading ? <Loader2 className="animate-spin" size={16} /> : (proofFile ? 'Enviar com Comprovante' : 'Informar sem Comprovante')}
+                  </button>
+                  <button 
+                    onClick={() => { setShowProofModal(false); setProofFile(null); }}
+                    className="w-full py-4 rounded-2xl font-black text-[10px] uppercase bg-white/5 tracking-widest"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
