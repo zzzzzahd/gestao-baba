@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
@@ -6,86 +6,157 @@ import toast from 'react-hot-toast';
 const BabaContext = createContext();
 
 // ─────────────────────────────────────────────
-// HELPER PURO exportado — pode ser importado em BabaSettings
-// Sanitiza e normaliza game_days_config:
-//   - sem duplicatas de day
-//   - day sempre Number
-//   - time sempre "HH:MM"
-//   - ordenado por day
+// HELPER PURO — exportado para uso em BabaSettings
+// Sanitiza game_days_config:
+//   ✔ remove objetos inválidos / incompletos
+//   ✔ valida horário (HH:MM, 00:00–23:59)
+//   ✔ day sempre Number inteiro 0–6
+//   ✔ sem duplicatas de day
+//   ✔ ordenado por day
 // ─────────────────────────────────────────────
 export const sanitizeGameDaysConfig = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return [];
+
   const seen = new Set();
+
   return raw
-    .filter((item) => item && typeof item === 'object' && item.time)
-    .map((item) => ({
-      day: Number(item.day),
-      time: String(item.time).substring(0, 5),
-      location: item.location ? String(item.location).trim() : '',
-    }))
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const day  = Number(item.day);
+      const time = String(item.time || '').trim();
+      const location = item.location ? String(item.location).trim() : '';
+      return { day, time, location };
+    })
     .filter((item) => {
+      // day deve ser inteiro 0–6
       if (!Number.isInteger(item.day) || item.day < 0 || item.day > 6) return false;
+      // time deve ser HH:MM válido
+      const timeMatch = item.time.match(/^(\d{1,2}):(\d{2})$/);
+      if (!timeMatch) return false;
+      const h = Number(timeMatch[1]);
+      const m = Number(timeMatch[2]);
+      if (h < 0 || h > 23 || m < 0 || m > 59) return false;
+      // sem duplicata
       if (seen.has(item.day)) return false;
       seen.add(item.day);
       return true;
     })
+    .map((item) => ({
+      day: item.day,
+      time: item.time.substring(0, 5),  // normaliza para HH:MM
+      location: item.location,
+    }))
     .sort((a, b) => a.day - b.day);
+};
+
+// ─────────────────────────────────────────────
+// HELPER — próximo dia de jogo a partir de hoje
+// Retorna { day, time, location, daysAhead } ou null
+// ─────────────────────────────────────────────
+export const getNextGameDay = (baba) => {
+  if (!baba) return null;
+
+  const now      = new Date();
+  const todayDow = now.getDay();
+
+  // Constrói lista de dias configurados (novo formato ou legado)
+  let configs = [];
+
+  if (Array.isArray(baba.game_days_config) && baba.game_days_config.length > 0) {
+    configs = sanitizeGameDaysConfig(baba.game_days_config);
+  } else if (Array.isArray(baba.game_days) && baba.game_days.length > 0 && baba.game_time) {
+    configs = baba.game_days
+      .map((d) => ({ day: Number(d), time: baba.game_time.substring(0, 5), location: '' }))
+      .filter((c) => Number.isInteger(c.day) && c.day >= 0 && c.day <= 6)
+      .sort((a, b) => a.day - b.day);
+  }
+
+  if (configs.length === 0) return null;
+
+  // Procura o próximo dia (hoje inclusive) dentro dos próximos 7 dias
+  for (let offset = 0; offset < 7; offset++) {
+    const checkDow = (todayDow + offset) % 7;
+    const match = configs.find((c) => c.day === checkDow);
+    if (!match) continue;
+
+    // Se é hoje, verifica se ainda não passou o deadline
+    if (offset === 0) {
+      const [h, m] = match.time.split(':').map(Number);
+      const gameDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      gameDate.setHours(h, m, 0, 0);
+      const deadline = new Date(gameDate.getTime() - 30 * 60 * 1000);
+      if (now >= deadline) {
+        // Já passou o deadline de hoje — continua para o próximo
+        continue;
+      }
+    }
+
+    return { ...match, daysAhead: offset };
+  }
+
+  // Todos os dias desta semana já passaram — retorna o primeiro da próxima semana
+  if (configs.length > 0) {
+    const first = configs[0];
+    const daysAhead = ((first.day - todayDow + 7) % 7) || 7;
+    return { ...first, daysAhead };
+  }
+
+  return null;
 };
 
 export const BabaProvider = ({ children }) => {
   const { user, profile } = useAuth();
-  const [myBabas, setMyBabas] = useState([]);
+  const [myBabas, setMyBabas]       = useState([]);
   const [currentBaba, setCurrentBaba] = useState(null);
-  const [players, setPlayers] = useState([]);
-  // 'matches' removido — não estava sendo consumido na UI
-  const [loading, setLoading] = useState(true);
+  const [players, setPlayers]       = useState([]);
+  const [loading, setLoading]       = useState(true);
 
   // Confirmação de presença
   const [gameConfirmations, setGameConfirmations] = useState([]);
-  const [myConfirmation, setMyConfirmation] = useState(null);
+  const [myConfirmation, setMyConfirmation]       = useState(null);
   const [confirmationDeadline, setConfirmationDeadline] = useState(null);
   const [canConfirm, setCanConfirm] = useState(false);
+  const [nextGameDay, setNextGameDay] = useState(null);
 
   // Sorteio
   const [drawConfig, setDrawConfig] = useState({ playersPerTeam: 5, strategy: 'reserve' });
   const [currentMatch, setCurrentMatch] = useState(null);
   const [matchPlayers, setMatchPlayers] = useState([]);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [isDrawing, setIsDrawing]     = useState(false);
+
+  // Flag para evitar auto-sorteio duplo
+  const hasAutoDrawnRef = useRef(false);
 
   // ─────────────────────────────────────────────
-  // HELPERS
+  // DEADLINE — usa hoje OU próximo dia
   // ─────────────────────────────────────────────
 
   /**
-   * Calcula deadline (30min antes do jogo).
-   *
-   * Prioridade:
-   *  1. game_days_config — Number(c.day) corrige bug string vs number
-   *  2. game_days + game_time (legado)
-   *
+   * Calcula deadline de confirmação (30min antes do jogo) para HOJE.
    * Retorna null se hoje não for dia de jogo.
+   * Use getNextGameDay() para antecipar o próximo.
    */
   const calculateDeadline = (baba) => {
     if (!baba) return null;
 
-    const now = new Date();
+    const now      = new Date();
     const todayDow = now.getDay();
     let gameTimeStr = null;
 
-    // 1. Novo formato
+    // Novo formato
     if (Array.isArray(baba.game_days_config) && baba.game_days_config.length > 0) {
       const todayConfig = baba.game_days_config.find(
-        (c) => Number(c.day) === todayDow   // ← FIX CRÍTICO: Number() resolve string vs number
+        (c) => Number(c.day) === todayDow
       );
       if (todayConfig?.time) gameTimeStr = todayConfig.time;
     }
 
-    // 2. Legado
+    // Legado
     if (!gameTimeStr) {
       const hasTodayInLegacy =
         !Array.isArray(baba.game_days) ||
         baba.game_days.length === 0 ||
-        baba.game_days.map(Number).includes(todayDow); // Number() aqui também
+        baba.game_days.map(Number).includes(todayDow);
 
       if (hasTodayInLegacy && baba.game_time) gameTimeStr = baba.game_time;
     }
@@ -132,7 +203,7 @@ export const BabaProvider = ({ children }) => {
 
       if (!currentBaba && unique.length > 0) {
         const savedId = localStorage.getItem('selected_baba_id');
-        const saved = savedId ? unique.find((b) => String(b.id) === savedId) : null;
+        const saved   = savedId ? unique.find((b) => String(b.id) === savedId) : null;
         if (saved) {
           setCurrentBaba(saved);
         } else {
@@ -183,7 +254,8 @@ export const BabaProvider = ({ children }) => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
-        .from('matches').select('*').eq('baba_id', babaId).eq('match_date', today)
+        .from('matches').select('*')
+        .eq('baba_id', babaId).eq('match_date', today)
         .order('id', { ascending: false }).limit(1).maybeSingle();
       if (error) throw error;
 
@@ -204,7 +276,8 @@ export const BabaProvider = ({ children }) => {
   const loadMatchPlayers = async (matchId) => {
     try {
       const { data, error } = await supabase
-        .from('match_players').select(`*, player:players(*)`).eq('match_id', matchId).order('team');
+        .from('match_players').select(`*, player:players(*)`)
+        .eq('match_id', matchId).order('team');
       if (error) throw error;
       setMatchPlayers(data || []);
       return data;
@@ -233,7 +306,6 @@ export const BabaProvider = ({ children }) => {
       if (error) throw error;
       if (!data) throw new Error('Insert retornou vazio');
 
-      // Presidente como jogador (guard duplicata)
       const { data: ep } = await supabase.from('players').select('id')
         .eq('baba_id', data.id).eq('user_id', user.id).maybeSingle();
       if (!ep) {
@@ -261,10 +333,7 @@ export const BabaProvider = ({ children }) => {
     try {
       setLoading(true);
       const code = inviteCode.trim().toUpperCase().substring(0, 6);
-      if (code.length < 6) {
-        toast.error('Código inválido. Deve ter 6 caracteres.');
-        return null;
-      }
+      if (code.length < 6) { toast.error('Código deve ter 6 caracteres.'); return null; }
 
       const { data: baba, error: babaError } = await supabase
         .from('babas').select('*').eq('invite_code', code).maybeSingle();
@@ -317,11 +386,6 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  /**
-   * updateBaba — sanitiza game_days_config antes de salvar.
-   * Suporta avatar_url e cover_url (imagens do baba).
-   * Atualiza estado local sem refetch completo.
-   */
   const updateBaba = async (babaId, updates) => {
     try {
       setLoading(true);
@@ -329,9 +393,10 @@ export const BabaProvider = ({ children }) => {
 
       if (Array.isArray(sanitized.game_days_config)) {
         sanitized.game_days_config = sanitizeGameDaysConfig(sanitized.game_days_config);
-        // Se há config nova, zera game_days legado para evitar mistura
         if (sanitized.game_days_config.length > 0) {
           sanitized.game_days = [];
+          // Mantém game_time como fallback = primeiro item da config
+          sanitized.game_time = sanitized.game_days_config[0].time;
         }
       }
 
@@ -381,7 +446,7 @@ export const BabaProvider = ({ children }) => {
     if (!currentBaba) return null;
     try {
       setLoading(true);
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const code      = Math.random().toString(36).substring(2, 8).toUpperCase();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -405,32 +470,40 @@ export const BabaProvider = ({ children }) => {
   };
 
   // ─────────────────────────────────────────────
-  // IMAGENS DO BABA
+  // IMAGENS — path fixo por baba evita acúmulo no bucket
   // ─────────────────────────────────────────────
 
-  /**
-   * Upload de imagem para Supabase Storage.
-   * Bucket: 'baba-images' (deve existir e ser público no Supabase)
-   * @param {File} file
-   * @param {'avatar'|'cover'} type
-   */
   const uploadBabaImage = async (file, type = 'avatar') => {
     if (!currentBaba || !file) return null;
     try {
       setLoading(true);
-      const ext = file.name.split('.').pop();
+
+      // Validações
+      if (!file.type.startsWith('image/')) {
+        toast.error('Selecione um arquivo de imagem válido');
+        return null;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Imagem deve ter no máximo 5MB');
+        return null;
+      }
+
+      // Path fixo por baba + tipo → sobrescreve automaticamente (sem acúmulo)
+      const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
       const path = `babas/${currentBaba.id}/${type}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from('baba-images')
-        .upload(path, file, { upsert: true });
+        .upload(path, file, { upsert: true, contentType: file.type });
+
       if (uploadError) throw uploadError;
 
+      // Cache-bust: adiciona timestamp para forçar reload do browser
       const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-      return updateBaba(currentBaba.id, {
-        [type === 'avatar' ? 'avatar_url' : 'cover_url']: urlData.publicUrl,
-      });
+      const urlField = type === 'avatar' ? 'avatar_url' : 'cover_url';
+      return updateBaba(currentBaba.id, { [urlField]: publicUrl });
     } catch (error) {
       console.error('Error uploading baba image:', error);
       toast.error('Erro ao enviar imagem');
@@ -451,10 +524,10 @@ export const BabaProvider = ({ children }) => {
       if (!myPlayer) { toast.error('Você não está registrado neste baba'); return; }
 
       const today = new Date().toISOString().split('T')[0];
+
       const { data: existing } = await supabase.from('game_confirmations').select('id')
         .eq('baba_id', currentBaba.id).eq('player_id', myPlayer.id)
         .eq('game_date', today).maybeSingle();
-
       if (existing) { toast.error('Você já confirmou presença!'); return; }
 
       const { data, error } = await supabase.from('game_confirmations')
@@ -539,7 +612,7 @@ export const BabaProvider = ({ children }) => {
       }
 
       const reserves = remaining;
-      const today = new Date().toISOString().split('T')[0];
+      const today    = new Date().toISOString().split('T')[0];
 
       const { data: drawResult, error: drawError } = await supabase
         .from('draw_results')
@@ -551,29 +624,29 @@ export const BabaProvider = ({ children }) => {
         .select().single();
       if (drawError) throw drawError;
 
-      // Fase 1 — limpa match do dia (respeita 'finished')
+      // Fase 1 — limpa match do dia (preserva 'finished')
       const { data: em } = await supabase.from('matches').select('id, status')
         .eq('baba_id', currentBaba.id).eq('match_date', today).maybeSingle();
       if (em) {
         if (em.status === 'finished') {
-          toast.error('Partida já finalizada hoje.'); setIsDrawing(false); return null;
+          toast.error('Partida já finalizada hoje.');
+          setIsDrawing(false); return null;
         }
         await supabase.from('matches').delete().eq('id', em.id);
       }
-
-      const gameTimeStr = currentBaba.game_time?.substring(0, 5) || '00:00';
 
       // Fase 2 — guard race condition
       const { data: rc } = await supabase.from('matches').select('id, status')
         .eq('baba_id', currentBaba.id).eq('match_date', today).maybeSingle();
       if (rc) {
-        console.warn('⚠️ Race condition: match já criado por outra instância');
+        console.warn('⚠️ Race condition detectada');
         setCurrentMatch(rc);
         await loadMatchPlayers(rc.id);
         toast('Times já sorteados!', { icon: '⚽' });
         setIsDrawing(false); return null;
       }
 
+      const gameTimeStr = currentBaba.game_time?.substring(0, 5) || '00:00';
       const { data: match, error: me } = await supabase.from('matches')
         .insert([{
           baba_id: currentBaba.id,
@@ -612,6 +685,8 @@ export const BabaProvider = ({ children }) => {
     if (gameConfirmations.length < 4) {
       toast.error('Mínimo de 4 jogadores confirmados'); return null;
     }
+    // Reset flag ao sortear manualmente
+    hasAutoDrawnRef.current = false;
     return drawTeamsIntelligent();
   };
 
@@ -633,8 +708,12 @@ export const BabaProvider = ({ children }) => {
   useEffect(() => {
     if (!currentBaba) return;
     localStorage.setItem('selected_baba_id', String(currentBaba.id));
+    // Reset flag de auto-sorteio ao trocar de baba
+    hasAutoDrawnRef.current = false;
     loadPlayers(currentBaba.id);
     loadTodayMatch(currentBaba.id);
+    // Calcula próximo dia de jogo
+    setNextGameDay(getNextGameDay(currentBaba));
   }, [currentBaba]);
 
   useEffect(() => {
@@ -645,6 +724,7 @@ export const BabaProvider = ({ children }) => {
     setCanConfirm(deadline ? new Date() < deadline : false);
   }, [currentBaba, players]);
 
+  // Tick canConfirm a cada minuto
   useEffect(() => {
     if (!confirmationDeadline) return;
     const interval = setInterval(() => {
@@ -660,15 +740,25 @@ export const BabaProvider = ({ children }) => {
   return (
     <BabaContext.Provider value={{
       myBabas, currentBaba, setCurrentBaba, players, loading,
+      // CRUD
       createBaba, joinBaba, updateBaba, deleteBaba, loadMyBabas,
-      generateInviteCode, uploadBabaImage,
+      // Invite
+      generateInviteCode,
+      // Imagens
+      uploadBabaImage,
+      // Confirmação
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline,
+      nextGameDay,
       confirmPresence, cancelConfirmation,
+      // Sorteio
       currentMatch, matchPlayers, isDrawing,
       drawTeams, drawTeamsIntelligent, manualDraw,
       drawConfig, setDrawConfig,
       loadTodayMatch, loadMatchPlayers,
-      calculateDeadline, sanitizeGameDaysConfig,
+      // Util exportados
+      calculateDeadline, sanitizeGameDaysConfig, getNextGameDay,
+      // Flag ref exposto para uso em PresenceConfirmation
+      hasAutoDrawnRef,
     }}>
       {children}
     </BabaContext.Provider>
