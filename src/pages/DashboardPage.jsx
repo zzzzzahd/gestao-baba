@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import {
   Trophy, Users, DollarSign, LogOut,
-  Calendar, Copy, Settings, MapPin, Clock, RefreshCw, Timer,
+  Calendar, Copy, Settings, MapPin, Clock, RefreshCw, Timer, Zap,
 } from 'lucide-react';
 import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
@@ -12,36 +12,28 @@ import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
 
 const DAY_SHORT = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const DAY_FULL  = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
-// ─── helpers de display ────────────────────────────────────────────────────
+// ── Helpers de display ────────────────────────────────────
 
-/** Formata game_days_config normalizado para exibição */
+/** Formata config deduplicada + ordenada */
 const formatConfig = (config) => {
   if (!Array.isArray(config) || config.length === 0) return null;
-  // Garante deduplica + ordena antes de exibir (segurança extra)
   const seen = new Set();
   return config
-    .filter((c) => {
-      const d = Number(c.day);
-      if (seen.has(d)) return false;
-      seen.add(d);
-      return true;
-    })
+    .filter((c) => { const d = Number(c.day); if (seen.has(d)) return false; seen.add(d); return true; })
     .sort((a, b) => Number(a.day) - Number(b.day))
     .map((c) => `${DAY_SHORT[Number(c.day)]} ${c.time?.substring(0, 5) || ''}`.trim())
     .join(' · ');
 };
 
-/** Formata game_days legado */
+/** Formata legado */
 const formatLegacyDays = (days) => {
   if (!Array.isArray(days) || days.length === 0) return null;
-  return [...new Set(days.map(Number))]
-    .sort((a, b) => a - b)
-    .map((d) => DAY_SHORT[d] ?? d)
-    .join(' · ');
+  return [...new Set(days.map(Number))].sort((a, b) => a - b).map((d) => DAY_SHORT[d] ?? d).join(' · ');
 };
 
-/** Calcula label de expiração reativamente */
+/** Label "Expira em..." com diff em tempo real */
 const computeExpiryLabel = (expiresAt) => {
   if (!expiresAt) return null;
   const diff = new Date(expiresAt) - new Date();
@@ -52,19 +44,30 @@ const computeExpiryLabel = (expiresAt) => {
   return `Expira em ${minutes}min`;
 };
 
-// ─────────────────────────────────────────────────────────────────────────
+/** Label "Próximo jogo" a partir do nextGameDay */
+const formatNextGame = (next) => {
+  if (!next) return null;
+  const { day, time, daysAhead } = next;
+  const dayName = DAY_FULL[day] || DAY_SHORT[day];
+  const timeStr = time?.substring(0, 5) || '';
+  if (daysAhead === 0) return `Hoje ${timeStr}`;
+  if (daysAhead === 1) return `Amanhã ${timeStr}`;
+  return `${dayName} ${timeStr}`;
+};
+
+// ─────────────────────────────────────────────────────────
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { currentBaba, players, loading, generateInviteCode } = useBaba();
+  const { currentBaba, players, loading, generateInviteCode, nextGameDay } = useBaba();
 
   const [showSettings, setShowSettings] = useState(false);
   const [inviteExpiry, setInviteExpiry] = useState(
     () => computeExpiryLabel(currentBaba?.invite_expires_at)
   );
 
-  // Contador adaptativo de expiração do convite
+  // Contador adaptativo de expiração (1s no último minuto, 60s no restante)
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
     if (!currentBaba?.invite_expires_at) return;
@@ -83,19 +86,24 @@ const DashboardPage = () => {
     return () => clearInterval(intervalId);
   }, [currentBaba?.invite_expires_at]);
 
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
+  const isPresident   = String(currentBaba?.president_id) === String(profile?.id);
   const inviteExpired = inviteExpiry === 'Expirado';
 
-  // Dados de exibição dos dias
+  // Dados de dias — dedup + sort garantido
   const gameDaysDisplay = currentBaba?.game_days_config?.length > 0
     ? formatConfig(currentBaba.game_days_config)
     : formatLegacyDays(currentBaba?.game_days);
 
-  // Horário principal (primeiro item da config ou game_time legado)
-  const mainGameTime = currentBaba?.game_days_config?.length > 0
-    ? currentBaba.game_days_config
-        .sort((a, b) => Number(a.day) - Number(b.day))[0]?.time?.substring(0, 5)
-    : currentBaba?.game_time?.substring(0, 5);
+  // Horário principal: primeiro item ordenado da config
+  const mainGameTime = (() => {
+    if (Array.isArray(currentBaba?.game_days_config) && currentBaba.game_days_config.length > 0) {
+      const sorted = [...currentBaba.game_days_config].sort((a, b) => Number(a.day) - Number(b.day));
+      return sorted[0]?.time?.substring(0, 5) || null;
+    }
+    return currentBaba?.game_time?.substring(0, 5) || null;
+  })();
+
+  const nextGameLabel = formatNextGame(nextGameDay);
 
   const handleCopyInviteCode = () => {
     if (currentBaba?.invite_code) {
@@ -103,6 +111,9 @@ const DashboardPage = () => {
       toast.success('Código copiado!');
     }
   };
+
+  // Fallback de avatar do baba (iniciais)
+  const babaInitial = (currentBaba?.name || 'B').charAt(0).toUpperCase();
 
   if (loading) {
     return (
@@ -180,10 +191,9 @@ const DashboardPage = () => {
               {/* Capa */}
               {currentBaba.cover_url && (
                 <div className="w-full h-24 overflow-hidden">
-                  <img
-                    src={currentBaba.cover_url}
-                    alt="Capa"
+                  <img src={currentBaba.cover_url} alt="Capa"
                     className="w-full h-full object-cover opacity-60"
+                    onError={(e) => { e.target.style.display = 'none'; }}
                   />
                 </div>
               )}
@@ -191,21 +201,42 @@ const DashboardPage = () => {
               <div className="p-6 space-y-4">
                 {/* Avatar + nome */}
                 <div className="flex items-center gap-3">
-                  {currentBaba.avatar_url ? (
-                    <img
-                      src={currentBaba.avatar_url}
-                      alt="Avatar"
-                      className="w-10 h-10 rounded-xl object-cover border border-white/10"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center">
-                      <Trophy size={18} className="text-cyan-electric opacity-60" />
-                    </div>
-                  )}
+                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 flex-shrink-0">
+                    {currentBaba.avatar_url ? (
+                      <img
+                        src={currentBaba.avatar_url}
+                        alt="Avatar"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback se imagem falhar
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = `<div class="w-full h-full bg-cyan-electric/10 flex items-center justify-center text-cyan-electric font-black text-lg">${babaInitial}</div>`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-cyan-electric/10 flex items-center justify-center">
+                        <span className="text-cyan-electric font-black text-lg">{babaInitial}</span>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-sm font-black opacity-60 uppercase tracking-widest">
                     {currentBaba.name}
                   </p>
                 </div>
+
+                {/* Próximo jogo — destaque */}
+                {nextGameLabel && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl">
+                    <Zap size={14} className="text-cyan-electric flex-shrink-0" />
+                    <div>
+                      <p className="text-[9px] font-black text-white/40 uppercase">Próximo Jogo</p>
+                      <p className="text-sm font-black text-cyan-electric">{nextGameLabel}</p>
+                    </div>
+                    {nextGameDay?.location && (
+                      <p className="text-[9px] text-white/40 ml-auto">{nextGameDay.location}</p>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   {/* Horário principal */}
@@ -304,7 +335,9 @@ const DashboardPage = () => {
                     {inviteExpiry && (
                       <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40">
                         <Timer size={12} />
-                        <span>{inviteExpiry}</span>
+                        <span className={inviteExpiry.includes('min') && !inviteExpiry.includes('h') ? 'text-yellow-500' : ''}>
+                          {inviteExpiry}
+                        </span>
                       </div>
                     )}
                   </>
@@ -343,9 +376,7 @@ const DashboardPage = () => {
             <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-dashed border-white/20">
               <Trophy className="opacity-20" size={40} />
             </div>
-            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">
-              Nenhum baba selecionado
-            </p>
+            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">Nenhum baba selecionado</p>
             <button
               onClick={() => navigate('/')}
               className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan"
