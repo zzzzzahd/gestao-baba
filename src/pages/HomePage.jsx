@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { PlusCircle, LogIn, Trophy, Users, Edit, Clock, Calendar, MapPin } from 'lucide-react';
+import { PlusCircle, LogIn, Trophy, Users, Edit, Clock, MapPin } from 'lucide-react';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
 /**
- * Exibe dias do baba de forma normalizada (deduplicado, ordenado).
+ * Exibe badges de dias de forma normalizada.
  * Suporta game_days_config (novo) e game_days (legado).
+ * Garante: sem duplicatas, ordenado, tipos corretos.
  */
 const BabaDaysBadges = ({ baba }) => {
   let days = [];
@@ -19,12 +20,14 @@ const BabaDaysBadges = ({ baba }) => {
     const seen = new Set();
     days = baba.game_days_config
       .map((c) => Number(c.day))
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
       .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
       .sort((a, b) => a - b);
   } else if (Array.isArray(baba?.game_days) && baba.game_days.length > 0) {
     const seen = new Set();
     days = baba.game_days
       .map(Number)
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
       .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
       .sort((a, b) => a - b);
   }
@@ -52,33 +55,43 @@ const HomePage = () => {
 
   const [mode, setMode] = useState(null); // 'create' | 'join'
   const [formData, setFormData] = useState({
-    name: '',
-    modality: 'futsal',
-    game_time: '20:00',
-    game_days: [],
+    name:           '',
+    modality:       'futsal',
+    game_time:      '20:00',
+    game_days:      [],
     match_duration: 10,
-    invite_code: '',
+    invite_code:    '',
   });
+
+  const toggleDay = (day) => {
+    const days = formData.game_days;
+    setFormData({
+      ...formData,
+      game_days: days.includes(day)
+        ? days.filter((d) => d !== day)
+        : [...days, day].sort((a, b) => a - b),
+    });
+  };
 
   // ── Criar Baba ──
   const handleCreateBaba = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) { toast.error('Digite o nome do baba'); return; }
+    if (!formData.name.trim())          { toast.error('Digite o nome do baba'); return; }
     if (formData.game_days.length === 0) { toast.error('Selecione pelo menos um dia'); return; }
 
-    // Converte game_days + game_time para o novo formato game_days_config
+    // Gera game_days_config no momento da criação — baba nasce já no novo formato
     const game_days_config = formData.game_days.map((d) => ({
-      day: Number(d),
-      time: formData.game_time || '20:00',
+      day:      Number(d),
+      time:     formData.game_time || '20:00',
       location: '',
     }));
 
     const result = await createBaba({
-      name: formData.name.trim(),
-      modality: formData.modality,
-      game_time: formData.game_time,
-      match_duration: Number(formData.match_duration),
-      game_days: formData.game_days.map(Number),
+      name:             formData.name.trim(),
+      modality:         formData.modality,
+      game_time:        formData.game_time,
+      match_duration:   Number(formData.match_duration),
+      game_days:        formData.game_days.map(Number),
       game_days_config,
     });
 
@@ -92,27 +105,16 @@ const HomePage = () => {
   const handleJoinBaba = async (e) => {
     e.preventDefault();
     const code = formData.invite_code.trim().toUpperCase();
-    if (!code) { toast.error('Digite o código do convite'); return; }
+    if (!code)           { toast.error('Digite o código do convite'); return; }
     if (code.length !== 6) { toast.error('O código deve ter exatamente 6 caracteres'); return; }
 
     const result = await joinBaba(code);
-    if (result) {
-      setMode(null);
-      navigate('/dashboard');
-    }
+    if (result) { setMode(null); navigate('/dashboard'); }
   };
 
   const handleSelectBaba = (baba) => {
     setCurrentBaba(baba);
     navigate('/dashboard');
-  };
-
-  const toggleDay = (day) => {
-    const days = formData.game_days;
-    const next = days.includes(day)
-      ? days.filter((d) => d !== day)
-      : [...days, day].sort((a, b) => a - b);
-    setFormData({ ...formData, game_days: next });
   };
 
   if (loading) {
@@ -167,7 +169,7 @@ const HomePage = () => {
           </div>
         </div>
 
-        {/* Ações */}
+        {/* Ações principais */}
         {mode === null && (
           <div className="space-y-4 animate-fade-in">
             <p className="text-center text-white/60 text-sm">Escolha uma opção para começar</p>
@@ -250,13 +252,12 @@ const HomePage = () => {
                       value={formData.match_duration}
                       onChange={(e) => setFormData({ ...formData, match_duration: e.target.value })}
                       className="input-tactical"
-                      min="5"
-                      max="120"
+                      min="5" max="120"
                     />
                   </div>
                 </div>
 
-                {/* Dias da Semana */}
+                {/* Dias */}
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
                     Dias da Semana
@@ -321,7 +322,10 @@ const HomePage = () => {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      invite_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6),
+                      invite_code: e.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9]/g, '')
+                        .substring(0, 6),
                     })
                   }
                   placeholder="AB12CD"
@@ -329,7 +333,7 @@ const HomePage = () => {
                   maxLength={6}
                   required
                 />
-                <div className="mt-2 text-center">
+                <div className="mt-2 text-center min-h-[18px]">
                   {formData.invite_code.length === 0 && (
                     <p className="text-[9px] text-white/30">
                       Código de 6 caracteres fornecido pelo presidente
@@ -381,19 +385,29 @@ const HomePage = () => {
                     className="card-glass p-6 rounded-[2rem] hover:border-cyan-electric/50 transition-all group text-left"
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        {baba.avatar_url ? (
-                          <img
-                            src={baba.avatar_url}
-                            alt=""
-                            className="w-8 h-8 rounded-lg object-cover border border-white/10"
-                          />
-                        ) : null}
-                        <h3 className="text-lg font-black uppercase italic text-white group-hover:text-cyan-electric transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Avatar com fallback de iniciais */}
+                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
+                          {baba.avatar_url ? (
+                            <img
+                              src={baba.avatar_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-cyan-electric/10 flex items-center justify-center">
+                              <span className="text-cyan-electric font-black text-xs">
+                                {(baba.name || 'B').charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-black uppercase italic text-white group-hover:text-cyan-electric transition-colors truncate">
                           {baba.name}
                         </h3>
                       </div>
-                      <div className="w-2 h-2 rounded-full bg-green-neon animate-pulse flex-shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-green-neon animate-pulse flex-shrink-0 mt-2" />
                     </div>
 
                     <div className="space-y-2">
