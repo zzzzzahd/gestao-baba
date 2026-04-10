@@ -1,13 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba, sanitizeGameDaysConfig } from '../contexts/BabaContext';
-import { X, Trash2, Save, AlertTriangle, Plus, Camera, Image, Loader2 } from 'lucide-react';
+import { X, Trash2, Save, AlertTriangle, Image, Loader2, MapPin, Clock, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const DAY_SHORT  = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-// Converte baba para estado editável de game_days_config
 const initGameDaysConfig = (baba) => {
   if (Array.isArray(baba?.game_days_config) && baba.game_days_config.length > 0) {
     return sanitizeGameDaysConfig(baba.game_days_config);
@@ -21,469 +20,299 @@ const initGameDaysConfig = (baba) => {
   return [];
 };
 
-// Valida se um horário HH:MM é válido
-const isValidTime = (time) => {
-  if (!time) return false;
-  const m = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return false;
-  const h = Number(m[1]), min = Number(m[2]);
-  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
-};
+const isValidTime = (time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(time);
 
 const BabaSettings = ({ baba, onClose }) => {
   const navigate = useNavigate();
-  const { updateBaba, deleteBaba, uploadBabaImage, loading } = useBaba();
+  const { updateBaba, deleteBaba, uploadBabaImage } = useBaba();
 
   const avatarInputRef = useRef(null);
   const coverInputRef  = useRef(null);
 
-  // Form state
-  const [name, setName]             = useState(baba.name || '');
-  const [modality, setModality]     = useState(baba.modality || 'futsal');
+  // --- FORM STATE ---
+  const [name, setName] = useState(baba.name || '');
+  const [modality, setModality] = useState(baba.modality || 'futsal');
   const [matchDuration, setMatchDuration] = useState(baba.match_duration || 10);
-  const [location, setLocation]     = useState(baba.location || '');
+  const [location, setLocation] = useState(baba.location || '');
   const [gameDaysConfig, setGameDaysConfig] = useState(() => initGameDaysConfig(baba));
 
-  // Image state
+  // --- UI & LOADING STATE ---
   const [avatarPreview, setAvatarPreview] = useState(baba.avatar_url || null);
   const [coverPreview, setCoverPreview]   = useState(baba.cover_url || null);
-  const [avatarFile, setAvatarFile]       = useState(null);
-  const [coverFile, setCoverFile]         = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover]   = useState(false);
-
+  const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Dias que ainda não foram usados
-  const usedDays = new Set(gameDaysConfig.map((c) => c.day));
-  const availableDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !usedDays.has(d));
+  // --- MEMOS (Ajuste 4) ---
+  const usedDays = useMemo(() => new Set(gameDaysConfig.map(c => c.day)), [gameDaysConfig]);
+  const availableDays = useMemo(() => [0, 1, 2, 3, 4, 5, 6].filter(d => !usedDays.has(d)), [usedDays]);
+  const initials = useMemo(() => (name || baba.name || '?').charAt(0).toUpperCase(), [name, baba.name]);
+  
+  const agendaSummary = useMemo(() => 
+    [...gameDaysConfig]
+      .sort((a, b) => a.day - b.day)
+      .map(d => `${DAY_SHORT[d.day]} ${d.time}`)
+      .join(' · '), 
+    [gameDaysConfig]
+  );
 
-  // ── Handlers de dias ──
-  const addDay = () => {
-    if (availableDays.length === 0) {
-      toast('Todos os dias já foram adicionados', { icon: '📅' });
-      return;
-    }
-    const nextDay = availableDays[0];
-    setGameDaysConfig((prev) =>
-      sanitizeGameDaysConfig([...prev, { day: nextDay, time: '20:00', location: '' }])
-    );
-  };
-
-  const removeDay = (index) => {
-    setGameDaysConfig((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateDayField = (index, field, value) => {
-    // Validação de horário em tempo real
-    if (field === 'time' && value && !isValidTime(value)) {
-      // Deixa o usuário digitar mas não rejeita (o input type=time já garante formato)
-    }
-
-    setGameDaysConfig((prev) => {
-      const updated = prev.map((item, i) =>
-        i === index
-          ? { ...item, [field]: field === 'day' ? Number(value) : value }
-          : item
-      );
-      // Re-sanitiza para evitar duplicata ao trocar o dia
-      return sanitizeGameDaysConfig(updated);
-    });
-  };
-
-  // ── Handlers de imagem ──
-  const handleImageChange = (e, type) => {
+  // --- HANDLERS (Ajuste 6 & 7) ---
+  const handleImageChange = async (e, type) => {
+    if (uploadingAvatar || uploadingCover) return; // Blindagem
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Selecione um arquivo de imagem válido');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Imagem deve ter no máximo 5MB');
-      return;
-    }
+    if (!file.type.startsWith('image/')) return toast.error('Selecione uma imagem válida');
+    if (file.size > 5 * 1024 * 1024) return toast.error('Máximo 5MB permitido');
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (type === 'avatar') {
-        setAvatarPreview(ev.target.result);
-        setAvatarFile(file);
-      } else {
-        setCoverPreview(ev.target.result);
-        setCoverFile(file);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      type === 'avatar' ? setUploadingAvatar(true) : setUploadingCover(true);
+      const res = await uploadBabaImage(file, type);
+      if (!res) throw new Error();
+
+      const reader = new FileReader();
+      reader.onload = (ev) => type === 'avatar' ? setAvatarPreview(ev.target.result) : setCoverPreview(ev.target.result);
+      reader.readAsDataURL(file);
+      toast.success('Imagem atualizada');
+    } catch (err) {
+      toast.error('Erro no upload');
+    } finally {
+      type === 'avatar' ? setUploadingAvatar(false) : setUploadingCover(false);
+    }
   };
 
-  // ── Salvar ──
+  const handleAddDay = () => {
+    if (availableDays.length === 0) return toast.error('Agenda cheia');
+    const dayToAdd = availableDays[0];
+    setGameDaysConfig(prev => 
+      sanitizeGameDaysConfig([...prev, { day: dayToAdd, time: '20:00', location: '' }])
+      .sort((a, b) => a.day - b.day)
+    );
+    toast.success(`${DAY_LABELS[dayToAdd]} adicionado`);
+  };
+
+  const handleRemoveDay = (idx) => {
+    setGameDaysConfig(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateDayField = (index, field, value) => {
+    setGameDaysConfig(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: field === 'day' ? Number(value) : value };
+      return field === 'day' ? sanitizeGameDaysConfig(updated).sort((a, b) => a.day - b.day) : updated;
+    });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
+    if (!name.trim()) return toast.error('Nome obrigatório');
+    
+    const invalid = gameDaysConfig.find(c => !isValidTime(c.time));
+    if (invalid) return toast.error(`Horário inválido na ${DAY_LABELS[invalid.day]}`);
 
-    if (!name.trim()) {
-      toast.error('Nome do baba é obrigatório');
-      return;
+    setIsSaving(true);
+    try {
+      const cleanConfig = sanitizeGameDaysConfig(gameDaysConfig);
+      const updates = {
+        name: name.trim(), modality,
+        match_duration: Number(matchDuration),
+        location: location.trim(),
+        game_days_config: cleanConfig,
+        game_days: [], // Ajuste 3: Limpeza legado
+        game_time: cleanConfig[0]?.time || '20:00'
+      };
+
+      const result = await updateBaba(baba.id, updates);
+      if (result) {
+        toast.success('Alterações salvas');
+        onClose();
+      }
+    } catch (err) {
+      toast.error('Erro ao salvar');
+    } finally {
+      setIsSaving(false);
     }
-
-    if (gameDaysConfig.length === 0) {
-      toast.error('Adicione pelo menos um dia de jogo');
-      return;
-    }
-
-    // Valida todos os horários
-    const invalidTime = gameDaysConfig.find((c) => !isValidTime(c.time));
-    if (invalidTime) {
-      toast.error(`Horário inválido para ${DAY_LABELS[invalidTime.day]}`);
-      return;
-    }
-
-    const cleanConfig = sanitizeGameDaysConfig(gameDaysConfig);
-
-    const updates = {
-      name:           name.trim(),
-      modality,
-      match_duration: Number(matchDuration),
-      location:       location.trim(),
-      game_days_config: cleanConfig,
-      game_days: [],
-      // game_time = primeiro item da config (fallback legado, ordenado)
-      game_time: cleanConfig[0]?.time || baba.game_time || '20:00',
-    };
-
-    const result = await updateBaba(baba.id, updates);
-    if (!result) return;
-
-    // Upload de imagens pendentes com loading visual independente
-    if (avatarFile) {
-      setUploadingAvatar(true);
-      await uploadBabaImage(avatarFile, 'avatar').finally(() => setUploadingAvatar(false));
-    }
-    if (coverFile) {
-      setUploadingCover(true);
-      await uploadBabaImage(coverFile, 'cover').finally(() => setUploadingCover(false));
-    }
-
-    onClose();
   };
-
-  const handleDelete = async () => {
-    const result = await deleteBaba(baba.id);
-    if (result) { navigate('/'); onClose(); }
-  };
-
-  // Iniciais do baba como fallback de avatar
-  const initials = (baba.name || 'B').charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center z-50 p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
-
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="text-2xl font-black uppercase italic text-cyan-electric">
-            Configurações do Baba
-          </h2>
-          <button onClick={onClose} className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
-            <X size={20} className="text-white/60" />
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex justify-center z-[60] p-0 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-black border-x border-white/5 sm:border sm:rounded-[2.5rem] sm:my-auto overflow-hidden shadow-2xl relative animate-in fade-in duration-300">
+        
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl border-b border-white/5 p-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black uppercase italic text-white tracking-tighter">Administração do Grupo</h2>
+            <p className="text-[9px] font-black text-cyan-electric uppercase tracking-[0.2em] opacity-60 mt-1 truncate max-w-[200px]">
+              {agendaSummary || 'Sem dias configurados'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all active:scale-95">
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-6">
-
-          {/* ── Capa ── */}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-              Capa do Baba
-            </label>
-            <div
-              className="relative w-full h-28 rounded-2xl overflow-hidden bg-white/5 border border-dashed border-white/20 cursor-pointer hover:border-cyan-electric/50 transition-all group"
-              onClick={() => coverInputRef.current?.click()}
+        <form onSubmit={handleSave} className="p-6 space-y-8 pb-32">
+          
+          {/* Imagens (Capa & Avatar) */}
+          <div className="space-y-4">
+            <div 
+              className="relative h-40 rounded-[2rem] bg-gray-900 border border-white/10 overflow-hidden cursor-pointer group"
+              onClick={() => !uploadingCover && coverInputRef.current?.click()}
             >
               {coverPreview ? (
-                <img src={coverPreview} alt="Capa" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2">
-                  <Image size={24} className="text-white/20 group-hover:text-cyan-electric/60 transition-all" />
-                  <span className="text-[9px] font-black uppercase text-white/30">Adicionar capa</span>
-                </div>
-              )}
-              {/* Loading overlay */}
-              {uploadingCover && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <Loader2 size={24} className="text-cyan-electric animate-spin" />
-                </div>
-              )}
-              {!uploadingCover && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                  <Camera size={20} className="text-white" />
-                </div>
-              )}
+                <img src={coverPreview} className={`w-full h-full object-cover transition-all duration-500 ${uploadingCover ? 'opacity-20' : 'opacity-40 group-hover:opacity-60'}`} alt="" />
+              ) : <div className="absolute inset-0 flex flex-col items-center justify-center text-white/10"><Image size={40} /></div>}
+              {uploadingCover && <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-cyan-electric" /></div>}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+              <input ref={coverInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'cover')} />
             </div>
-            <input ref={coverInputRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => handleImageChange(e, 'cover')} />
-          </div>
 
-          {/* ── Avatar + Nome ── */}
-          <div className="flex items-end gap-4">
-            <div className="flex-shrink-0">
-              <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                Brasão
-              </label>
-              <div
-                className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white/5 border border-dashed border-white/20 cursor-pointer hover:border-cyan-electric/50 transition-all group"
-                onClick={() => avatarInputRef.current?.click()}
+            <div className="flex items-center gap-6 px-2">
+              <div 
+                className="relative w-24 h-24 rounded-[2.5rem] bg-gray-800 border-4 border-black -mt-12 z-10 overflow-hidden cursor-pointer group shadow-2xl"
+                onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
               >
-                {/* Fallback: iniciais quando não há imagem */}
                 {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-cyan-electric/10">
-                    <span className="text-2xl font-black text-cyan-electric/60">{initials}</span>
-                  </div>
-                )}
-                {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <Loader2 size={18} className="text-cyan-electric animate-spin" />
-                  </div>
-                )}
-                {!uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                    <Camera size={14} className="text-white" />
-                  </div>
-                )}
+                  <img src={avatarPreview} className={`w-full h-full object-cover transition-transform group-hover:scale-110 ${uploadingAvatar ? 'opacity-20' : ''}`} alt="" />
+                ) : <div className="w-full h-full flex items-center justify-center bg-cyan-electric/10 text-cyan-electric text-4xl font-black italic">{initials}</div>}
+                {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={24} className="animate-spin text-cyan-electric" /></div>}
+                <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'avatar')} />
               </div>
-              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
-                onChange={(e) => handleImageChange(e, 'avatar')} />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                Nome do Baba
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="input-tactical"
-                placeholder="Ex: Baba da Galera"
-                required
-              />
+              <div className="flex-1">
+                <label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Nome do Baba</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 mt-1 font-bold outline-none focus:border-cyan-electric/50 transition-colors" required />
+              </div>
             </div>
           </div>
 
-          {/* ── Modalidade + Duração ── */}
+          {/* Dados Básicos */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                Modalidade
-              </label>
-              <select value={modality} onChange={(e) => setModality(e.target.value)} className="input-tactical">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Modalidade</label>
+              <select value={modality} onChange={(e) => setModality(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-bold outline-none appearance-none cursor-pointer">
                 <option value="futsal">Futsal</option>
                 <option value="society">Society</option>
+                <option value="campo">Campo</option>
               </select>
             </div>
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                Duração da Partida (min)
-              </label>
-              <input
-                type="number"
-                value={matchDuration}
-                onChange={(e) => setMatchDuration(e.target.value)}
-                className="input-tactical"
-                min="5" max="120"
-              />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Duração (min)</label>
+              <input type="number" value={matchDuration} onChange={(e) => setMatchDuration(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-bold outline-none" min="5" />
             </div>
           </div>
 
-          {/* ── Local padrão ── */}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-              Local Padrão (opcional)
-            </label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="input-tactical"
-              placeholder="Ex: Arena X, Quadra Central"
-            />
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Local Padrão</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 pl-12 font-bold outline-none focus:border-cyan-electric/50" placeholder="Ex: Arena da Vila" />
+            </div>
           </div>
 
-          {/* ── Dias e Horários ── */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-white/40">
-                  Dias e Horários de Jogo
-                </label>
-                <p className="text-[9px] text-white/30 mt-0.5">Configure horário e local para cada dia</p>
-              </div>
-              <button
-                type="button"
-                onClick={addDay}
+          {/* Agenda (Ajuste 2, 5, 8) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Configuração de Agenda</label>
+              <button 
+                type="button" 
+                onClick={handleAddDay}
                 disabled={availableDays.length === 0}
-                className="flex items-center gap-2 px-3 py-2 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-[10px] font-black uppercase text-cyan-electric bg-cyan-electric/10 px-4 py-2 rounded-xl border border-cyan-electric/20 hover:bg-cyan-electric/20 transition-all disabled:opacity-20"
               >
-                <Plus size={14} />
-                Adicionar Dia
+                + Adicionar Dia
               </button>
             </div>
 
-            {gameDaysConfig.length === 0 ? (
-              <div className="p-6 bg-white/5 rounded-2xl border border-dashed border-white/10 text-center">
-                <p className="text-xs text-white/30 font-black uppercase">Nenhum dia configurado</p>
-                <p className="text-[9px] text-white/20 mt-1">Clique em "Adicionar Dia" para começar</p>
+            {gameDaysConfig.length === 0 && (
+              <div className="text-center py-10 bg-white/5 border border-dashed border-white/10 rounded-[2rem] text-white/20 text-[10px] font-black uppercase tracking-widest">
+                Nenhum dia de jogo configurado
               </div>
-            ) : (
-              <div className="space-y-3">
-                {gameDaysConfig.map((item, index) => {
-                  const timeInvalid = item.time && !isValidTime(item.time);
-                  return (
-                    <div
-                      key={`${item.day}-${index}`}
-                      className={`p-4 rounded-2xl border space-y-3 transition-all ${
-                        timeInvalid
-                          ? 'bg-red-500/5 border-red-500/30'
-                          : 'bg-white/5 border-white/10'
-                      }`}
-                    >
-                      {/* Seletor dia + horário + remover */}
-                      <div className="flex items-end gap-3">
-                        <div className="flex-1">
-                          <label className="block text-[9px] font-black uppercase text-white/40 mb-1">Dia</label>
-                          <select
-                            value={item.day}
-                            onChange={(e) => updateDayField(index, 'day', e.target.value)}
-                            className="input-tactical text-sm"
-                          >
-                            {[0, 1, 2, 3, 4, 5, 6]
-                              .filter((d) => d === item.day || !usedDays.has(d))
-                              .map((d) => (
-                                <option key={d} value={d}>{DAY_LABELS[d]}</option>
-                              ))}
-                          </select>
-                        </div>
+            )}
 
-                        <div className="w-32">
-                          <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
-                            Horário {timeInvalid && <span className="text-red-400">• inválido</span>}
-                          </label>
-                          <input
-                            type="time"
-                            value={item.time}
-                            onChange={(e) => updateDayField(index, 'time', e.target.value)}
-                            className={`input-tactical text-sm ${timeInvalid ? 'border-red-500/50' : ''}`}
-                            required
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeDay(index)}
-                          className="p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500/20 transition-all flex-shrink-0 mb-0.5"
+            <div className="space-y-3">
+              {gameDaysConfig.map((item, idx) => {
+                const isTimeInvalid = item.time && !isValidTime(item.time);
+                return (
+                  <div key={idx} className={`bg-white/5 border rounded-[2rem] p-5 space-y-4 transition-all ${isTimeInvalid ? 'border-red-500/30 bg-red-500/5' : 'border-white/10'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <select 
+                          value={item.day}
+                          onChange={(e) => updateDayField(idx, 'day', e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-[10px] font-black uppercase tracking-widest outline-none"
                         >
-                          <Trash2 size={16} />
-                        </button>
+                          {[0,1,2,3,4,5,6].filter(d => d === item.day || !usedDays.has(d)).map(d => (
+                            <option key={d} value={d}>{DAY_LABELS[d]}</option>
+                          ))}
+                        </select>
                       </div>
-
-                      {/* Local específico */}
-                      <div>
-                        <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
-                          Local (opcional)
-                        </label>
-                        <input
-                          type="text"
-                          value={item.location || ''}
-                          onChange={(e) => updateDayField(index, 'location', e.target.value)}
-                          className="input-tactical text-sm"
-                          placeholder="Ex: Quadra Norte"
+                      <div className="relative w-32">
+                        <Clock size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isTimeInvalid ? 'text-red-500' : 'text-white/20'}`} />
+                        <input 
+                          type="time" 
+                          value={item.time} 
+                          onChange={(e) => updateDayField(idx, 'time', e.target.value)}
+                          className={`w-full bg-black/40 border rounded-xl p-2 pl-9 text-xs font-black outline-none transition-colors ${isTimeInvalid ? 'border-red-500/50 text-red-500' : 'border-white/10'}`}
+                          required
                         />
                       </div>
-
-                      {/* Badge resumo */}
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded-lg text-[9px] font-black text-cyan-electric uppercase">
-                          {DAY_SHORT[item.day]}
-                        </span>
-                        <span className="text-[9px] text-white/40 font-black">
-                          {item.time} {item.location ? `• ${item.location}` : ''}
-                        </span>
-                      </div>
+                      <button type="button" onClick={() => handleRemoveDay(idx)} className="p-2 text-red-500/40 hover:text-red-500 transition-colors">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {availableDays.length === 0 && gameDaysConfig.length > 0 && (
-              <p className="text-[9px] text-cyan-electric mt-2">✓ Todos os 7 dias configurados</p>
-            )}
-          </div>
-
-          {/* ── Botões ── */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={loading || uploadingAvatar || uploadingCover}
-              className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading || uploadingAvatar || uploadingCover ? (
-                <><Loader2 size={18} className="animate-spin" /> Salvando...</>
-              ) : (
-                <><Save size={18} /> Salvar Alterações</>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="px-6 py-4 rounded-2xl bg-white/5 border border-red-500/30 text-red-500 font-black uppercase text-[10px] tracking-widest hover:bg-red-500/10 transition-all flex items-center gap-2"
-            >
-              <Trash2 size={16} />
-              Excluir
-            </button>
+                    <input type="text" value={item.location} onChange={(e) => updateDayField(idx, 'location', e.target.value)} placeholder={`Local específico ${location ? `(Padrão: ${location})` : ''}`} className="w-full bg-black/20 border border-white/5 rounded-xl p-3 text-[11px] font-bold outline-none focus:border-white/20" />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </form>
-      </div>
 
-      {/* Modal exclusão */}
-      {showDeleteConfirm && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10 p-4">
-          <div className="w-full max-w-md card-glass p-8 rounded-[2rem] border-2 border-red-500/30">
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertTriangle className="text-red-500" size={32} />
-              </div>
+        {/* Footer Actions */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/5 flex gap-4">
+          <button 
+            type="button" 
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-black transition-all"
+          >
+            <Trash2 size={20} />
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving || uploadingAvatar || uploadingCover}
+            className="flex-1 bg-cyan-electric text-black font-black uppercase italic tracking-tighter py-4 rounded-2xl shadow-lg shadow-cyan-electric/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+            {isSaving ? 'Salvando...' : 'Confirmar Ajustes'}
+          </button>
+        </div>
+
+        {/* Modal Delete */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !isSaving && setShowDeleteConfirm(false)} />
+            <div className="relative w-full max-w-sm bg-gray-900 border border-red-500/30 rounded-[2.5rem] p-8 text-center space-y-6 shadow-2xl">
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto text-red-500"><AlertTriangle size={32} /></div>
               <div>
-                <h3 className="text-xl font-black uppercase mb-2">Excluir Baba?</h3>
-                <p className="text-sm text-white/60">
-                  Tem certeza que deseja excluir{' '}
-                  <span className="text-white font-bold">"{baba.name}"</span>?
-                </p>
-                <p className="text-xs text-red-500/80 mt-2">Esta ação não pode ser desfeita!</p>
+                <h3 className="text-xl font-black uppercase tracking-tighter text-white">Excluir Grupo?</h3>
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mt-2">Os dados serão perdidos permanentemente.</p>
               </div>
-              <div className="flex gap-3 w-full mt-4">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 font-black uppercase text-xs hover:bg-white/10 transition-all"
+              <div className="flex gap-3">
+                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-4 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-colors">Voltar</button>
+                <button 
+                  onClick={async () => { setIsSaving(true); const res = await deleteBaba(baba.id); if (res) { navigate('/'); onClose(); } }} 
+                  disabled={isSaving}
+                  className="flex-1 py-4 rounded-2xl bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-500/20 disabled:opacity-50"
                 >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-red-500 text-white font-black uppercase text-xs hover:bg-red-600 transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Excluindo...' : 'Sim, Excluir'}
+                  Confirmar
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
