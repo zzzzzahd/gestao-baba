@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
-import { Clock, CheckCircle2, XCircle, Users, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Users, AlertCircle, Zap } from 'lucide-react';
 
-const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const DAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 const PresenceConfirmation = () => {
   const navigate = useNavigate();
@@ -19,57 +19,87 @@ const PresenceConfirmation = () => {
     currentMatch,
     isDrawing,
     drawTeamsIntelligent,
+    nextGameDay,
+    hasAutoDrawnRef,  // flag de ref para evitar disparo duplo
   } = useBaba();
 
   const [timeRemaining, setTimeRemaining] = useState('');
 
-  // Contador regressivo até o deadline
+  // Contador regressivo
   useEffect(() => {
     if (!confirmationDeadline) return;
-
     const update = () => {
       const diff = confirmationDeadline - new Date();
       if (diff <= 0) { setTimeRemaining('Encerrado'); return; }
-
       const h = Math.floor(diff / (1000 * 60 * 60));
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const s = Math.floor((diff % (1000 * 60)) / 1000);
-
       if (h > 0)      setTimeRemaining(`${h}h ${m}min`);
       else if (m > 0) setTimeRemaining(`${m}min ${s}s`);
       else            setTimeRemaining(`${s}s`);
     };
-
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [confirmationDeadline]);
 
-  // Auto-sorteio após deadline
+  // Auto-sorteio após deadline — flag ref evita disparos múltiplos
   useEffect(() => {
-    if (!canConfirm && gameConfirmations.length >= 4 && !currentMatch && !isDrawing) {
+    if (
+      !canConfirm &&
+      gameConfirmations.length >= 4 &&
+      !currentMatch &&
+      !isDrawing &&
+      !hasAutoDrawnRef?.current
+    ) {
+      hasAutoDrawnRef.current = true; // marca ANTES do setTimeout
       const timer = setTimeout(async () => {
         const result = await drawTeamsIntelligent();
-        if (result) setTimeout(() => navigate('/teams'), 2000);
+        if (result) {
+          setTimeout(() => navigate('/teams'), 2000);
+        } else {
+          // Se falhou, libera para tentar novamente (ex: race condition já resolvida)
+          hasAutoDrawnRef.current = false;
+        }
       }, 3000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        // Não reseta hasAutoDrawnRef aqui — evita re-disparo no cleanup
+      };
     }
-  }, [canConfirm, gameConfirmations, currentMatch, isDrawing, drawTeamsIntelligent, navigate]);
+  }, [canConfirm, gameConfirmations, currentMatch, isDrawing]);
 
-  const getGameTime = () => currentBaba?.game_time?.substring(0, 5) || '--:--';
-
+  const getGameTime   = () => currentBaba?.game_time?.substring(0, 5) || '--:--';
   const getDeadlineTime = () => {
     if (!confirmationDeadline) return '--:--';
     return confirmationDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // ── Estado especial: hoje não é dia de jogo ──
+  // Label do próximo jogo
+  const nextGameLabel = (() => {
+    if (!nextGameDay) return null;
+    const { day, time, daysAhead } = nextGameDay;
+    const dayName = DAY_FULL[day] || '';
+    const t = time?.substring(0, 5) || '';
+    if (daysAhead === 0) return `Hoje ${t}`;
+    if (daysAhead === 1) return `Amanhã ${t}`;
+    return `${dayName} ${t}`;
+  })();
+
+  // ── Hoje não é dia de jogo ──
   if (!confirmationDeadline && !canConfirm) {
-    const gameDays = Array.isArray(currentBaba?.game_days_config)
-      ? currentBaba.game_days_config.map((c) => DAY_LABELS[Number(c.day)]).join(', ')
-      : Array.isArray(currentBaba?.game_days)
-        ? currentBaba.game_days.map((d) => DAY_LABELS[Number(d)]).join(', ')
-        : null;
+    const gameDaysList = (() => {
+      if (Array.isArray(currentBaba?.game_days_config) && currentBaba.game_days_config.length > 0) {
+        return currentBaba.game_days_config
+          .sort((a, b) => Number(a.day) - Number(b.day))
+          .map((c) => `${DAY_FULL[Number(c.day)]} ${c.time?.substring(0, 5) || ''}`.trim())
+          .join(', ');
+      }
+      if (Array.isArray(currentBaba?.game_days) && currentBaba.game_days.length > 0) {
+        return currentBaba.game_days.map((d) => DAY_FULL[Number(d)]).join(', ');
+      }
+      return null;
+    })();
 
     return (
       <div className="card-glass p-6 rounded-[2rem] border border-white/10 bg-white/5">
@@ -79,12 +109,25 @@ const PresenceConfirmation = () => {
             Confirmação de Presença
           </h3>
         </div>
-        <p className="text-xs text-white/30 text-center py-4">
-          Hoje não é dia de jogo. Volte no próximo dia.
+
+        <p className="text-xs text-white/30 text-center py-3">
+          Hoje não é dia de jogo.
         </p>
-        {gameDays && (
-          <p className="text-[9px] text-white/20 text-center">
-            Dias de jogo: {gameDays}
+
+        {/* Próximo jogo */}
+        {nextGameLabel && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl mt-2">
+            <Zap size={14} className="text-cyan-electric flex-shrink-0" />
+            <div>
+              <p className="text-[9px] font-black text-white/40 uppercase">Próximo Jogo</p>
+              <p className="text-sm font-black text-cyan-electric">{nextGameLabel}</p>
+            </div>
+          </div>
+        )}
+
+        {gameDaysList && !nextGameLabel && (
+          <p className="text-[9px] text-white/20 text-center mt-2">
+            Dias de jogo: {gameDaysList}
           </p>
         )}
       </div>
@@ -124,7 +167,7 @@ const PresenceConfirmation = () => {
         <div className="mb-4 p-4 bg-black/20 rounded-xl border border-white/5 text-center">
           <p className="text-[9px] font-black text-white/40 uppercase mb-2">Tempo Restante</p>
           <p className={`text-2xl font-black font-mono ${
-            timeRemaining.includes('h') || (timeRemaining.includes('min') && !timeRemaining.includes('s'))
+            timeRemaining.includes('h') || (timeRemaining.includes('min') && !timeRemaining.endsWith('s'))
               ? 'text-green-400'
               : 'text-red-500 animate-pulse'
           }`}>
@@ -166,7 +209,9 @@ const PresenceConfirmation = () => {
             <div className="flex flex-wrap gap-2">
               {gameConfirmations.slice(0, 8).map((conf, i) => (
                 <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'
+                  }`} />
                   <span className="text-[9px] font-bold text-white/80">
                     {conf.player?.name || 'Jogador'}
                   </span>
@@ -223,7 +268,9 @@ const PresenceConfirmation = () => {
         </div>
       ) : gameConfirmations.length >= 4 ? (
         <div className="p-4 bg-white/5 rounded-xl border border-white/5 text-center">
-          <p className="text-[9px] font-black text-white/40 uppercase mb-2">Sorteio automático em andamento...</p>
+          <p className="text-[9px] font-black text-white/40 uppercase mb-2">
+            Sorteio automático em andamento...
+          </p>
           <div className="flex items-center justify-center gap-2">
             {[0, 0.2, 0.4].map((delay, i) => (
               <div key={i} className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse"
@@ -261,7 +308,9 @@ const PresenceConfirmation = () => {
           <div className="flex flex-wrap gap-2">
             {gameConfirmations.map((conf, i) => (
               <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                <div className={`w-1.5 h-1.5 rounded-full ${conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'
+                }`} />
                 <span className="text-[9px] font-bold text-white/80">
                   {conf.player?.name || 'Jogador'}
                 </span>
