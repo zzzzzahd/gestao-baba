@@ -1,136 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
-import {
-  Trophy, Users, DollarSign, LogOut,
-  Calendar, Copy, Settings, MapPin, Clock, RefreshCw, Timer,
-} from 'lucide-react';
-import PresenceConfirmation from '../components/PresenceConfirmation';
-import BabaSettings from '../components/BabaSettings';
-import DrawConfigPanel from '../components/DrawConfigPanel';
+import { useAuth } from '../contexts/AuthContext';
+import { PlusCircle, LogIn, Trophy, Users, Edit, Clock, Calendar, MapPin } from 'lucide-react';
+import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
-const DAY_SHORT = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-// ─── helpers de display ────────────────────────────────────────────────────
+/**
+ * Exibe dias do baba de forma normalizada (deduplicado, ordenado).
+ * Suporta game_days_config (novo) e game_days (legado).
+ */
+const BabaDaysBadges = ({ baba }) => {
+  let days = [];
 
-/** Formata game_days_config normalizado para exibição */
-const formatConfig = (config) => {
-  if (!Array.isArray(config) || config.length === 0) return null;
-  // Garante deduplica + ordena antes de exibir (segurança extra)
-  const seen = new Set();
-  return config
-    .filter((c) => {
-      const d = Number(c.day);
-      if (seen.has(d)) return false;
-      seen.add(d);
-      return true;
-    })
-    .sort((a, b) => Number(a.day) - Number(b.day))
-    .map((c) => `${DAY_SHORT[Number(c.day)]} ${c.time?.substring(0, 5) || ''}`.trim())
-    .join(' · ');
-};
+  if (Array.isArray(baba?.game_days_config) && baba.game_days_config.length > 0) {
+    const seen = new Set();
+    days = baba.game_days_config
+      .map((c) => Number(c.day))
+      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
+      .sort((a, b) => a - b);
+  } else if (Array.isArray(baba?.game_days) && baba.game_days.length > 0) {
+    const seen = new Set();
+    days = baba.game_days
+      .map(Number)
+      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
+      .sort((a, b) => a - b);
+  }
 
-/** Formata game_days legado */
-const formatLegacyDays = (days) => {
-  if (!Array.isArray(days) || days.length === 0) return null;
-  return [...new Set(days.map(Number))]
-    .sort((a, b) => a - b)
-    .map((d) => DAY_SHORT[d] ?? d)
-    .join(' · ');
-};
+  if (days.length === 0) return null;
 
-/** Calcula label de expiração reativamente */
-const computeExpiryLabel = (expiresAt) => {
-  if (!expiresAt) return null;
-  const diff = new Date(expiresAt) - new Date();
-  if (diff <= 0) return 'Expirado';
-  const hours   = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) return `Expira em ${hours}h ${minutes}min`;
-  return `Expira em ${minutes}min`;
-};
-
-// ─────────────────────────────────────────────────────────────────────────
-
-const DashboardPage = () => {
-  const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
-  const { currentBaba, players, loading, generateInviteCode } = useBaba();
-
-  const [showSettings, setShowSettings] = useState(false);
-  const [inviteExpiry, setInviteExpiry] = useState(
-    () => computeExpiryLabel(currentBaba?.invite_expires_at)
+  return (
+    <div className="flex flex-wrap gap-1 mt-2">
+      {days.map((d) => (
+        <span
+          key={d}
+          className="w-6 h-6 rounded-md bg-cyan-electric/20 border border-cyan-electric/30 text-cyan-electric text-[8px] font-black flex items-center justify-center"
+        >
+          {DAY_LABELS[d]?.charAt(0) ?? d}
+        </span>
+      ))}
+    </div>
   );
+};
 
-  // Contador adaptativo de expiração do convite
-  useEffect(() => {
-    setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
-    if (!currentBaba?.invite_expires_at) return;
+const HomePage = () => {
+  const navigate = useNavigate();
+  const { myBabas, createBaba, joinBaba, setCurrentBaba, loading } = useBaba();
+  const { profile } = useAuth();
 
-    let intervalId;
-    const tick = () => {
-      const label = computeExpiryLabel(currentBaba.invite_expires_at);
-      setInviteExpiry(label);
-      if (label === 'Expirado') { clearInterval(intervalId); return; }
-      const diff = new Date(currentBaba.invite_expires_at) - new Date();
-      clearInterval(intervalId);
-      intervalId = setInterval(tick, diff < 60_000 ? 1_000 : 60_000);
-    };
-    const diff = new Date(currentBaba.invite_expires_at) - new Date();
-    intervalId = setInterval(tick, diff < 60_000 ? 1_000 : 60_000);
-    return () => clearInterval(intervalId);
-  }, [currentBaba?.invite_expires_at]);
+  const [mode, setMode] = useState(null); // 'create' | 'join'
+  const [formData, setFormData] = useState({
+    name: '',
+    modality: 'futsal',
+    game_time: '20:00',
+    game_days: [],
+    match_duration: 10,
+    invite_code: '',
+  });
 
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
-  const inviteExpired = inviteExpiry === 'Expirado';
+  // ── Criar Baba ──
+  const handleCreateBaba = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) { toast.error('Digite o nome do baba'); return; }
+    if (formData.game_days.length === 0) { toast.error('Selecione pelo menos um dia'); return; }
 
-  // Dados de exibição dos dias
-  const gameDaysDisplay = currentBaba?.game_days_config?.length > 0
-    ? formatConfig(currentBaba.game_days_config)
-    : formatLegacyDays(currentBaba?.game_days);
+    // Converte game_days + game_time para o novo formato game_days_config
+    const game_days_config = formData.game_days.map((d) => ({
+      day: Number(d),
+      time: formData.game_time || '20:00',
+      location: '',
+    }));
 
-  // Horário principal (primeiro item da config ou game_time legado)
-  const mainGameTime = currentBaba?.game_days_config?.length > 0
-    ? currentBaba.game_days_config
-        .sort((a, b) => Number(a.day) - Number(b.day))[0]?.time?.substring(0, 5)
-    : currentBaba?.game_time?.substring(0, 5);
+    const result = await createBaba({
+      name: formData.name.trim(),
+      modality: formData.modality,
+      game_time: formData.game_time,
+      match_duration: Number(formData.match_duration),
+      game_days: formData.game_days.map(Number),
+      game_days_config,
+    });
 
-  const handleCopyInviteCode = () => {
-    if (currentBaba?.invite_code) {
-      navigator.clipboard.writeText(currentBaba.invite_code);
-      toast.success('Código copiado!');
+    if (result) {
+      setMode(null);
+      toast.success('Baba criado! Clique nele abaixo para acessar.');
     }
+  };
+
+  // ── Entrar em Baba ──
+  const handleJoinBaba = async (e) => {
+    e.preventDefault();
+    const code = formData.invite_code.trim().toUpperCase();
+    if (!code) { toast.error('Digite o código do convite'); return; }
+    if (code.length !== 6) { toast.error('O código deve ter exatamente 6 caracteres'); return; }
+
+    const result = await joinBaba(code);
+    if (result) {
+      setMode(null);
+      navigate('/dashboard');
+    }
+  };
+
+  const handleSelectBaba = (baba) => {
+    setCurrentBaba(baba);
+    navigate('/dashboard');
+  };
+
+  const toggleDay = (day) => {
+    const days = formData.game_days;
+    const next = days.includes(day)
+      ? days.filter((d) => d !== day)
+      : [...days, day].sort((a, b) => a - b);
+    setFormData({ ...formData, game_days: next });
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sincronizando...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Carregando...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24 font-sans">
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="w-full max-w-4xl mx-auto space-y-8">
 
-      {/* ── HEADER ── */}
-      <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+        {/* Logo */}
+        <div className="flex justify-center">
+          <Logo size="large" />
+        </div>
+
+        {/* Perfil */}
+        <div className="card-glass p-6 rounded-[2rem] animate-fade-in">
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
-                <span className="text-2xl font-black text-black">
-                  {profile?.name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-black" />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+              <span className="text-2xl font-black text-black">
+                {profile?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black italic tracking-tighter uppercase leading-none">
-                {profile?.name || 'Comandante'}
+              <h2 className="text-xl font-black uppercase italic text-white truncate">
+                {profile?.name || 'Usuário'}
               </h2>
               {(profile?.age || profile?.position || profile?.favorite_team) && (
                 <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
@@ -144,223 +157,278 @@ const DashboardPage = () => {
                 </div>
               )}
             </div>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-6 space-y-6">
-        {currentBaba ? (
-          <>
-            {/* ── ATALHOS ── */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { icon: <Trophy size={20} />, label: 'Ranking', path: '/rankings' },
-                { icon: <DollarSign size={20} />, label: 'Caixa', path: '/financial' },
-                { icon: <Users size={20} />, label: 'Times', path: '/teams' },
-              ].map((item, i) => (
-                <button
-                  key={i}
-                  onClick={() => navigate(item.path)}
-                  className="flex flex-col items-center gap-3 p-6 card-glass rounded-3xl border border-white/5 hover:bg-white/10 transition-all bg-white/5"
-                >
-                  <div className="text-cyan-electric opacity-60">{item.icon}</div>
-                  <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* ── INFO DO BABA ── */}
-            <div className="card-glass rounded-3xl border border-white/5 bg-white/5 overflow-hidden">
-              {/* Capa */}
-              {currentBaba.cover_url && (
-                <div className="w-full h-24 overflow-hidden">
-                  <img
-                    src={currentBaba.cover_url}
-                    alt="Capa"
-                    className="w-full h-full object-cover opacity-60"
-                  />
-                </div>
-              )}
-
-              <div className="p-6 space-y-4">
-                {/* Avatar + nome */}
-                <div className="flex items-center gap-3">
-                  {currentBaba.avatar_url ? (
-                    <img
-                      src={currentBaba.avatar_url}
-                      alt="Avatar"
-                      className="w-10 h-10 rounded-xl object-cover border border-white/10"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center">
-                      <Trophy size={18} className="text-cyan-electric opacity-60" />
-                    </div>
-                  )}
-                  <p className="text-sm font-black opacity-60 uppercase tracking-widest">
-                    {currentBaba.name}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Horário principal */}
-                  {mainGameTime && (
-                    <div className="flex items-start gap-3">
-                      <Clock size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Horário</p>
-                        <p className="text-sm font-black italic">{mainGameTime}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Modalidade */}
-                  <div className="flex items-start gap-3">
-                    <Trophy size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Modalidade</p>
-                      <p className="text-sm font-black italic uppercase">{currentBaba.modality || '—'}</p>
-                    </div>
-                  </div>
-
-                  {/* Dias */}
-                  {gameDaysDisplay && (
-                    <div className="flex items-start gap-3 col-span-2">
-                      <Calendar size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Dias de Jogo</p>
-                        <p className="text-sm font-black italic">{gameDaysDisplay}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Jogadores */}
-                  <div className="flex items-start gap-3">
-                    <Users size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Atletas</p>
-                      <p className="text-sm font-black italic">{players?.length || 0} jogadores</p>
-                    </div>
-                  </div>
-
-                  {/* Local */}
-                  <div className="flex items-start gap-3">
-                    <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Local</p>
-                      <p className="text-sm font-black italic text-white/40">
-                        {currentBaba.location || 'A definir'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── CONFIRMAÇÃO DE PRESENÇA ── */}
-            <PresenceConfirmation />
-
-            {/* ── SORTEIO (só presidente) ── */}
-            {isPresident && <DrawConfigPanel />}
-
-            {/* ── CÓDIGO DE CONVITE (só presidente) ── */}
-            {isPresident && (
-              <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
-                    <p className="text-xs text-white/60">Válido por 24h após geração</p>
-                  </div>
-                  <button
-                    onClick={generateInviteCode}
-                    disabled={loading}
-                    className="p-2 bg-white/5 border border-white/10 rounded-xl text-white/40 hover:text-cyan-electric hover:border-cyan-electric/30 transition-all disabled:opacity-50"
-                    title="Gerar novo código"
-                  >
-                    <RefreshCw size={16} />
-                  </button>
-                </div>
-
-                {currentBaba.invite_code && !inviteExpired ? (
-                  <>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 bg-black/30 px-4 py-3 rounded-xl border border-white/10">
-                        <p className="text-2xl font-black tracking-widest text-cyan-electric text-center">
-                          {currentBaba.invite_code}
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleCopyInviteCode}
-                        className="p-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
-                      >
-                        <Copy size={20} />
-                      </button>
-                    </div>
-                    {inviteExpiry && (
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40">
-                        <Timer size={12} />
-                        <span>{inviteExpiry}</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    {inviteExpired && (
-                      <p className="text-[10px] text-red-400 font-black uppercase text-center mb-2">
-                        Código expirado — gere um novo
-                      </p>
-                    )}
-                    <button
-                      onClick={generateInviteCode}
-                      disabled={loading}
-                      className="w-full py-3 rounded-xl bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric font-black uppercase text-xs tracking-widest hover:bg-cyan-electric/20 transition-all disabled:opacity-50"
-                    >
-                      {loading ? 'Gerando...' : 'Gerar Código de Convite'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── CONFIGURAÇÕES (só presidente) ── */}
-            {isPresident && (
-              <button
-                onClick={() => setShowSettings(true)}
-                className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white/60 font-black uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white hover:border-cyan-electric/30 transition-all flex items-center justify-center gap-2"
-              >
-                <Settings size={16} />
-                Configurações do Baba
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="py-20 text-center space-y-6">
-            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-dashed border-white/20">
-              <Trophy className="opacity-20" size={40} />
-            </div>
-            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">
-              Nenhum baba selecionado
-            </p>
             <button
-              onClick={() => navigate('/')}
-              className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan"
+              onClick={() => navigate('/profile')}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2 flex-shrink-0"
             >
-              Criar ou Entrar em um Baba
+              <Edit size={14} />
+              <span className="hidden sm:inline">Editar</span>
             </button>
           </div>
-        )}
-      </div>
+        </div>
 
-      {showSettings && currentBaba && (
-        <BabaSettings baba={currentBaba} onClose={() => setShowSettings(false)} />
-      )}
+        {/* Ações */}
+        {mode === null && (
+          <div className="space-y-4 animate-fade-in">
+            <p className="text-center text-white/60 text-sm">Escolha uma opção para começar</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => setMode('create')}
+                className="p-6 rounded-[2rem] bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                <PlusCircle size={24} /> Criar Novo Baba
+              </button>
+              <button
+                onClick={() => setMode('join')}
+                className="p-6 rounded-[2rem] bg-white/5 border border-green-neon text-green-neon font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 hover:bg-green-neon/10 transition-all"
+              >
+                <LogIn size={24} /> Entrar com Convite
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Formulário: Criar Baba ── */}
+        {mode === 'create' && (
+          <form onSubmit={handleCreateBaba} className="space-y-6 animate-fade-in">
+            <div className="card-glass p-8 rounded-[2rem]">
+              <div className="flex items-center gap-3 mb-6">
+                <Trophy className="text-cyan-electric" size={24} />
+                <h2 className="text-2xl font-black italic uppercase">Criar Baba</h2>
+              </div>
+
+              <div className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Nome do Baba
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ex: Baba da Galera"
+                    className="input-tactical"
+                    required
+                  />
+                </div>
+
+                {/* Modalidade */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                    Modalidade
+                  </label>
+                  <select
+                    value={formData.modality}
+                    onChange={(e) => setFormData({ ...formData, modality: e.target.value })}
+                    className="input-tactical"
+                  >
+                    <option value="futsal">Futsal</option>
+                    <option value="society">Society</option>
+                  </select>
+                </div>
+
+                {/* Horário + Duração */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                      Horário
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.game_time}
+                      onChange={(e) => setFormData({ ...formData, game_time: e.target.value })}
+                      className="input-tactical"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                      Duração (min)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.match_duration}
+                      onChange={(e) => setFormData({ ...formData, match_duration: e.target.value })}
+                      className="input-tactical"
+                      min="5"
+                      max="120"
+                    />
+                  </div>
+                </div>
+
+                {/* Dias da Semana */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
+                    Dias da Semana
+                  </label>
+                  <div className="grid grid-cols-7 gap-2">
+                    {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${
+                          formData.game_days.includes(day)
+                            ? 'bg-cyan-electric text-black border-2 border-cyan-electric shadow-[0_0_15px_rgba(0,242,255,0.4)]'
+                            : 'bg-white/5 text-white/40 border-2 border-white/10 hover:bg-white/10 hover:text-white/60'
+                        }`}
+                      >
+                        {DAY_LABELS[day]}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.game_days.length === 0 && (
+                    <p className="text-[9px] text-yellow-500 mt-2">⚠️ Selecione pelo menos um dia</p>
+                  )}
+                  {formData.game_days.length > 0 && (
+                    <p className="text-[9px] text-cyan-electric mt-2">
+                      ✓ {formData.game_days.length} dia{formData.game_days.length > 1 ? 's' : ''} selecionado{formData.game_days.length > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setMode(null)}
+                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all">
+                Voltar
+              </button>
+              <button type="submit" disabled={loading}
+                className="flex-[2] py-5 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest shadow-neon-cyan hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50">
+                {loading ? 'Criando...' : 'Criar Baba'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Formulário: Entrar em Baba ── */}
+        {mode === 'join' && (
+          <form onSubmit={handleJoinBaba} className="space-y-6 animate-fade-in">
+            <div className="card-glass p-8 rounded-[2rem]">
+              <div className="flex items-center gap-3 mb-6">
+                <Users className="text-green-neon" size={24} />
+                <h2 className="text-2xl font-black italic uppercase">Entrar no Baba</h2>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+                  Código do Convite
+                </label>
+                <input
+                  type="text"
+                  value={formData.invite_code}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      invite_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6),
+                    })
+                  }
+                  placeholder="AB12CD"
+                  className="input-tactical text-center text-2xl font-black tracking-widest"
+                  maxLength={6}
+                  required
+                />
+                <div className="mt-2 text-center">
+                  {formData.invite_code.length === 0 && (
+                    <p className="text-[9px] text-white/30">
+                      Código de 6 caracteres fornecido pelo presidente
+                    </p>
+                  )}
+                  {formData.invite_code.length > 0 && formData.invite_code.length < 6 && (
+                    <p className="text-[9px] text-yellow-500">
+                      {6 - formData.invite_code.length} caractere{6 - formData.invite_code.length !== 1 ? 's' : ''} restante{6 - formData.invite_code.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                  {formData.invite_code.length === 6 && (
+                    <p className="text-[9px] text-cyan-electric">✓ Código completo</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setMode(null)}
+                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all">
+                Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || formData.invite_code.length !== 6}
+                className="flex-[2] py-5 rounded-2xl bg-green-neon text-black font-black uppercase text-[10px] tracking-widest shadow-neon-green hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Meus Babas ── */}
+        {mode === null && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent" />
+              <h2 className="text-xl font-black uppercase italic text-cyan-electric">Meus Babas</h2>
+              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent" />
+            </div>
+
+            {myBabas && myBabas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myBabas.map((baba) => (
+                  <button
+                    key={baba.id}
+                    onClick={() => handleSelectBaba(baba)}
+                    className="card-glass p-6 rounded-[2rem] hover:border-cyan-electric/50 transition-all group text-left"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        {baba.avatar_url ? (
+                          <img
+                            src={baba.avatar_url}
+                            alt=""
+                            className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                          />
+                        ) : null}
+                        <h3 className="text-lg font-black uppercase italic text-white group-hover:text-cyan-electric transition-colors">
+                          {baba.name}
+                        </h3>
+                      </div>
+                      <div className="w-2 h-2 rounded-full bg-green-neon animate-pulse flex-shrink-0" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
+                        <MapPin size={12} />
+                        <span>{baba.modality === 'futsal' ? 'Futsal' : 'Society'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
+                        <Clock size={12} />
+                        <span>{baba.game_time?.substring(0, 5) || '—'}</span>
+                      </div>
+                      <BabaDaysBadges baba={baba} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="card-glass p-12 rounded-[2rem] text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                    <Trophy size={32} className="text-white/20" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black uppercase text-white/40 mb-2">Nenhum Baba Ainda</p>
+                    <p className="text-sm text-white/30">Crie ou entre com código de convite</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };
 
-export default DashboardPage;
+export default HomePage;
