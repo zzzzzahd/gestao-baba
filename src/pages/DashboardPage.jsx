@@ -11,63 +11,92 @@ import BabaSettings from '../components/BabaSettings';
 import DrawConfigPanel from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
 
-const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const DAY_SHORT = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-// Calcula label de expiração a partir de uma data ISO string
+// ─── helpers de display ────────────────────────────────────────────────────
+
+/** Formata game_days_config normalizado para exibição */
+const formatConfig = (config) => {
+  if (!Array.isArray(config) || config.length === 0) return null;
+  // Garante deduplica + ordena antes de exibir (segurança extra)
+  const seen = new Set();
+  return config
+    .filter((c) => {
+      const d = Number(c.day);
+      if (seen.has(d)) return false;
+      seen.add(d);
+      return true;
+    })
+    .sort((a, b) => Number(a.day) - Number(b.day))
+    .map((c) => `${DAY_SHORT[Number(c.day)]} ${c.time?.substring(0, 5) || ''}`.trim())
+    .join(' · ');
+};
+
+/** Formata game_days legado */
+const formatLegacyDays = (days) => {
+  if (!Array.isArray(days) || days.length === 0) return null;
+  return [...new Set(days.map(Number))]
+    .sort((a, b) => a - b)
+    .map((d) => DAY_SHORT[d] ?? d)
+    .join(' · ');
+};
+
+/** Calcula label de expiração reativamente */
 const computeExpiryLabel = (expiresAt) => {
   if (!expiresAt) return null;
   const diff = new Date(expiresAt) - new Date();
   if (diff <= 0) return 'Expirado';
-  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const hours   = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   if (hours > 0) return `Expira em ${hours}h ${minutes}min`;
   return `Expira em ${minutes}min`;
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { currentBaba, setCurrentBaba, players, loading, generateInviteCode } = useBaba();
+  const { currentBaba, players, loading, generateInviteCode } = useBaba();
 
   const [showSettings, setShowSettings] = useState(false);
-  // Fix 6: contador reativo de expiração do convite
-  const [inviteExpiry, setInviteExpiry] = useState(() => computeExpiryLabel(currentBaba?.invite_expires_at));
+  const [inviteExpiry, setInviteExpiry] = useState(
+    () => computeExpiryLabel(currentBaba?.invite_expires_at)
+  );
 
+  // Contador adaptativo de expiração do convite
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
-
     if (!currentBaba?.invite_expires_at) return;
 
-    // Intervalo adaptativo: 1s no último minuto, 60s o restante
-    // → precisão máxima quando o contador está crítico, performance no restante
     let intervalId;
-
     const tick = () => {
       const label = computeExpiryLabel(currentBaba.invite_expires_at);
       setInviteExpiry(label);
-
-      if (label === 'Expirado') {
-        clearInterval(intervalId);
-        return;
-      }
-
-      // Calcula tempo restante para decidir frequência do próximo tick
+      if (label === 'Expirado') { clearInterval(intervalId); return; }
       const diff = new Date(currentBaba.invite_expires_at) - new Date();
-      const nextDelay = diff < 60_000 ? 1_000 : 60_000;
-
-      // Re-agenda com o delay correto (intervalo dinâmico via setTimeout recursivo)
       clearInterval(intervalId);
-      intervalId = setInterval(tick, nextDelay);
+      intervalId = setInterval(tick, diff < 60_000 ? 1_000 : 60_000);
     };
-
     const diff = new Date(currentBaba.invite_expires_at) - new Date();
-    const initialDelay = diff < 60_000 ? 1_000 : 60_000;
-    intervalId = setInterval(tick, initialDelay);
-
+    intervalId = setInterval(tick, diff < 60_000 ? 1_000 : 60_000);
     return () => clearInterval(intervalId);
   }, [currentBaba?.invite_expires_at]);
 
-  // Copiar código de convite
+  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
+  const inviteExpired = inviteExpiry === 'Expirado';
+
+  // Dados de exibição dos dias
+  const gameDaysDisplay = currentBaba?.game_days_config?.length > 0
+    ? formatConfig(currentBaba.game_days_config)
+    : formatLegacyDays(currentBaba?.game_days);
+
+  // Horário principal (primeiro item da config ou game_time legado)
+  const mainGameTime = currentBaba?.game_days_config?.length > 0
+    ? currentBaba.game_days_config
+        .sort((a, b) => Number(a.day) - Number(b.day))[0]?.time?.substring(0, 5)
+    : currentBaba?.game_time?.substring(0, 5);
+
   const handleCopyInviteCode = () => {
     if (currentBaba?.invite_code) {
       navigator.clipboard.writeText(currentBaba.invite_code);
@@ -75,40 +104,11 @@ const DashboardPage = () => {
     }
   };
 
-  // Gerar / regenerar código de convite via BabaContext
-  const handleGenerateInviteCode = async () => {
-    await generateInviteCode();
-  };
-
-  // Verificar se usuário é presidente (comparação segura de tipos)
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
-
-  // Formatar dias da semana (legado)
-  const formatGameDays = (days) => {
-    if (!days || !Array.isArray(days) || days.length === 0) return null;
-    return days.map((d) => DAY_LABELS[d] ?? d).join(' · ');
-  };
-
-  // Formatar game_days_config (novo formato)
-  const formatGameDaysConfig = (config) => {
-    if (!Array.isArray(config) || config.length === 0) return null;
-    return config.map((c) => {
-      const label = DAY_LABELS[c.day] ?? c.day;
-      return c.time ? `${label} ${c.time.substring(0, 5)}` : label;
-    }).join(' · ');
-  };
-
-  const gameDaysDisplay = currentBaba?.game_days_config
-    ? formatGameDaysConfig(currentBaba.game_days_config)
-    : formatGameDays(currentBaba?.game_days);
-
-  const inviteExpired = inviteExpiry === 'Expirado';
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sincronizando Dados...</p>
+        <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sincronizando...</p>
       </div>
     );
   }
@@ -116,49 +116,48 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans">
 
-      {/* HEADER */}
+      {/* ── HEADER ── */}
       <div className="p-6 bg-gradient-to-b from-cyan-electric/10 to-transparent">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
-                  <span className="text-2xl font-black text-black">
-                    {profile?.name?.charAt(0).toUpperCase() || 'U'}
-                  </span>
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-black"></div>
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+                <span className="text-2xl font-black text-black">
+                  {profile?.name?.charAt(0).toUpperCase() || 'U'}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-black italic tracking-tighter uppercase leading-none">
-                  {profile?.name || 'Comandante'}
-                </h2>
-                {(profile?.age || profile?.position || profile?.favorite_team) && (
-                  <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
-                    {profile?.age && <span>{profile.age} anos</span>}
-                    {profile?.age && profile?.position && <span>•</span>}
-                    {profile?.position && <span>{profile.position}</span>}
-                    {(profile?.age || profile?.position) && profile?.favorite_team && <span>•</span>}
-                    {profile?.favorite_team && <span className="truncate max-w-[100px]">{profile.favorite_team}</span>}
-                  </div>
-                )}
-              </div>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-black" />
             </div>
-            <button
-              onClick={() => signOut()}
-              className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all"
-            >
-              <LogOut size={20} />
-            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-black italic tracking-tighter uppercase leading-none">
+                {profile?.name || 'Comandante'}
+              </h2>
+              {(profile?.age || profile?.position || profile?.favorite_team) && (
+                <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
+                  {profile?.age && <span>{profile.age} anos</span>}
+                  {profile?.age && profile?.position && <span>•</span>}
+                  {profile?.position && <span>{profile.position}</span>}
+                  {(profile?.age || profile?.position) && profile?.favorite_team && <span>•</span>}
+                  {profile?.favorite_team && (
+                    <span className="truncate max-w-[100px]">{profile.favorite_team}</span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+          <button
+            onClick={() => signOut()}
+            className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 text-white/40 hover:text-red-500 transition-all"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 space-y-6">
-
         {currentBaba ? (
           <>
-            {/* ATALHOS PRINCIPAIS */}
+            {/* ── ATALHOS ── */}
             <div className="grid grid-cols-3 gap-4">
               {[
                 { icon: <Trophy size={20} />, label: 'Ranking', path: '/rankings' },
@@ -176,81 +175,109 @@ const DashboardPage = () => {
               ))}
             </div>
 
-            {/* INFO DO BABA */}
-            <div className="card-glass p-6 rounded-3xl border border-white/5 bg-white/5 space-y-4">
-              <p className="text-[9px] font-black opacity-40 uppercase tracking-widest mb-2">
-                {currentBaba.name}
-              </p>
+            {/* ── INFO DO BABA ── */}
+            <div className="card-glass rounded-3xl border border-white/5 bg-white/5 overflow-hidden">
+              {/* Capa */}
+              {currentBaba.cover_url && (
+                <div className="w-full h-24 overflow-hidden">
+                  <img
+                    src={currentBaba.cover_url}
+                    alt="Capa"
+                    className="w-full h-full object-cover opacity-60"
+                  />
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Horário */}
-                <div className="flex items-start gap-3">
-                  <Clock size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Horário</p>
-                    <p className="text-sm font-black italic">{currentBaba.game_time || '—'}</p>
-                  </div>
+              <div className="p-6 space-y-4">
+                {/* Avatar + nome */}
+                <div className="flex items-center gap-3">
+                  {currentBaba.avatar_url ? (
+                    <img
+                      src={currentBaba.avatar_url}
+                      alt="Avatar"
+                      className="w-10 h-10 rounded-xl object-cover border border-white/10"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center">
+                      <Trophy size={18} className="text-cyan-electric opacity-60" />
+                    </div>
+                  )}
+                  <p className="text-sm font-black opacity-60 uppercase tracking-widest">
+                    {currentBaba.name}
+                  </p>
                 </div>
 
-                {/* Modalidade */}
-                <div className="flex items-start gap-3">
-                  <Trophy size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Modalidade</p>
-                    <p className="text-sm font-black italic uppercase">{currentBaba.modality || '—'}</p>
-                  </div>
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Horário principal */}
+                  {mainGameTime && (
+                    <div className="flex items-start gap-3">
+                      <Clock size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Horário</p>
+                        <p className="text-sm font-black italic">{mainGameTime}</p>
+                      </div>
+                    </div>
+                  )}
 
-                {/* Dias da semana */}
-                {gameDaysDisplay && (
+                  {/* Modalidade */}
                   <div className="flex items-start gap-3">
-                    <Calendar size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+                    <Trophy size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Dias</p>
-                      <p className="text-sm font-black italic">{gameDaysDisplay}</p>
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Modalidade</p>
+                      <p className="text-sm font-black italic uppercase">{currentBaba.modality || '—'}</p>
                     </div>
                   </div>
-                )}
 
-                {/* Jogadores */}
-                <div className="flex items-start gap-3">
-                  <Users size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Atletas</p>
-                    <p className="text-sm font-black italic">{players?.length || 0} jogadores</p>
+                  {/* Dias */}
+                  {gameDaysDisplay && (
+                    <div className="flex items-start gap-3 col-span-2">
+                      <Calendar size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Dias de Jogo</p>
+                        <p className="text-sm font-black italic">{gameDaysDisplay}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Jogadores */}
+                  <div className="flex items-start gap-3">
+                    <Users size={14} className="text-cyan-electric mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Atletas</p>
+                      <p className="text-sm font-black italic">{players?.length || 0} jogadores</p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Local */}
-                <div className="flex items-start gap-3 col-span-2">
-                  <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Local</p>
-                    <p className="text-sm font-black italic text-white/40">
-                      {currentBaba.location || 'A definir'}
-                    </p>
+                  {/* Local */}
+                  <div className="flex items-start gap-3">
+                    <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-[9px] font-black opacity-40 uppercase mb-0.5">Local</p>
+                      <p className="text-sm font-black italic text-white/40">
+                        {currentBaba.location || 'A definir'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Confirmação de Presença */}
+            {/* ── CONFIRMAÇÃO DE PRESENÇA ── */}
             <PresenceConfirmation />
 
-            {/* Painel de Configuração do Sorteio (Só Presidente) */}
+            {/* ── SORTEIO (só presidente) ── */}
             {isPresident && <DrawConfigPanel />}
 
-            {/* Código de Convite — Só para Presidente */}
+            {/* ── CÓDIGO DE CONVITE (só presidente) ── */}
             {isPresident && (
               <div className="card-glass p-6 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-[9px] font-black opacity-40 uppercase mb-1">Código de Convite</p>
-                    <p className="text-xs text-white/60">Compartilhe com novos jogadores</p>
+                    <p className="text-xs text-white/60">Válido por 24h após geração</p>
                   </div>
-                  {/* Botão regenerar sempre visível para o presidente */}
                   <button
-                    onClick={handleGenerateInviteCode}
+                    onClick={generateInviteCode}
                     disabled={loading}
                     className="p-2 bg-white/5 border border-white/10 rounded-xl text-white/40 hover:text-cyan-electric hover:border-cyan-electric/30 transition-all disabled:opacity-50"
                     title="Gerar novo código"
@@ -274,7 +301,6 @@ const DashboardPage = () => {
                         <Copy size={20} />
                       </button>
                     </div>
-                    {/* Contador de expiração */}
                     {inviteExpiry && (
                       <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40">
                         <Timer size={12} />
@@ -290,7 +316,7 @@ const DashboardPage = () => {
                       </p>
                     )}
                     <button
-                      onClick={handleGenerateInviteCode}
+                      onClick={generateInviteCode}
                       disabled={loading}
                       className="w-full py-3 rounded-xl bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric font-black uppercase text-xs tracking-widest hover:bg-cyan-electric/20 transition-all disabled:opacity-50"
                     >
@@ -301,7 +327,7 @@ const DashboardPage = () => {
               </div>
             )}
 
-            {/* Botão Configurações (só presidente) */}
+            {/* ── CONFIGURAÇÕES (só presidente) ── */}
             {isPresident && (
               <button
                 onClick={() => setShowSettings(true)}
@@ -317,7 +343,9 @@ const DashboardPage = () => {
             <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-dashed border-white/20">
               <Trophy className="opacity-20" size={40} />
             </div>
-            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">Nenhum baba selecionado</p>
+            <p className="text-sm font-bold opacity-40 uppercase tracking-widest">
+              Nenhum baba selecionado
+            </p>
             <button
               onClick={() => navigate('/')}
               className="px-8 py-4 bg-cyan-electric text-black font-black uppercase text-[10px] rounded-2xl shadow-neon-cyan"
@@ -328,12 +356,8 @@ const DashboardPage = () => {
         )}
       </div>
 
-      {/* Modal de Configurações */}
       {showSettings && currentBaba && (
-        <BabaSettings
-          baba={currentBaba}
-          onClose={() => setShowSettings(false)}
-        />
+        <BabaSettings baba={currentBaba} onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
