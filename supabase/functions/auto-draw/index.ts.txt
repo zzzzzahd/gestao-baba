@@ -1,0 +1,199 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+
+// --- HELPERS DE CONFIGURAÇÃO ---
+
+interface GameDayConfig {
+  day: number;
+  time: string;
+  location?: string;
+}
+
+const sanitizeGameDaysConfig = (baba: any): GameDayConfig[] => {
+  const raw = baba.game_days_config;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((item: any) => ({
+      day: Number(item.day),
+      time: String(item.time).trim(),
+      location: item.location || ''
+    }));
+  }
+  // Fallback Legado
+  if (Array.isArray(baba.game_days) && baba.game_time) {
+    return baba.game_days.map((d: any) => ({
+      day: Number(d),
+      time: baba.game_time.substring(0, 5)
+    }));
+  }
+  return [];
+};
+
+const getNextGameDay = (baba: any) => {
+  const configs = sanitizeGameDaysConfig(baba);
+  if (configs.length === 0) return null;
+
+  // Ajuste de Timezone (America/Bahia)
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bahia" }));
+  const todayDow = now.getDay();
+
+  // Procuramos o jogo mais próximo (hoje ou próximos 7 dias)
+  for (let offset = 0; offset < 7; offset++) {
+    const checkDow = (todayDow + offset) % 7;
+    const match = configs.find((c) => c.day === checkDow);
+    if (!match) continue;
+
+    const [h, m] = match.time.split(':').map(Number);
+    const gameDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    gameDate.setHours(h, m, 0, 0);
+    
+    const deadline = new Date(gameDate.getTime() - 30 * 60 * 1000);
+
+    // Retornamos se for o jogo que deve ser sorteado agora
+    return { ...match, date: gameDate, deadline, dateStr: gameDate.toISOString().split('T')[0] };
+  }
+  return null;
+};
+
+// --- LÓGICA DE SORTEIO ---
+
+const performDraw = (players: any[], playersPerTeam: number) => {
+  const goalies = players.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
+  const outfield = players.filter(p => p.position !== 'goleiro').sort(() => Math.random() - 0.5);
+
+  const numTeams = Math.floor(players.length / playersPerTeam);
+  const teams = Array.from({ length: Math.max(2, numTeams) }, (_, i) => ({
+    name: `Time ${String.fromCharCode(65 + i)}`,
+    players: [] as any[]
+  }));
+
+  // 1. Distribuir goleiros
+  for (let i = 0; i < teams.length && goalies.length > 0; i++) {
+    teams[i].players.push(goalies.shift());
+  }
+
+  // 2. Distribuir o resto
+  let remaining = [...outfield, ...goalies];
+  let tIdx = 0;
+  while (remaining.length > 0) {
+    if (teams[tIdx].players.length < playersPerTeam) {
+      teams[tIdx].players.push(remaining.shift());
+    }
+    tIdx = (tIdx + 1) % teams.length;
+    // Se todos os times encherem e sobrar gente, vão para reserva
+    if (teams.every(t => t.players.length >= playersPerTeam)) break;
+  }
+
+  return { teams, reserves: remaining };
+};
+
+// --- HANDLER PRINCIPAL ---
+
+Deno.serve(async (req) => {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  try {
+    console.log("🚀 Iniciando processamento de Auto-Sorteio...");
+
+    // 1. Buscar Babas
+    const { data: babas, error: bError } = await supabase.from('babas').select('*');
+    if (bError) throw bError;
+
+    const results = [];
+
+    for (const baba of babas) {
+      const nextGame = getNextGameDay(baba);
+      if (!nextGame) continue;
+
+      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bahia" }));
+
+      // REGRA: Só sorteia se passou do deadline mas ainda não passou da hora do jogo
+      if (now >= nextGame.deadline && now < nextGame.date) {
+        
+        // 2. Checar se já existe sorteio hoje
+        const { data: existing } = await supabase
+          .from('draw_results')
+          .select('id')
+          .eq('baba_id', baba.id)
+          .eq('draw_date', nextGame.dateStr)
+          .maybeSingle();
+
+        if (existing) {
+          console.log(`[Baba: ${baba.name}] Já sorteado hoje.`);
+          continue;
+        }
+
+        // 3. Buscar confirmações
+        const { data: confirms } = await supabase
+          .from('game_confirmations')
+          .select('*, player:players(*)')
+          .eq('baba_id', baba.id)
+          .eq('game_date', nextGame.dateStr);
+
+        const players = confirms?.map(c => c.player).filter(Boolean) || [];
+        const playersPerTeam = baba.players_per_team || 5;
+
+        if (players.length < playersPerTeam * 2) {
+          console.log(`[Baba: ${baba.name}] Jogadores insuficientes (${players.length}).`);
+          continue;
+        }
+
+        // 4. Executar Sorteio
+        console.log(`[Baba: ${baba.name}] Sorteando...`);
+        const { teams, reserves } = performDraw(players, playersPerTeam);
+
+        // 5. Persistir Sorteio
+        const { data: drawRes, error: dError } = await supabase.from('draw_results').insert({
+          baba_id: baba.id,
+          draw_date: nextGame.dateStr,
+          teams,
+          reserves,
+          players_per_team: playersPerTeam
+        }).select().single();
+
+        if (dError) throw dError;
+
+        // 6. Criar Match e Match Players
+        // Limpar agendamentos antigos do dia (não finalizados)
+        await supabase.from('matches').delete()
+          .eq('baba_id', baba.id)
+          .gte('match_date', `${nextGame.dateStr}T00:00:00`)
+          .lte('match_date', `${nextGame.dateStr}T23:59:59`)
+          .neq('status', 'finished');
+
+        const gameTimeStr = nextGame.time.length === 5 ? `${nextGame.time}:00` : nextGame.time;
+        const { data: match, error: mError } = await supabase.from('matches').insert({
+          baba_id: baba.id,
+          match_date: `${nextGame.dateStr}T${gameTimeStr}`,
+          team_a_name: teams[0].name,
+          team_b_name: teams[1].name,
+          draw_result_id: drawRes.id,
+          status: 'scheduled'
+        }).select().single();
+
+        if (mError) throw mError;
+
+        const mPlayers = teams.slice(0, 2).flatMap((t, i) => t.players.map(p => ({
+          match_id: match.id,
+          player_id: p.id,
+          team: i === 0 ? 'A' : 'B',
+          position: p.position || 'linha'
+        })));
+
+        await supabase.from('match_players').insert(mPlayers);
+        
+        results.push({ baba: baba.name, status: 'Sorteado com sucesso' });
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, results }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (err) {
+    console.error("ERRO CRÍTICO:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+});
