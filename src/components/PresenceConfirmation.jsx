@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { Clock, CheckCircle2, XCircle, Users, AlertCircle } from 'lucide-react';
 
+const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
 const PresenceConfirmation = () => {
   const navigate = useNavigate();
   const {
@@ -21,29 +23,21 @@ const PresenceConfirmation = () => {
 
   const [timeRemaining, setTimeRemaining] = useState('');
 
-  // Contador de tempo restante até o deadline
+  // Contador regressivo até o deadline
   useEffect(() => {
     if (!confirmationDeadline) return;
 
     const update = () => {
       const diff = confirmationDeadline - new Date();
+      if (diff <= 0) { setTimeRemaining('Encerrado'); return; }
 
-      if (diff <= 0) {
-        setTimeRemaining('Encerrado');
-        return;
-      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}min`);
-      } else if (minutes > 0) {
-        setTimeRemaining(`${minutes}min ${seconds}s`);
-      } else {
-        setTimeRemaining(`${seconds}s`);
-      }
+      if (h > 0)      setTimeRemaining(`${h}h ${m}min`);
+      else if (m > 0) setTimeRemaining(`${m}min ${s}s`);
+      else            setTimeRemaining(`${s}s`);
     };
 
     update();
@@ -51,32 +45,32 @@ const PresenceConfirmation = () => {
     return () => clearInterval(interval);
   }, [confirmationDeadline]);
 
-  // Auto-sorteio após deadline (quando há jogadores suficientes)
+  // Auto-sorteio após deadline
   useEffect(() => {
     if (!canConfirm && gameConfirmations.length >= 4 && !currentMatch && !isDrawing) {
       const timer = setTimeout(async () => {
         const result = await drawTeamsIntelligent();
-        if (result) {
-          setTimeout(() => navigate('/teams'), 2000);
-        }
+        if (result) setTimeout(() => navigate('/teams'), 2000);
       }, 3000);
-
       return () => clearTimeout(timer);
     }
   }, [canConfirm, gameConfirmations, currentMatch, isDrawing, drawTeamsIntelligent, navigate]);
 
-  const getGameTime = () => {
-    if (!currentBaba?.game_time) return '--:--';
-    return currentBaba.game_time.substring(0, 5);
-  };
+  const getGameTime = () => currentBaba?.game_time?.substring(0, 5) || '--:--';
 
   const getDeadlineTime = () => {
     if (!confirmationDeadline) return '--:--';
     return confirmationDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Se hoje não é dia de jogo (deadline nulo e canConfirm false)
+  // ── Estado especial: hoje não é dia de jogo ──
   if (!confirmationDeadline && !canConfirm) {
+    const gameDays = Array.isArray(currentBaba?.game_days_config)
+      ? currentBaba.game_days_config.map((c) => DAY_LABELS[Number(c.day)]).join(', ')
+      : Array.isArray(currentBaba?.game_days)
+        ? currentBaba.game_days.map((d) => DAY_LABELS[Number(d)]).join(', ')
+        : null;
+
     return (
       <div className="card-glass p-6 rounded-[2rem] border border-white/10 bg-white/5">
         <div className="flex items-center gap-2 mb-3">
@@ -86,30 +80,25 @@ const PresenceConfirmation = () => {
           </h3>
         </div>
         <p className="text-xs text-white/30 text-center py-4">
-          Hoje não é dia de jogo. Volte no próximo dia configurado.
+          Hoje não é dia de jogo. Volte no próximo dia.
         </p>
-        {Array.isArray(currentBaba?.game_days) && currentBaba.game_days.length > 0 && (
+        {gameDays && (
           <p className="text-[9px] text-white/20 text-center">
-            Dias de jogo: {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
-              .filter((_, i) => currentBaba.game_days.includes(i))
-              .join(', ')}
+            Dias de jogo: {gameDays}
           </p>
         )}
       </div>
     );
   }
 
-  // ── ESTADO: ANTES DO DEADLINE ──
+  // ── ANTES DO DEADLINE ──
   if (canConfirm) {
     return (
       <div className="card-glass p-6 rounded-[2rem] border border-cyan-electric/20 bg-cyan-electric/5">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Clock className="text-cyan-electric" size={20} />
-            <h3 className="text-sm font-black uppercase tracking-wider">
-              Confirmar Presença
-            </h3>
+            <h3 className="text-sm font-black uppercase tracking-wider">Confirmar Presença</h3>
           </div>
           <div className="flex items-center gap-2 bg-cyan-electric/10 px-3 py-1 rounded-xl">
             <Users size={14} className="text-cyan-electric" />
@@ -143,14 +132,12 @@ const PresenceConfirmation = () => {
           </p>
         </div>
 
-        {/* Botão de Ação */}
+        {/* Ação */}
         {myConfirmation ? (
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
               <CheckCircle2 className="text-green-500" size={20} />
-              <span className="text-sm font-black text-green-500 uppercase">
-                Presença Confirmada
-              </span>
+              <span className="text-sm font-black text-green-500 uppercase">Presença Confirmada</span>
             </div>
             <button
               onClick={cancelConfirmation}
@@ -170,7 +157,7 @@ const PresenceConfirmation = () => {
           </button>
         )}
 
-        {/* Lista de Confirmados */}
+        {/* Lista */}
         {gameConfirmations.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/5">
             <p className="text-[9px] font-black text-white/40 uppercase mb-2">
@@ -178,13 +165,8 @@ const PresenceConfirmation = () => {
             </p>
             <div className="flex flex-wrap gap-2">
               {gameConfirmations.slice(0, 8).map((conf, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5"
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'
-                  }`}></div>
+                <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'}`} />
                   <span className="text-[9px] font-bold text-white/80">
                     {conf.player?.name || 'Jogador'}
                   </span>
@@ -202,10 +184,9 @@ const PresenceConfirmation = () => {
     );
   }
 
-  // ── ESTADO: APÓS O DEADLINE ──
+  // ── APÓS O DEADLINE ──
   return (
     <div className="card-glass p-6 rounded-[2rem] border border-yellow-500/20 bg-yellow-500/5">
-      {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <AlertCircle className="text-yellow-500" size={20} />
         <h3 className="text-sm font-black uppercase tracking-wider text-yellow-500">
@@ -213,11 +194,8 @@ const PresenceConfirmation = () => {
         </h3>
       </div>
 
-      {/* Info */}
       <div className="mb-4 p-4 bg-black/20 rounded-xl border border-white/5 text-center">
-        <p className="text-xs text-white/60 mb-2">
-          O prazo para confirmação de presença terminou.
-        </p>
+        <p className="text-xs text-white/60 mb-2">O prazo para confirmação encerrou.</p>
         <div className="flex items-center justify-center gap-2 mt-3">
           <Users className="text-cyan-electric" size={16} />
           <span className="text-lg font-black text-cyan-electric">
@@ -229,17 +207,13 @@ const PresenceConfirmation = () => {
       {/* Status do sorteio */}
       {isDrawing ? (
         <div className="p-4 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl text-center">
-          <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs font-black text-cyan-electric uppercase">
-            Sorteando times...
-          </p>
+          <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-xs font-black text-cyan-electric uppercase">Sorteando times...</p>
         </div>
       ) : currentMatch ? (
         <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-center">
           <CheckCircle2 className="text-green-500 mx-auto mb-2" size={24} />
-          <p className="text-xs font-black text-green-500 uppercase mb-3">
-            Times sorteados!
-          </p>
+          <p className="text-xs font-black text-green-500 uppercase mb-3">Times sorteados!</p>
           <button
             onClick={() => navigate('/teams')}
             className="w-full py-3 bg-green-500 text-black font-black uppercase text-xs rounded-xl hover:bg-green-400 transition-all"
@@ -249,28 +223,19 @@ const PresenceConfirmation = () => {
         </div>
       ) : gameConfirmations.length >= 4 ? (
         <div className="p-4 bg-white/5 rounded-xl border border-white/5 text-center">
-          <p className="text-[9px] font-black text-white/40 uppercase mb-2">
-            Sorteio automático em andamento...
-          </p>
+          <p className="text-[9px] font-black text-white/40 uppercase mb-2">Sorteio automático em andamento...</p>
           <div className="flex items-center justify-center gap-2">
             {[0, 0.2, 0.4].map((delay, i) => (
-              <div
-                key={i}
-                className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse"
-                style={{ animationDelay: `${delay}s` }}
-              ></div>
+              <div key={i} className="w-2 h-2 bg-cyan-electric rounded-full animate-pulse"
+                style={{ animationDelay: `${delay}s` }} />
             ))}
           </div>
         </div>
       ) : (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
           <XCircle className="text-red-500 mx-auto mb-2" size={24} />
-          <p className="text-xs font-black text-red-500 uppercase">
-            Jogadores insuficientes
-          </p>
-          <p className="text-[9px] text-white/40 mt-1">
-            Mínimo 4 jogadores necessários
-          </p>
+          <p className="text-xs font-black text-red-500 uppercase">Jogadores insuficientes</p>
+          <p className="text-[9px] text-white/40 mt-1">Mínimo 4 jogadores</p>
         </div>
       )}
 
@@ -278,34 +243,25 @@ const PresenceConfirmation = () => {
       {myConfirmation ? (
         <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-xl mt-4">
           <CheckCircle2 className="text-green-500" size={18} />
-          <span className="text-xs font-black text-green-500 uppercase">
-            Você confirmou presença
-          </span>
+          <span className="text-xs font-black text-green-500 uppercase">Você confirmou presença</span>
         </div>
       ) : (
         <div className="flex items-center justify-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl mt-4">
           <XCircle className="text-red-500" size={18} />
-          <span className="text-xs font-black text-red-500 uppercase">
-            Você não confirmou
-          </span>
+          <span className="text-xs font-black text-red-500 uppercase">Você não confirmou</span>
         </div>
       )}
 
-      {/* Lista de Confirmados */}
+      {/* Lista final */}
       {gameConfirmations.length > 0 && (
         <div className="mt-4 pt-4 border-t border-white/5">
           <p className="text-[9px] font-black text-white/40 uppercase mb-2">
-            Lista de Confirmados ({gameConfirmations.length})
+            Confirmados ({gameConfirmations.length})
           </p>
           <div className="flex flex-wrap gap-2">
             {gameConfirmations.map((conf, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5"
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'
-                }`}></div>
+              <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
+                <div className={`w-1.5 h-1.5 rounded-full ${conf.player?.position === 'goleiro' ? 'bg-yellow-400' : 'bg-cyan-electric'}`} />
                 <span className="text-[9px] font-bold text-white/80">
                   {conf.player?.name || 'Jogador'}
                 </span>
