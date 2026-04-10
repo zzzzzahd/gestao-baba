@@ -1,22 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba, sanitizeGameDaysConfig } from '../contexts/BabaContext';
-import { X, Trash2, Save, AlertTriangle, Plus, Camera, Image } from 'lucide-react';
+import { X, Trash2, Save, AlertTriangle, Plus, Camera, Image, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const DAY_SHORT  = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-/**
- * Inicializa o estado da config de dias a partir do baba.
- * Prioridade: game_days_config (novo) → game_days + game_time (legado)
- */
+// Converte baba para estado editável de game_days_config
 const initGameDaysConfig = (baba) => {
-  // Novo formato
   if (Array.isArray(baba?.game_days_config) && baba.game_days_config.length > 0) {
     return sanitizeGameDaysConfig(baba.game_days_config);
   }
-  // Legado: converte para o novo formato
   if (Array.isArray(baba?.game_days) && baba.game_days.length > 0) {
     const time = baba.game_time?.substring(0, 5) || '20:00';
     return sanitizeGameDaysConfig(
@@ -26,6 +21,15 @@ const initGameDaysConfig = (baba) => {
   return [];
 };
 
+// Valida se um horário HH:MM é válido
+const isValidTime = (time) => {
+  if (!time) return false;
+  const m = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return false;
+  const h = Number(m[1]), min = Number(m[2]);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
+};
+
 const BabaSettings = ({ baba, onClose }) => {
   const navigate = useNavigate();
   const { updateBaba, deleteBaba, uploadBabaImage, loading } = useBaba();
@@ -33,31 +37,31 @@ const BabaSettings = ({ baba, onClose }) => {
   const avatarInputRef = useRef(null);
   const coverInputRef  = useRef(null);
 
-  // ── Estado do formulário ──
-  const [name, setName] = useState(baba.name || '');
-  const [modality, setModality] = useState(baba.modality || 'futsal');
+  // Form state
+  const [name, setName]             = useState(baba.name || '');
+  const [modality, setModality]     = useState(baba.modality || 'futsal');
   const [matchDuration, setMatchDuration] = useState(baba.match_duration || 10);
-  const [location, setLocation] = useState(baba.location || '');
-
-  // Config de dias/horários (novo formato)
+  const [location, setLocation]     = useState(baba.location || '');
   const [gameDaysConfig, setGameDaysConfig] = useState(() => initGameDaysConfig(baba));
 
-  // Preview de imagens
+  // Image state
   const [avatarPreview, setAvatarPreview] = useState(baba.avatar_url || null);
-  const [coverPreview, setCoverPreview] = useState(baba.cover_url || null);
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [coverFile, setCoverFile] = useState(null);
+  const [coverPreview, setCoverPreview]   = useState(baba.cover_url || null);
+  const [avatarFile, setAvatarFile]       = useState(null);
+  const [coverFile, setCoverFile]         = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover]   = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // ── Dias disponíveis para adicionar (não duplicar) ──
+  // Dias que ainda não foram usados
   const usedDays = new Set(gameDaysConfig.map((c) => c.day));
   const availableDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !usedDays.has(d));
 
   // ── Handlers de dias ──
   const addDay = () => {
     if (availableDays.length === 0) {
-      toast.error('Todos os dias já foram adicionados');
+      toast('Todos os dias já foram adicionados', { icon: '📅' });
       return;
     }
     const nextDay = availableDays[0];
@@ -71,11 +75,18 @@ const BabaSettings = ({ baba, onClose }) => {
   };
 
   const updateDayField = (index, field, value) => {
+    // Validação de horário em tempo real
+    if (field === 'time' && value && !isValidTime(value)) {
+      // Deixa o usuário digitar mas não rejeita (o input type=time já garante formato)
+    }
+
     setGameDaysConfig((prev) => {
       const updated = prev.map((item, i) =>
-        i === index ? { ...item, [field]: field === 'day' ? Number(value) : value } : item
+        i === index
+          ? { ...item, [field]: field === 'day' ? Number(value) : value }
+          : item
       );
-      // Re-sanitiza para garantir sem duplicata após troca de dia
+      // Re-sanitiza para evitar duplicata ao trocar o dia
       return sanitizeGameDaysConfig(updated);
     });
   };
@@ -85,7 +96,6 @@ const BabaSettings = ({ baba, onClose }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validação básica
     if (!file.type.startsWith('image/')) {
       toast.error('Selecione um arquivo de imagem válido');
       return;
@@ -122,45 +132,55 @@ const BabaSettings = ({ baba, onClose }) => {
       return;
     }
 
-    // Sanitiza antes de enviar
+    // Valida todos os horários
+    const invalidTime = gameDaysConfig.find((c) => !isValidTime(c.time));
+    if (invalidTime) {
+      toast.error(`Horário inválido para ${DAY_LABELS[invalidTime.day]}`);
+      return;
+    }
+
     const cleanConfig = sanitizeGameDaysConfig(gameDaysConfig);
 
     const updates = {
-      name: name.trim(),
+      name:           name.trim(),
       modality,
       match_duration: Number(matchDuration),
-      location: location.trim(),
+      location:       location.trim(),
       game_days_config: cleanConfig,
-      // Zera campos legados para evitar mistura
       game_days: [],
-      // game_time mantido como fallback (usa o primeiro item da config)
+      // game_time = primeiro item da config (fallback legado, ordenado)
       game_time: cleanConfig[0]?.time || baba.game_time || '20:00',
     };
 
     const result = await updateBaba(baba.id, updates);
     if (!result) return;
 
-    // Upload de imagens pendentes
-    if (avatarFile) await uploadBabaImage(avatarFile, 'avatar');
-    if (coverFile) await uploadBabaImage(coverFile, 'cover');
+    // Upload de imagens pendentes com loading visual independente
+    if (avatarFile) {
+      setUploadingAvatar(true);
+      await uploadBabaImage(avatarFile, 'avatar').finally(() => setUploadingAvatar(false));
+    }
+    if (coverFile) {
+      setUploadingCover(true);
+      await uploadBabaImage(coverFile, 'cover').finally(() => setUploadingCover(false));
+    }
 
     onClose();
   };
 
-  // ── Deletar ──
   const handleDelete = async () => {
     const result = await deleteBaba(baba.id);
-    if (result) {
-      navigate('/');
-      onClose();
-    }
+    if (result) { navigate('/'); onClose(); }
   };
+
+  // Iniciais do baba como fallback de avatar
+  const initials = (baba.name || 'B').charAt(0).toUpperCase();
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center z-50 p-4 overflow-y-auto">
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,242,255,0.1)]">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-black uppercase italic text-cyan-electric">
             Configurações do Baba
@@ -189,17 +209,20 @@ const BabaSettings = ({ baba, onClose }) => {
                   <span className="text-[9px] font-black uppercase text-white/30">Adicionar capa</span>
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                <Camera size={20} className="text-white" />
-              </div>
+              {/* Loading overlay */}
+              {uploadingCover && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <Loader2 size={24} className="text-cyan-electric animate-spin" />
+                </div>
+              )}
+              {!uploadingCover && (
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                  <Camera size={20} className="text-white" />
+                </div>
+              )}
             </div>
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleImageChange(e, 'cover')}
-            />
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => handleImageChange(e, 'cover')} />
           </div>
 
           {/* ── Avatar + Nome ── */}
@@ -212,24 +235,27 @@ const BabaSettings = ({ baba, onClose }) => {
                 className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white/5 border border-dashed border-white/20 cursor-pointer hover:border-cyan-electric/50 transition-all group"
                 onClick={() => avatarInputRef.current?.click()}
               >
+                {/* Fallback: iniciais quando não há imagem */}
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <Camera size={20} className="text-white/20 group-hover:text-cyan-electric/60 transition-all" />
+                  <div className="flex items-center justify-center h-full bg-cyan-electric/10">
+                    <span className="text-2xl font-black text-cyan-electric/60">{initials}</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                  <Camera size={14} className="text-white" />
-                </div>
+                {uploadingAvatar && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <Loader2 size={18} className="text-cyan-electric animate-spin" />
+                  </div>
+                )}
+                {!uploadingAvatar && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                    <Camera size={14} className="text-white" />
+                  </div>
+                )}
               </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleImageChange(e, 'avatar')}
-              />
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => handleImageChange(e, 'avatar')} />
             </div>
 
             <div className="flex-1">
@@ -253,11 +279,7 @@ const BabaSettings = ({ baba, onClose }) => {
               <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
                 Modalidade
               </label>
-              <select
-                value={modality}
-                onChange={(e) => setModality(e.target.value)}
-                className="input-tactical"
-              >
+              <select value={modality} onChange={(e) => setModality(e.target.value)} className="input-tactical">
                 <option value="futsal">Futsal</option>
                 <option value="society">Society</option>
               </select>
@@ -271,8 +293,7 @@ const BabaSettings = ({ baba, onClose }) => {
                 value={matchDuration}
                 onChange={(e) => setMatchDuration(e.target.value)}
                 className="input-tactical"
-                min="5"
-                max="120"
+                min="5" max="120"
               />
             </div>
           </div>
@@ -291,16 +312,14 @@ const BabaSettings = ({ baba, onClose }) => {
             />
           </div>
 
-          {/* ── Dias e Horários (game_days_config) ── */}
+          {/* ── Dias e Horários ── */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-white/40">
                   Dias e Horários de Jogo
                 </label>
-                <p className="text-[9px] text-white/30 mt-0.5">
-                  Configure horário e local para cada dia
-                </p>
+                <p className="text-[9px] text-white/30 mt-0.5">Configure horário e local para cada dia</p>
               </div>
               <button
                 type="button"
@@ -313,103 +332,94 @@ const BabaSettings = ({ baba, onClose }) => {
               </button>
             </div>
 
-            {/* Lista de dias configurados */}
             {gameDaysConfig.length === 0 ? (
               <div className="p-6 bg-white/5 rounded-2xl border border-dashed border-white/10 text-center">
-                <p className="text-xs text-white/30 font-black uppercase">
-                  Nenhum dia configurado
-                </p>
-                <p className="text-[9px] text-white/20 mt-1">
-                  Clique em "Adicionar Dia" para começar
-                </p>
+                <p className="text-xs text-white/30 font-black uppercase">Nenhum dia configurado</p>
+                <p className="text-[9px] text-white/20 mt-1">Clique em "Adicionar Dia" para começar</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {gameDaysConfig.map((item, index) => (
-                  <div
-                    key={`${item.day}-${index}`}
-                    className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3"
-                  >
-                    {/* Linha 1: seletor de dia + horário + remover */}
-                    <div className="flex items-center gap-3">
-                      {/* Seletor de dia */}
-                      <div className="flex-1">
-                        <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
-                          Dia
-                        </label>
-                        <select
-                          value={item.day}
-                          onChange={(e) => updateDayField(index, 'day', e.target.value)}
-                          className="input-tactical text-sm"
+                {gameDaysConfig.map((item, index) => {
+                  const timeInvalid = item.time && !isValidTime(item.time);
+                  return (
+                    <div
+                      key={`${item.day}-${index}`}
+                      className={`p-4 rounded-2xl border space-y-3 transition-all ${
+                        timeInvalid
+                          ? 'bg-red-500/5 border-red-500/30'
+                          : 'bg-white/5 border-white/10'
+                      }`}
+                    >
+                      {/* Seletor dia + horário + remover */}
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black uppercase text-white/40 mb-1">Dia</label>
+                          <select
+                            value={item.day}
+                            onChange={(e) => updateDayField(index, 'day', e.target.value)}
+                            className="input-tactical text-sm"
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6]
+                              .filter((d) => d === item.day || !usedDays.has(d))
+                              .map((d) => (
+                                <option key={d} value={d}>{DAY_LABELS[d]}</option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <div className="w-32">
+                          <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
+                            Horário {timeInvalid && <span className="text-red-400">• inválido</span>}
+                          </label>
+                          <input
+                            type="time"
+                            value={item.time}
+                            onChange={(e) => updateDayField(index, 'time', e.target.value)}
+                            className={`input-tactical text-sm ${timeInvalid ? 'border-red-500/50' : ''}`}
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeDay(index)}
+                          className="p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500/20 transition-all flex-shrink-0 mb-0.5"
                         >
-                          {/* Sempre mostra o dia atual + disponíveis */}
-                          {[0, 1, 2, 3, 4, 5, 6]
-                            .filter((d) => d === item.day || !usedDays.has(d))
-                            .map((d) => (
-                              <option key={d} value={d}>
-                                {DAY_LABELS[d]}
-                              </option>
-                            ))}
-                        </select>
+                          <Trash2 size={16} />
+                        </button>
                       </div>
 
-                      {/* Horário */}
-                      <div className="w-32">
+                      {/* Local específico */}
+                      <div>
                         <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
-                          Horário
+                          Local (opcional)
                         </label>
                         <input
-                          type="time"
-                          value={item.time}
-                          onChange={(e) => updateDayField(index, 'time', e.target.value)}
+                          type="text"
+                          value={item.location || ''}
+                          onChange={(e) => updateDayField(index, 'location', e.target.value)}
                           className="input-tactical text-sm"
-                          required
+                          placeholder="Ex: Quadra Norte"
                         />
                       </div>
 
-                      {/* Remover */}
-                      <button
-                        type="button"
-                        onClick={() => removeDay(index)}
-                        className="mt-5 p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500/20 transition-all flex-shrink-0"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* Badge resumo */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded-lg text-[9px] font-black text-cyan-electric uppercase">
+                          {DAY_SHORT[item.day]}
+                        </span>
+                        <span className="text-[9px] text-white/40 font-black">
+                          {item.time} {item.location ? `• ${item.location}` : ''}
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Linha 2: local específico */}
-                    <div>
-                      <label className="block text-[9px] font-black uppercase text-white/40 mb-1">
-                        Local (opcional)
-                      </label>
-                      <input
-                        type="text"
-                        value={item.location || ''}
-                        onChange={(e) => updateDayField(index, 'location', e.target.value)}
-                        className="input-tactical text-sm"
-                        placeholder="Ex: Quadra Norte"
-                      />
-                    </div>
-
-                    {/* Badge de resumo */}
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded-lg text-[9px] font-black text-cyan-electric uppercase">
-                        {DAY_SHORT[item.day]}
-                      </span>
-                      <span className="text-[9px] text-white/40 font-black">
-                        {item.time} {item.location ? `• ${item.location}` : ''}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
-            {/* Aviso se configurou todos os dias */}
-            {availableDays.length === 0 && (
-              <p className="text-[9px] text-cyan-electric mt-2">
-                ✓ Todos os dias da semana configurados
-              </p>
+            {availableDays.length === 0 && gameDaysConfig.length > 0 && (
+              <p className="text-[9px] text-cyan-electric mt-2">✓ Todos os 7 dias configurados</p>
             )}
           </div>
 
@@ -417,11 +427,14 @@ const BabaSettings = ({ baba, onClose }) => {
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || uploadingAvatar || uploadingCover}
               className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <Save size={18} />
-              {loading ? 'Salvando...' : 'Salvar Alterações'}
+              {loading || uploadingAvatar || uploadingCover ? (
+                <><Loader2 size={18} className="animate-spin" /> Salvando...</>
+              ) : (
+                <><Save size={18} /> Salvar Alterações</>
+              )}
             </button>
 
             <button
@@ -436,7 +449,7 @@ const BabaSettings = ({ baba, onClose }) => {
         </form>
       </div>
 
-      {/* ── Modal de Confirmação de Exclusão ── */}
+      {/* Modal exclusão */}
       {showDeleteConfirm && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10 p-4">
           <div className="w-full max-w-md card-glass p-8 rounded-[2rem] border-2 border-red-500/30">
