@@ -25,7 +25,6 @@ const POSITION_LABEL = {
 };
 
 const formatGameDays = (baba) => {
-  // Lê game_days (ARRAY de inteiros) + game_time do banco
   if (!Array.isArray(baba?.game_days) || baba.game_days.length === 0) return null;
   const time = baba.game_time ? String(baba.game_time).substring(0, 5) : '';
   return [...new Set(baba.game_days.map(Number))]
@@ -123,41 +122,57 @@ const DashboardPage = () => {
   const [showMembers, setShowMembers] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [inviteExpiry, setInviteExpiry] = useState(null);
-  const [countdown, setCountdown] = useState({ h: '00', m: '00', s: '00', active: false });
+  
+  // ✅ CORREÇÃO: d inicializado em 0
+  const [countdown, setCountdown] = useState({ d: 0, h: '00', m: '00', s: '00', active: false });
 
-  // gameDaysDisplay lê os campos reais do banco
   const gameDaysDisplay = useMemo(() => formatGameDays(currentBaba), [currentBaba]);
 
-  // ─── TIMER ───
+  // ✅ CRONÔMETRO CORRIGIDO (PADRÃO PROFISSIONAL)
   const calculateTimer = useCallback(() => {
-    if (!nextGameDay?.time) {
-      setCountdown(prev => prev.active ? { h: '00', m: '00', s: '00', active: false } : prev);
+    // Se não houver data definida no motor principal, reseta o timer local
+    if (!nextGameDay?.date) {
+      setCountdown(prev => prev.active ? { d: 0, h: '00', m: '00', s: '00', active: false } : prev);
       return;
     }
-    const d = new Date();
-    d.setDate(d.getDate() + (nextGameDay.daysAhead || 0));
-    const [hh, mm] = nextGameDay.time.split(':');
-    d.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
-    const diff = d.getTime() - Date.now();
+
+    // ✅ Fonte de Verdade: Usa a data absoluta gerada pelo context
+    const targetDate = new Date(nextGameDay.date).getTime();
+    const diff = targetDate - Date.now();
 
     if (diff > 0) {
-      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-      setCountdown(prev => (prev.h === h && prev.m === m && prev.s === s) ? prev : { h, m, s, active: true });
+      const totalSeconds = Math.floor(diff / 1000);
+
+      const d = Math.floor(totalSeconds / (60 * 60 * 24));
+      const h = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60))
+        .toString().padStart(2, '0');
+      const m = Math.floor((totalSeconds % (60 * 60)) / 60)
+        .toString().padStart(2, '0');
+      const s = (totalSeconds % 60)
+        .toString().padStart(2, '0');
+
+      // ✅ Atualização atômica: evita render se o tempo não mudou de fato
+      setCountdown(prev => 
+        (prev.d === d && prev.h === h && prev.m === m && prev.s === s) 
+        ? prev 
+        : { d, h, m, s, active: true }
+      );
     } else {
-      setCountdown(prev => prev.active ? { h: '00', m: '00', s: '00', active: false } : prev);
+      setCountdown(prev => prev.active ? { d: 0, h: '00', m: '00', s: '00', active: false } : prev);
     }
-  }, [nextGameDay]);
+  }, [nextGameDay?.date]); // ✅ Depende apenas da data bruta do context
 
   useEffect(() => {
     let isMounted = true;
     let timerId;
+
     const tick = () => {
       if (!isMounted) return;
       calculateTimer();
+      // Sincroniza a batida do relógio para cada milissegundo zero do sistema
       timerId = setTimeout(tick, 1000 - (Date.now() % 1000));
     };
+
     tick();
     return () => { isMounted = false; clearTimeout(timerId); };
   }, [calculateTimer]);
@@ -170,7 +185,6 @@ const DashboardPage = () => {
     return () => clearInterval(interval);
   }, [currentBaba?.invite_expires_at]);
 
-  // ─── UPLOAD ───
   const handleUpload = async (e, type) => {
     const file = e.target.files[0];
     if (!file || isUploading) return;
@@ -193,12 +207,6 @@ const DashboardPage = () => {
   );
 
   const isPresident = String(currentBaba?.president_id) === String(profile?.id);
-
-  const nextGameLabel = nextGameDay
-    ? nextGameDay.daysAhead === 0 ? 'HOJE'
-    : nextGameDay.daysAhead === 1 ? 'AMANHÃ'
-    : DAY_FULL[nextGameDay.day]
-    : null;
 
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans selection:bg-cyan-electric selection:text-black">
@@ -245,7 +253,6 @@ const DashboardPage = () => {
         <div className="absolute left-6 bottom-0 flex items-end gap-5">
           <div className="relative group">
             <div className="w-32 h-32 rounded-[2.5rem] border-4 border-black bg-gray-800 shadow-2xl overflow-hidden relative">
-              {/* ✅ CORRIGIDO: usa logo_url (campo real do banco para o brasão) */}
               {currentBaba?.logo_url && (
                 <img
                   key={currentBaba.logo_url}
@@ -284,96 +291,89 @@ const DashboardPage = () => {
 
       <div className="max-w-xl mx-auto px-6 mt-12 space-y-6">
 
-       {/* ── CRONÔMETRO + AGENDA ── */}
-{nextGameDay ? (
-  <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
-    <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
-      <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-white/40">
-        <span>Próximo Baba em</span>
-        <span className="text-cyan-electric">
-          {nextGameDay.daysAhead === 0 ? 'Hoje' : nextGameDay.daysAhead === 1 ? 'Amanhã' : DAY_FULL[nextGameDay.day]}
-        </span>
-      </div>
-      <div className="flex justify-between items-end">
-        <div>
-          <p className={`text-4xl font-black font-mono leading-none tracking-tighter ${countdown.active ? 'text-white' : 'text-cyan-electric animate-pulse'}`}>
-            {countdown.active ? (
-              <>
-                {/* Lógica Final: Usa countdown.d diretamente e padroniza H:M:S */}
-                {Number(countdown.d) > 0 && (
-                  <span className="mr-2">{countdown.d} D</span>
+        {/* ── CRONÔMETRO CORRIGIDO ── */}
+        {nextGameDay ? (
+          <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
+            <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
+              <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-white/40">
+                <span>Próximo Baba em</span>
+                <span className="text-cyan-electric">
+                  {nextGameDay.daysAhead === 0 ? 'Hoje' : nextGameDay.daysAhead === 1 ? 'Amanhã' : DAY_FULL[nextGameDay.day]}
+                </span>
+              </div>
+              <div className="flex justify-between items-end">
+                <div>
+                  <div className={`text-4xl font-black font-mono leading-none tracking-tighter ${countdown.active ? 'text-white' : 'text-cyan-electric animate-pulse'}`}>
+                    {countdown.active ? (
+                      <div className="flex items-baseline">
+                        {Number(countdown.d) > 0 && (
+                          <span className="mr-2 text-3xl">{countdown.d}D</span>
+                        )}
+                        <span>{countdown.h}</span>
+                        <span className="mx-0.5 opacity-30 text-2xl">:</span>
+                        <span>{countdown.m}</span>
+                        <span className="mx-0.5 opacity-30 text-2xl">:</span>
+                        <span className="text-cyan-electric">{countdown.s}</span>
+                      </div>
+                    ) : (
+                      <span className="text-2xl uppercase">Processando...</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase truncate max-w-[200px]">
+                    <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
+                    <span className="truncate">
+                      {nextGameDay.location || currentBaba.location || 'Arena Principal'}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xl font-black text-cyan-electric italic uppercase">PARTIDA</span>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-1">
+                    {nextGameDay.time?.substring(0, 5)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase">
+                  <Zap size={12} className="text-cyan-electric" />
+                  <span>{currentBaba.modality || 'Futebol'}</span>
+                </div>
+                {gameDaysDisplay && (
+                  <div className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase">
+                    <Calendar size={12} className="text-white/20" />
+                    <span>{gameDaysDisplay}</span>
+                  </div>
                 )}
-                <span>{String(countdown.h).padStart(2, '0')}:</span>
-                <span>{String(countdown.m).padStart(2, '0')}:</span>
-                <span>{String(countdown.s).padStart(2, '0')}</span>
-              </>
-            ) : (
-              /* UX Segura para transição entre jogos */
-              <span className="text-2xl">AGUARDANDO...</span>
-            )}
-          </p>
-          <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase truncate max-w-[200px]">
-            <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
-            <span className="truncate">
-              {nextGameDay.location || currentBaba.location || 'Arena Principal'}
-            </span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="text-right">
-          <span className="text-xl font-black text-cyan-electric italic uppercase">PARTIDA</span>
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-1">
-            {nextGameDay.time?.substring(0, 5)}
-          </p>
-        </div>
-      </div>
-      {/* ✅ Linha de agenda integrada ao cronômetro */}
-      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase">
-          <Zap size={12} className="text-cyan-electric" />
-          <span>{currentBaba.modality || 'Futebol'}</span>
-        </div>
-        {gameDaysDisplay && (
-          <div className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase">
-            <Calendar size={12} className="text-white/20" />
-            <span>{gameDaysDisplay}</span>
+        ) : (
+          <div className="p-[1px] rounded-[2rem] border border-white/10">
+            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Próximo Jogo</p>
+                  <p className="text-sm font-bold text-white/40">Nenhum jogo agendado</p>
+                </div>
+                {isPresident && (
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
+                  >
+                    Configurar →
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
-      </div>
-    </div>
-  </div>
-) : (
-  /* Fallback sem jogo agendado */
-  <div className="p-[1px] rounded-[2rem] border border-white/10">
-    <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Próximo Jogo</p>
-          <p className="text-sm font-bold text-white/40">Nenhum jogo agendado</p>
-          <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase">
-            <Zap size={12} className="text-cyan-electric" />
-            <span>{currentBaba.modality || 'Futebol'}</span>
-          </div>
-        </div>
-        {isPresident && (
-          <button
-            onClick={() => setShowSettings(true)}
-            className="text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
-          >
-            Configurar →
-          </button>
-        )}
-      </div>
-    </div>
-  </div>
-)}
 
         {/* ── GRID DE ATALHOS ── */}
-        {/* ✅ CORRIGIDO: "Times" navega para /teams | "Atletas" abre modal de membros */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: <Trophy />,    label: 'Ranking', action: () => navigate('/rankings') },
+            { icon: <Trophy />,   label: 'Ranking', action: () => navigate('/rankings') },
             { icon: <DollarSign />, label: 'Caixa',   action: () => navigate('/financial') },
-            { icon: <Users />,     label: 'Times',    action: () => navigate('/teams') },
+            { icon: <Users />,      label: 'Times',    action: () => navigate('/teams') },
           ].map((item, i) => (
             <button
               key={i}
@@ -389,7 +389,6 @@ const DashboardPage = () => {
         </div>
 
         {/* ── ATLETAS ATIVOS ── */}
-        {/* ✅ Card único em full-width; "Ver todos" abre modal de membros */}
         <div className="card-glass p-5 rounded-3xl bg-white/5 border border-white/5">
           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-3">Atletas Ativos</p>
           <div className="flex items-center justify-between">
