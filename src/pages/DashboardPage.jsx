@@ -289,7 +289,7 @@ const DashboardPage = () => {
           <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
             <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
               <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-white/40">
-                <span>{countdown.active ? 'Kick-off em' : 'Status'}</span>
+                <span>{countdown.active ? 'Proximo Baba em' : 'Status'}</span>
                 <span className="text-cyan-electric">
                   {nextGameDay.daysAhead === 0 ? 'Hoje' : nextGameDay.daysAhead === 1 ? 'Amanhã' : DAY_FULL[nextGameDay.day]}
                 </span>
