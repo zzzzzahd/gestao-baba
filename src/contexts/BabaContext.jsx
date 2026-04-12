@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/supabase'; // Mantido seu path original
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
 const BabaContext = createContext();
 
-// --- HELPERS (ORIGINAIS) ---
+// --- HELPERS (ORIGINAIS PRESERVADOS) ---
 export const sanitizeGameDaysConfig = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const seen = new Set();
@@ -100,6 +100,40 @@ export const BabaProvider = ({ children }) => {
 
   const hasAutoDrawnRef = useRef(false);
 
+  // --- MÉTODOS DE RATING (NOVOS - INTEGRADOS) ---
+  const ratePlayer = async (ratedId, ratings) => {
+    if (!user || !currentBaba) return;
+    try {
+      const myPlayer = players.find(p => p.user_id === user.id);
+      if (!myPlayer) throw new Error('Jogador não identificado');
+
+      const { error } = await supabase
+        .from('player_ratings')
+        .upsert({
+          baba_id: currentBaba.id,
+          rater_id: myPlayer.id,
+          rated_id: ratedId,
+          skill: ratings.skill,
+          physical: ratings.physical,
+          commitment: ratings.commitment
+        });
+
+      if (error) throw error;
+      toast.success('Avaliação enviada!');
+    } catch (err) {
+      toast.error('Erro ao avaliar');
+    }
+  };
+
+  const getAllRatings = async () => {
+    if (!currentBaba) return [];
+    const { data, error } = await supabase
+      .from('player_rating_summary')
+      .select('*')
+      .eq('baba_id', currentBaba.id);
+    return error ? [] : data;
+  };
+
   // --- CARREGAMENTO ---
   const loadMyBabas = async () => {
     if (!user) return;
@@ -125,7 +159,7 @@ export const BabaProvider = ({ children }) => {
       }
     } catch (error) { 
         console.error('[loadMyBabas]', error);
-        throw error; // Repassa para o init tratar
+        throw error;
     }
   };
 
@@ -276,13 +310,12 @@ export const BabaProvider = ({ children }) => {
     } catch (error) { toast.error('Erro ao gerar código'); }
   };
 
-  // --- SORTEIO (FIX: BLINDAGEM DE MAP) ---
+  // --- SORTEIO ---
   const drawTeamsIntelligent = async () => {
     if (isDrawing || !currentBaba || !nextGameDay) return null;
     setIsDrawing(true);
     try {
       const dateStr = nextGameDay.dateStr;
-      // ✅ SOLUÇÃO 2: Blindagem no map e filter
       const confirmed = gameConfirmations
         .map(c => c?.player)
         .filter(p => p && p.id);
@@ -325,23 +358,20 @@ export const BabaProvider = ({ children }) => {
     } else { setDrawStatus('insufficient'); }
   };
 
-  // ✅ 1. INIT COM TRATAMENTO DE ERRO (SOLUÇÃO 1 e 4)
+  // ✅ EFEITOS DE SINCRONIA (SOLUÇÕES 1, 3, 4 e 5 INTEGRADAS)
   useEffect(() => {
     const init = async () => {
       try {
-        if (user) {
-          await loadMyBabas();
-        }
+        if (user) await loadMyBabas();
       } catch (e) {
         console.error('[INIT ERROR]', e);
       } finally {
-        setLoading(false); // ✅ Garante que o loading saia SEMPRE
+        setLoading(false);
       }
     };
     init();
-  }, [user]); // ✅ Depende do objeto user inteiro para garantir re-trigger
+  }, [user]);
 
-  // ✅ 2. SINCRONIZAÇÃO (SOLUÇÃO 5)
   useEffect(() => {
     if (!currentBaba || !user) return;
     localStorage.setItem('selected_baba_id', String(currentBaba.id));
@@ -362,7 +392,6 @@ export const BabaProvider = ({ children }) => {
         setMyConfirmation(myP ? confirmations.find(conf => conf.player_id === myP.id) || null : null);
         await loadTodayMatch(currentBaba.id, next.dateStr);
       } else {
-        // ✅ Reset se não houver próximo jogo
         setGameConfirmations([]);
         setMyConfirmation(null);
         setConfirmationDeadline(null);
@@ -371,7 +400,6 @@ export const BabaProvider = ({ children }) => {
     syncData();
   }, [currentBaba?.id, user?.id]);
 
-  // ✅ 3. CRONÔMETRO (SOLUÇÃO 3)
   useEffect(() => {
     let timeoutId;
     const update = () => {
@@ -400,7 +428,6 @@ export const BabaProvider = ({ children }) => {
     return () => clearTimeout(timeoutId);
   }, [nextGameDay?.dateStr]);
 
-  // ✅ 4. INTERVALO AUTO-DRAW
   useEffect(() => {
     const interval = setInterval(() => {
       if (nextGameDay) {
@@ -420,7 +447,8 @@ export const BabaProvider = ({ children }) => {
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline, nextGameDay,
       countdown, currentMatch, matchPlayers, isDrawing, drawStatus,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
-      confirmPresence, cancelConfirmation
+      confirmPresence, cancelConfirmation,
+      ratePlayer, getAllRatings // Expondo as novas funções
     }}>
       {children}
     </BabaContext.Provider>
