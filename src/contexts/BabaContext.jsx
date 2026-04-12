@@ -39,7 +39,6 @@ export const getNextGameDay = (baba) => {
   const todayDow = now.getDay();
   let configs = [];
 
-  // ✅ Prioriza game_days_config (nova coluna), fallback para game_days + game_time
   if (Array.isArray(baba.game_days_config) && baba.game_days_config.length > 0) {
     configs = sanitizeGameDaysConfig(baba.game_days_config);
   } else if (Array.isArray(baba.game_days) && baba.game_days.length > 0) {
@@ -89,6 +88,15 @@ export const BabaProvider = ({ children }) => {
   const [confirmationDeadline, setConfirmationDeadline] = useState(null);
   const [canConfirm, setCanConfirm] = useState(false);
   const [nextGameDay, setNextGameDay] = useState(null);
+
+  // ✅ Estado do Cronômetro Automático
+  const [countdown, setCountdown] = useState({
+    d: 0,
+    h: 0,
+    m: 0,
+    s: 0,
+    active: false,
+  });
 
   const [drawConfig, setDrawConfig] = useState({ playersPerTeam: 5, strategy: 'reserve' });
   const [currentMatch, setCurrentMatch] = useState(null);
@@ -187,39 +195,30 @@ export const BabaProvider = ({ children }) => {
     } finally { setLoading(false); }
   };
 
-  // ✅ updateBaba: game_days_config agora existe no banco, salva direto
   const updateBaba = async (babaId, updates) => {
     setLoading(true);
     try {
       const sanitized = { ...updates };
-
       if (Array.isArray(sanitized.game_days_config)) {
         const clean = sanitizeGameDaysConfig(sanitized.game_days_config);
         sanitized.game_days_config = clean;
-        // Mantém game_days e game_time sincronizados para compatibilidade
         sanitized.game_days = clean.map(c => c.day);
         sanitized.game_time = clean[0]?.time || '20:00';
       }
-
       const { data, error } = await supabase
         .from('babas')
         .update(sanitized)
         .eq('id', babaId)
         .select('*')
         .single();
-
-      if (error) {
-        console.error('[updateBaba] Supabase error:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       setMyBabas(prev => prev.map(b => b.id === babaId ? { ...b, ...data } : b));
       if (currentBaba?.id === babaId) setCurrentBaba({ ...data });
       toast.success('Configurações salvas!');
       return data;
     } catch (error) {
       console.error('[updateBaba]', error);
-      toast.error('Erro ao salvar: ' + (error.message || 'verifique o console'));
+      toast.error('Erro ao salvar');
       return null;
     } finally { setLoading(false); }
   };
@@ -242,39 +241,23 @@ export const BabaProvider = ({ children }) => {
     finally { setLoading(false); }
   };
 
-  // ✅ CORRIGIDO: usa logo_url para brasão, cover_url para capa
   const uploadBabaImage = async (file, type = 'avatar') => {
     if (!currentBaba || !file) return null;
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
       const path = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('baba-images')
-        .upload(path, file, { upsert: true, contentType: file.type });
+      const { error: uploadError } = await supabase.storage.from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
       if (uploadError) throw uploadError;
-
       const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       const field = type === 'avatar' ? 'logo_url' : 'cover_url';
-
-      const { data: updatedBaba, error: updateError } = await supabase
-        .from('babas')
-        .update({ [field]: publicUrl })
-        .eq('id', currentBaba.id)
-        .select('*')
-        .single();
+      const { data: updatedBaba, error: updateError } = await supabase.from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
       if (updateError) throw updateError;
-
       setMyBabas(prev => prev.map(b => b.id === currentBaba.id ? { ...b, ...updatedBaba } : b));
       setCurrentBaba(prev => ({ ...prev, ...updatedBaba }));
       toast.success('Imagem atualizada!');
       return publicUrl;
-    } catch (error) {
-      console.error('[uploadBabaImage]', error);
-      toast.error('Erro no upload');
-      return null;
-    }
+    } catch (error) { console.error('[uploadBabaImage]', error); toast.error('Erro no upload'); return null; }
   };
 
   const drawTeamsIntelligent = async () => {
@@ -283,20 +266,11 @@ export const BabaProvider = ({ children }) => {
     try {
       const dateStr = nextGameDay.dateStr;
       const confirmed = gameConfirmations.map(c => c.player).filter(Boolean);
-
-      if (confirmed.length < (drawConfig.playersPerTeam * 2)) {
-        setDrawStatus('insufficient');
-        return null;
-      }
-
+      if (confirmed.length < (drawConfig.playersPerTeam * 2)) { setDrawStatus('insufficient'); return null; }
       let goalies = confirmed.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
       let outfield = confirmed.filter(p => p.position !== 'goleiro').sort(() => Math.random() - 0.5);
-
       const numTeams = Math.floor(confirmed.length / drawConfig.playersPerTeam);
-      const teams = Array.from({ length: Math.max(2, numTeams) }, (_, i) => ({
-        name: `Time ${String.fromCharCode(65 + i)}`, players: []
-      }));
-
+      const teams = Array.from({ length: Math.max(2, numTeams) }, (_, i) => ({ name: `Time ${String.fromCharCode(65 + i)}`, players: [] }));
       for (let i = 0; i < teams.length && goalies.length > 0; i++) teams[i].players.push(goalies.shift());
       let remaining = [...outfield, ...goalies];
       let tIdx = 0;
@@ -305,32 +279,13 @@ export const BabaProvider = ({ children }) => {
         tIdx = (tIdx + 1) % teams.length;
         if (teams.every(t => t.players.length >= drawConfig.playersPerTeam)) break;
       }
-
-      const { data: drawResult } = await supabase.from('draw_results').upsert({
-        baba_id: currentBaba.id, draw_date: dateStr, teams,
-        reserves: remaining, players_per_team: drawConfig.playersPerTeam,
-      }).select().single();
-
-      const { data: existingMatch } = await supabase.from('matches')
-        .select('id').eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
-
+      const { data: drawResult } = await supabase.from('draw_results').upsert({ baba_id: currentBaba.id, draw_date: dateStr, teams, reserves: remaining, players_per_team: drawConfig.playersPerTeam }).select().single();
+      const { data: existingMatch } = await supabase.from('matches').select('id').eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
       if (!existingMatch) {
-        const { data: match } = await supabase.from('matches').insert([{
-          baba_id: currentBaba.id,
-          match_date: `${dateStr}T${nextGameDay.time}:00`,
-          team_a_name: teams[0].name, team_b_name: teams[1].name,
-          draw_result_id: drawResult.id, status: 'scheduled',
-        }]).select().single();
-
-        const mPlayers = teams.slice(0, 2).flatMap((t, i) =>
-          t.players.map(p => ({
-            match_id: match.id, player_id: p.id,
-            team: i === 0 ? 'A' : 'B', position: p.position || 'linha',
-          }))
-        );
+        const { data: match } = await supabase.from('matches').insert([{ baba_id: currentBaba.id, match_date: `${dateStr}T${nextGameDay.time}:00`, team_a_name: teams[0].name, team_b_name: teams[1].name, draw_result_id: drawResult.id, status: 'scheduled' }]).select().single();
+        const mPlayers = teams.slice(0, 2).flatMap((t, i) => t.players.map(p => ({ match_id: match.id, player_id: p.id, team: i === 0 ? 'A' : 'B', position: p.position || 'linha' })));
         await supabase.from('match_players').insert(mPlayers);
       }
-
       await loadTodayMatch(currentBaba.id, dateStr);
       return true;
     } catch (error) { console.error('[drawTeamsIntelligent]', error); return null; }
@@ -340,8 +295,7 @@ export const BabaProvider = ({ children }) => {
   const tryAutoDraw = async () => {
     if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
     if (new Date() >= nextGameDay.deadline) {
-      const { data: existing } = await supabase.from('draw_results')
-        .select('id').eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
+      const { data: existing } = await supabase.from('draw_results').select('id').eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
       if (existing) { hasAutoDrawnRef.current = true; return; }
       if (gameConfirmations.length >= drawConfig.playersPerTeam * 2) {
         hasAutoDrawnRef.current = true;
@@ -350,6 +304,33 @@ export const BabaProvider = ({ children }) => {
       } else { setDrawStatus('insufficient'); }
     }
   };
+
+  // ✅ Efeito do Cronômetro Automático e Inteligente
+  useEffect(() => {
+    if (!nextGameDay) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = new Date(nextGameDay.date) - now;
+
+      if (diff <= 0) {
+        // Quando o jogo começa, recalcula imediatamente o próximo
+        const next = getNextGameDay(currentBaba);
+        setNextGameDay(next);
+        return;
+      }
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const d = Math.floor(totalSeconds / (60 * 60 * 24));
+      const h = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
+      const m = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const s = totalSeconds % 60;
+
+      setCountdown({ d, h, m, s, active: true });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextGameDay, currentBaba]);
 
   useEffect(() => {
     if (user) loadMyBabas().finally(() => setLoading(false));
@@ -396,6 +377,7 @@ export const BabaProvider = ({ children }) => {
       myBabas, currentBaba, setCurrentBaba, players, loading,
       createBaba, joinBaba, updateBaba, uploadBabaImage,
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline, nextGameDay,
+      countdown, // ✅ Agora o cronômetro está disponível globalmente
       currentMatch, matchPlayers, isDrawing, drawStatus,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
     }}>
