@@ -5,10 +5,6 @@ import toast from 'react-hot-toast';
 
 const BabaContext = createContext();
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-
 export const sanitizeGameDaysConfig = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const seen = new Set();
@@ -43,13 +39,11 @@ export const getNextGameDay = (baba) => {
   const todayDow = now.getDay();
   let configs = [];
 
-  // ✅ CORRIGIDO: lê game_days_config se existir em memória, senão usa game_days + game_time do banco
+  // ✅ Prioriza game_days_config (nova coluna), fallback para game_days + game_time
   if (Array.isArray(baba.game_days_config) && baba.game_days_config.length > 0) {
     configs = sanitizeGameDaysConfig(baba.game_days_config);
   } else if (Array.isArray(baba.game_days) && baba.game_days.length > 0) {
-    const time = baba.game_time
-      ? String(baba.game_time).substring(0, 5)
-      : '20:00';
+    const time = baba.game_time ? String(baba.game_time).substring(0, 5) : '20:00';
     configs = [...new Set(baba.game_days.map(Number))]
       .filter(d => d >= 0 && d <= 6)
       .map(d => ({ day: d, time, location: baba.location || '' }))
@@ -77,17 +71,11 @@ export const getNextGameDay = (baba) => {
   const [h, m] = first.time.split(':').map(Number);
   gameDate.setHours(h, m, 0, 0);
   return {
-    ...first,
-    date: gameDate,
+    ...first, date: gameDate,
     deadline: new Date(gameDate.getTime() - 30 * 60 * 1000),
-    daysAhead,
-    dateStr: gameDate.toISOString().split('T')[0],
+    daysAhead, dateStr: gameDate.toISOString().split('T')[0],
   };
 };
-
-// ─────────────────────────────────────────────
-// PROVIDER
-// ─────────────────────────────────────────────
 
 export const BabaProvider = ({ children }) => {
   const { user, profile } = useAuth();
@@ -109,10 +97,6 @@ export const BabaProvider = ({ children }) => {
   const [drawStatus, setDrawStatus] = useState('waiting');
 
   const hasAutoDrawnRef = useRef(false);
-
-  // ─────────────────────────────────────────────
-  // LOADERS
-  // ─────────────────────────────────────────────
 
   const loadMyBabas = async () => {
     if (!user) return;
@@ -139,7 +123,6 @@ export const BabaProvider = ({ children }) => {
     } catch (error) { console.error('[loadMyBabas]', error); }
   };
 
-  // ✅ CORRIGIDO: players agora faz join com profiles para trazer avatar_url
   const loadPlayers = async (babaId) => {
     const { data, error } = await supabase
       .from('players')
@@ -147,7 +130,6 @@ export const BabaProvider = ({ children }) => {
       .eq('baba_id', babaId)
       .order('name');
     if (error) console.error('[loadPlayers]', error);
-    // Normaliza: expõe avatar_url e name do profile diretamente no objeto do player
     const normalized = (data || []).map(p => ({
       ...p,
       avatar_url: p.profile?.avatar_url || null,
@@ -175,37 +157,26 @@ export const BabaProvider = ({ children }) => {
     } catch (e) { console.error('[loadTodayMatch]', e); }
   };
 
-  // ─────────────────────────────────────────────
-  // CRUD
-  // ─────────────────────────────────────────────
-
   const createBaba = async (babaData) => {
     setLoading(true);
     try {
-      // game_days_config não existe no banco — converte para game_days + game_time
       const sanitized = { ...babaData };
       if (Array.isArray(sanitized.game_days_config)) {
         const clean = sanitizeGameDaysConfig(sanitized.game_days_config);
+        sanitized.game_days_config = clean;
         sanitized.game_days = clean.map(c => c.day);
         sanitized.game_time = clean[0]?.time || '20:00';
-        sanitized.location = sanitized.location || clean[0]?.location || '';
-        delete sanitized.game_days_config;
       }
-
       const { data, error } = await supabase
         .from('babas')
         .insert([{ ...sanitized, president_id: user.id }])
-        .select()
-        .single();
+        .select().single();
       if (error) throw error;
 
       await supabase.from('players').insert([{
-        baba_id: data.id,
-        user_id: user.id,
-        name: profile?.name || 'Presidente',
-        position: 'linha',
+        baba_id: data.id, user_id: user.id,
+        name: profile?.name || 'Presidente', position: 'linha',
       }]);
-
       await loadMyBabas();
       setCurrentBaba(data);
       return data;
@@ -216,26 +187,19 @@ export const BabaProvider = ({ children }) => {
     } finally { setLoading(false); }
   };
 
-  // ✅ CORRIGIDO: converte game_days_config → game_days + game_time (campos reais do banco)
-  // ✅ CORRIGIDO: usa logo_url (campo real) em vez de avatar_url (não existe)
+  // ✅ updateBaba: game_days_config agora existe no banco, salva direto
   const updateBaba = async (babaId, updates) => {
     setLoading(true);
     try {
       const sanitized = { ...updates };
 
-      // Converte game_days_config (usado na UI) para os campos reais do banco
       if (Array.isArray(sanitized.game_days_config)) {
         const clean = sanitizeGameDaysConfig(sanitized.game_days_config);
+        sanitized.game_days_config = clean;
+        // Mantém game_days e game_time sincronizados para compatibilidade
         sanitized.game_days = clean.map(c => c.day);
         sanitized.game_time = clean[0]?.time || '20:00';
-        if (!sanitized.location && clean[0]?.location) {
-          sanitized.location = clean[0].location;
-        }
-        delete sanitized.game_days_config;
       }
-
-      // Remove campos que não existem no banco
-      delete sanitized.avatar_url;
 
       const { data, error } = await supabase
         .from('babas')
@@ -278,7 +242,7 @@ export const BabaProvider = ({ children }) => {
     finally { setLoading(false); }
   };
 
-  // ✅ CORRIGIDO: usa logo_url (campo real da tabela babas para avatar/brasão)
+  // ✅ CORRIGIDO: usa logo_url para brasão, cover_url para capa
   const uploadBabaImage = async (file, type = 'avatar') => {
     if (!currentBaba || !file) return null;
     try {
@@ -292,8 +256,6 @@ export const BabaProvider = ({ children }) => {
 
       const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      // ✅ avatar → logo_url | cover → cover_url (ambos existem no banco)
       const field = type === 'avatar' ? 'logo_url' : 'cover_url';
 
       const { data: updatedBaba, error: updateError } = await supabase
@@ -314,10 +276,6 @@ export const BabaProvider = ({ children }) => {
       return null;
     }
   };
-
-  // ─────────────────────────────────────────────
-  // SORTEIO
-  // ─────────────────────────────────────────────
 
   const drawTeamsIntelligent = async () => {
     if (isDrawing || !currentBaba || !nextGameDay) return null;
@@ -360,10 +318,8 @@ export const BabaProvider = ({ children }) => {
         const { data: match } = await supabase.from('matches').insert([{
           baba_id: currentBaba.id,
           match_date: `${dateStr}T${nextGameDay.time}:00`,
-          team_a_name: teams[0].name,
-          team_b_name: teams[1].name,
-          draw_result_id: drawResult.id,
-          status: 'scheduled',
+          team_a_name: teams[0].name, team_b_name: teams[1].name,
+          draw_result_id: drawResult.id, status: 'scheduled',
         }]).select().single();
 
         const mPlayers = teams.slice(0, 2).flatMap((t, i) =>
@@ -387,7 +343,6 @@ export const BabaProvider = ({ children }) => {
       const { data: existing } = await supabase.from('draw_results')
         .select('id').eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
       if (existing) { hasAutoDrawnRef.current = true; return; }
-
       if (gameConfirmations.length >= drawConfig.playersPerTeam * 2) {
         hasAutoDrawnRef.current = true;
         const res = await drawTeamsIntelligent();
@@ -395,10 +350,6 @@ export const BabaProvider = ({ children }) => {
       } else { setDrawStatus('insufficient'); }
     }
   };
-
-  // ─────────────────────────────────────────────
-  // LIFECYCLE
-  // ─────────────────────────────────────────────
 
   useEffect(() => {
     if (user) loadMyBabas().finally(() => setLoading(false));
