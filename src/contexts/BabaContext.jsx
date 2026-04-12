@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { supabase } from '../services/supabase'; // Mantido seu path original
+import { supabase } from '../services/supabase'; 
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
@@ -100,7 +100,7 @@ export const BabaProvider = ({ children }) => {
 
   const hasAutoDrawnRef = useRef(false);
 
-  // --- MÉTODOS DE RATING (NOVOS - INTEGRADOS) ---
+  // --- MÉTODOS DE RATING (INTEGRADOS) ---
   const ratePlayer = async (ratedId, ratings) => {
     if (!user || !currentBaba) return;
     try {
@@ -127,14 +127,23 @@ export const BabaProvider = ({ children }) => {
 
   const getAllRatings = async () => {
     if (!currentBaba) return [];
-    const { data, error } = await supabase
-      .from('player_rating_summary')
-      .select('*')
-      .eq('baba_id', currentBaba.id);
-    return error ? [] : data;
+    try {
+      const { data, error } = await supabase
+        .from('player_rating_summary')
+        .select(`
+          *,
+          player:players!player_id(name, position)
+        `)
+        .eq('baba_id', currentBaba.id);
+      
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      return [];
+    }
   };
 
-  // --- CARREGAMENTO ---
+  // --- CARREGAMENTO (ORIGINAIS) ---
   const loadMyBabas = async () => {
     if (!user) return;
     try {
@@ -310,7 +319,7 @@ export const BabaProvider = ({ children }) => {
     } catch (error) { toast.error('Erro ao gerar código'); }
   };
 
-  // --- SORTEIO ---
+  // --- SORTEIO (ORIGINAL) ---
   const drawTeamsIntelligent = async () => {
     if (isDrawing || !currentBaba || !nextGameDay) return null;
     setIsDrawing(true);
@@ -358,7 +367,7 @@ export const BabaProvider = ({ children }) => {
     } else { setDrawStatus('insufficient'); }
   };
 
-  // ✅ EFEITOS DE SINCRONIA (SOLUÇÕES 1, 3, 4 e 5 INTEGRADAS)
+  // ✅ EFEITOS DE SINCRONIA (MANUTENÇÃO ORIGINAL)
   useEffect(() => {
     const init = async () => {
       try {
