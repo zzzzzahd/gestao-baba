@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 const BabaContext = createContext();
 
-// --- HELPERS ---
+// --- HELPERS (ORIGINAIS) ---
 export const sanitizeGameDaysConfig = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const seen = new Set();
@@ -118,12 +118,15 @@ export const BabaProvider = ({ children }) => {
       const unique = Array.from(uniqueMap.values());
       setMyBabas(unique);
 
-      if (!currentBaba && unique.length > 0) {
+      if (unique.length > 0) {
         const savedId = localStorage.getItem('selected_baba_id');
         const saved = savedId ? unique.find(b => String(b.id) === savedId) : null;
         setCurrentBaba(saved || unique[0]);
       }
-    } catch (error) { console.error('[loadMyBabas]', error); }
+    } catch (error) { 
+        console.error('[loadMyBabas]', error);
+        throw error; // Repassa para o init tratar
+    }
   };
 
   const loadPlayers = async (babaId) => {
@@ -156,7 +159,35 @@ export const BabaProvider = ({ children }) => {
     } catch (e) { console.error('[loadTodayMatch]', e); }
   };
 
-  // --- CRUD RESTAURADO ---
+  const confirmPresence = async () => {
+    if (!currentBaba || !user || !nextGameDay) return;
+    setLoading(true);
+    try {
+      const myPlayer = players.find(p => p.user_id === user.id);
+      if (!myPlayer) throw new Error('Jogador não encontrado');
+      const { data, error } = await supabase.from('game_confirmations').insert([{ baba_id: currentBaba.id, player_id: myPlayer.id, game_date: nextGameDay.dateStr }]).select('*, player:players(*)').single();
+      if (error) throw error;
+      setGameConfirmations(prev => [...prev, data]);
+      setMyConfirmation(data);
+      toast.success('Presença confirmada!');
+    } catch (error) { toast.error('Erro ao confirmar'); } 
+    finally { setLoading(false); }
+  };
+
+  const cancelConfirmation = async () => {
+    if (!myConfirmation) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('game_confirmations').delete().eq('id', myConfirmation.id);
+      if (error) throw error;
+      setGameConfirmations(prev => prev.filter(c => c.id !== myConfirmation.id));
+      setMyConfirmation(null);
+      toast.success('Presença cancelada');
+    } catch (error) { toast.error('Erro ao cancelar'); } 
+    finally { setLoading(false); }
+  };
+
+  // --- CRUD (ORIGINAIS) ---
   const createBaba = async (babaData) => {
     setLoading(true);
     try {
@@ -169,17 +200,12 @@ export const BabaProvider = ({ children }) => {
       }
       const { data, error } = await supabase.from('babas').insert([{ ...sanitized, president_id: user.id }]).select().single();
       if (error) throw error;
-
-      await supabase.from('players').insert([{
-        baba_id: data.id, user_id: user.id, name: profile?.name || 'Presidente', position: 'linha',
-      }]);
+      await supabase.from('players').insert([{ baba_id: data.id, user_id: user.id, name: profile?.name || 'Presidente', position: 'linha' }]);
       await loadMyBabas();
       setCurrentBaba(data);
       return data;
-    } catch (error) {
-      toast.error('Erro ao criar baba');
-      return null;
-    } finally { setLoading(false); }
+    } catch (error) { toast.error('Erro ao criar baba'); return null; }
+    finally { setLoading(false); }
   };
 
   const updateBaba = async (babaId, updates) => {
@@ -198,10 +224,8 @@ export const BabaProvider = ({ children }) => {
       if (currentBaba?.id === babaId) setCurrentBaba({ ...data });
       toast.success('Configurações salvas!');
       return data;
-    } catch (error) {
-      toast.error('Erro ao salvar');
-      return null;
-    } finally { setLoading(false); }
+    } catch (error) { toast.error('Erro ao salvar'); return null; }
+    finally { setLoading(false); }
   };
 
   const joinBaba = async (inviteCode) => {
@@ -210,9 +234,7 @@ export const BabaProvider = ({ children }) => {
       const code = inviteCode.trim().toUpperCase();
       const { data: baba } = await supabase.from('babas').select('*').eq('invite_code', code).maybeSingle();
       if (!baba) throw new Error('Código inválido');
-      await supabase.from('players').upsert([{
-        baba_id: baba.id, user_id: user.id, name: profile?.name || 'Jogador', position: 'linha',
-      }]);
+      await supabase.from('players').upsert([{ baba_id: baba.id, user_id: user.id, name: profile?.name || 'Jogador', position: 'linha' }]);
       await loadMyBabas();
       setCurrentBaba(baba);
       toast.success('Entrou no Baba!');
@@ -254,13 +276,17 @@ export const BabaProvider = ({ children }) => {
     } catch (error) { toast.error('Erro ao gerar código'); }
   };
 
-  // --- SORTEIO ---
+  // --- SORTEIO (FIX: BLINDAGEM DE MAP) ---
   const drawTeamsIntelligent = async () => {
     if (isDrawing || !currentBaba || !nextGameDay) return null;
     setIsDrawing(true);
     try {
       const dateStr = nextGameDay.dateStr;
-      const confirmed = gameConfirmations.map(c => c.player).filter(Boolean);
+      // ✅ SOLUÇÃO 2: Blindagem no map e filter
+      const confirmed = gameConfirmations
+        .map(c => c?.player)
+        .filter(p => p && p.id);
+
       if (confirmed.length < (drawConfig.playersPerTeam * 2)) { setDrawStatus('insufficient'); return null; }
       let goalies = confirmed.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
       let outfield = confirmed.filter(p => p.position !== 'goleiro').sort(() => Math.random() - 0.5);
@@ -290,7 +316,6 @@ export const BabaProvider = ({ children }) => {
   const tryAutoDraw = async () => {
     if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
     if (new Date() < nextGameDay.deadline) return;
-
     const { data: existing } = await supabase.from('draw_results').select('id').eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
     if (existing) { hasAutoDrawnRef.current = true; return; }
     if (gameConfirmations.length >= drawConfig.playersPerTeam * 2) {
@@ -300,35 +325,23 @@ export const BabaProvider = ({ children }) => {
     } else { setDrawStatus('insufficient'); }
   };
 
-  // ✅ CRONÔMETRO SINCRONIZADO
+  // ✅ 1. INIT COM TRATAMENTO DE ERRO (SOLUÇÃO 1 e 4)
   useEffect(() => {
-    let timeoutId;
-    const update = () => {
-      if (!nextGameDay) {
-        setCountdown({ d: 0, h: 0, m: 0, s: 0, active: false });
-        return;
+    const init = async () => {
+      try {
+        if (user) {
+          await loadMyBabas();
+        }
+      } catch (e) {
+        console.error('[INIT ERROR]', e);
+      } finally {
+        setLoading(false); // ✅ Garante que o loading saia SEMPRE
       }
-      const now = new Date();
-      const diff = new Date(nextGameDay.date) - now;
-      if (diff <= 0) {
-        setNextGameDay(getNextGameDay(currentBaba));
-        return;
-      }
-      const totalSeconds = Math.floor(diff / 1000);
-      const d = Math.floor(totalSeconds / (60 * 60 * 24));
-      const h = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
-      const m = Math.floor((totalSeconds % (60 * 60)) / 60);
-      const s = totalSeconds % 60;
-
-      setCountdown({ d, h, m, s, active: true });
-      const delay = 1000 - (Date.now() % 1000);
-      timeoutId = setTimeout(update, delay);
     };
-    update();
-    return () => clearTimeout(timeoutId);
-  }, [nextGameDay, currentBaba]);
+    init();
+  }, [user]); // ✅ Depende do objeto user inteiro para garantir re-trigger
 
-  // --- SINCRONIZAÇÃO ---
+  // ✅ 2. SINCRONIZAÇÃO (SOLUÇÃO 5)
   useEffect(() => {
     if (!currentBaba || !user) return;
     localStorage.setItem('selected_baba_id', String(currentBaba.id));
@@ -341,35 +354,73 @@ export const BabaProvider = ({ children }) => {
 
       if (next) {
         setConfirmationDeadline(next.deadline);
+        setCanConfirm(new Date() < next.deadline);
         const { data: c } = await supabase.from('game_confirmations').select('*, player:players(*)').eq('baba_id', currentBaba.id).eq('game_date', next.dateStr);
-        setGameConfirmations(c || []);
-        
+        const confirmations = c || [];
+        setGameConfirmations(confirmations);
         const myP = playersData.find(p => p.user_id === user.id);
-        if (myP) setMyConfirmation(c?.find(conf => conf.player_id === myP.id) || null);
-        
+        setMyConfirmation(myP ? confirmations.find(conf => conf.player_id === myP.id) || null : null);
         await loadTodayMatch(currentBaba.id, next.dateStr);
+      } else {
+        // ✅ Reset se não houver próximo jogo
+        setGameConfirmations([]);
+        setMyConfirmation(null);
+        setConfirmationDeadline(null);
       }
     };
     syncData();
-  }, [currentBaba, user]);
+  }, [currentBaba?.id, user?.id]);
 
+  // ✅ 3. CRONÔMETRO (SOLUÇÃO 3)
+  useEffect(() => {
+    let timeoutId;
+    const update = () => {
+      if (!nextGameDay?.date) {
+        setCountdown({ d: 0, h: 0, m: 0, s: 0, active: false });
+        return;
+      }
+      const now = new Date();
+      const diff = new Date(nextGameDay.date) - now;
+      if (diff <= 0) {
+        setCountdown(prev => prev.active ? { d: 0, h: 0, m: 0, s: 0, active: false } : prev);
+        return;
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      setCountdown({
+        d: Math.floor(totalSeconds / (60 * 60 * 24)),
+        h: Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60)),
+        m: Math.floor((totalSeconds % (60 * 60)) / 60),
+        s: totalSeconds % 60,
+        active: true
+      });
+      const delay = 1000 - (Date.now() % 1000);
+      timeoutId = setTimeout(update, delay);
+    };
+    update();
+    return () => clearTimeout(timeoutId);
+  }, [nextGameDay?.dateStr]);
+
+  // ✅ 4. INTERVALO AUTO-DRAW
   useEffect(() => {
     const interval = setInterval(() => {
       if (nextGameDay) {
         setCanConfirm(new Date() < nextGameDay.deadline);
-        tryAutoDraw();
+        if (drawStatus === 'waiting' && !isDrawing) {
+          tryAutoDraw();
+        }
       }
     }, 60000);
     return () => clearInterval(interval);
-  }, [nextGameDay, gameConfirmations.length]);
+  }, [nextGameDay?.dateStr, gameConfirmations.length, drawStatus, isDrawing]);
 
   return (
     <BabaContext.Provider value={{
       myBabas, currentBaba, setCurrentBaba, players, loading,
-      createBaba, joinBaba, updateBaba, uploadBabaImage, generateInviteCode, // ✅ RESTAURADOS
+      createBaba, joinBaba, updateBaba, uploadBabaImage, generateInviteCode,
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline, nextGameDay,
       countdown, currentMatch, matchPlayers, isDrawing, drawStatus,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
+      confirmPresence, cancelConfirmation
     }}>
       {children}
     </BabaContext.Provider>
