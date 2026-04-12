@@ -284,12 +284,12 @@ const DashboardPage = () => {
 
       <div className="max-w-xl mx-auto px-6 mt-12 space-y-6">
 
-        {/* ── CRONÔMETRO + AGENDA ── */}
+       {/* ── CRONÔMETRO + AGENDA ── */}
 {nextGameDay ? (
   <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
     <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
       <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-white/40">
-        <span>{countdown.active ? 'Proximo Baba em' : 'Status'}</span>
+        <span>Próximo Baba em</span>
         <span className="text-cyan-electric">
           {nextGameDay.daysAhead === 0 ? 'Hoje' : nextGameDay.daysAhead === 1 ? 'Amanhã' : DAY_FULL[nextGameDay.day]}
         </span>
@@ -297,8 +297,20 @@ const DashboardPage = () => {
       <div className="flex justify-between items-end">
         <div>
           <p className={`text-4xl font-black font-mono leading-none tracking-tighter ${countdown.active ? 'text-white' : 'text-cyan-electric animate-pulse'}`}>
-            {/* Alteração aqui: adicionado countdown.d e o sufixo D */}
-            {countdown.active ? `${countdown.d} D ${countdown.h}:${countdown.m}:${countdown.s}` : 'INICIADO'}
+            {countdown.active ? (
+              <>
+                {/* Lógica Final: Usa countdown.d diretamente e padroniza H:M:S */}
+                {Number(countdown.d) > 0 && (
+                  <span className="mr-2">{countdown.d} D</span>
+                )}
+                <span>{String(countdown.h).padStart(2, '0')}:</span>
+                <span>{String(countdown.m).padStart(2, '0')}:</span>
+                <span>{String(countdown.s).padStart(2, '0')}</span>
+              </>
+            ) : (
+              /* UX Segura para transição entre jogos */
+              <span className="text-2xl">AGUARDANDO...</span>
+            )}
           </p>
           <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase truncate max-w-[200px]">
             <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
