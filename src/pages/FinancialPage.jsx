@@ -31,26 +31,41 @@ const FinancialPage = () => {
   });
 
   useEffect(() => {
-    if (!currentBaba) {
-      navigate('/home');
+    if (!currentBaba || !user) {
+      if (!currentBaba) navigate('/home');
       return;
     }
     setIsPresident(currentBaba.president_id === user.id);
     loadFinancials();
-  }, [currentBaba, user.id]);
+  }, [currentBaba, user]);
 
+  // CORREÇÃO 1: Query otimizada para buscar os pagamentos e o nome dos jogadores corretamente
   const loadFinancials = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('financials')
-        .select(`*, payments:payments(*, player:players(name))`)
+        .select(`
+          *,
+          payments (
+            id,
+            status,
+            amount,
+            proof_url,
+            player_id,
+            player:players (
+              name,
+              user_id
+            )
+          )
+        `)
         .eq('baba_id', currentBaba.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setFinancials(data || []);
     } catch (error) {
+      console.error("Erro loadFinancials:", error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -79,50 +94,37 @@ const FinancialPage = () => {
     }
   };
 
-  // FUNÇÃO DE ENCERRAR CORRIGIDA
+  // CORREÇÃO 2: Forçando o refresh após mudar status
   const toggleFinancialStatus = async (id, currentStatus) => {
     try {
       const nextStatus = currentStatus === 'active' ? 'closed' : 'active';
-      
       const { error } = await supabase
         .from('financials')
         .update({ status: nextStatus })
         .eq('id', id);
 
       if (error) throw error;
-
-      // Atualiza o estado local imediatamente para refletir na tela
-      setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: nextStatus } : f));
       
+      // Atualiza local e recarrega para garantir sincronia com DB
+      setFinancials(prev => prev.map(f => f.id === id ? { ...f, status: nextStatus } : f));
       toast.success(nextStatus === 'closed' ? 'Cobrança Encerrada!' : 'Reativada!');
     } catch (error) {
-      console.error("Erro ao mudar status:", error);
-      toast.error('Erro técnico ao mudar status');
+      toast.error('Erro ao mudar status');
     }
   };
 
-  // FUNÇÃO DE EXCLUIR CORRIGIDA (LIMPA PAGAMENTOS ANTES)
   const deleteFinancial = async (id) => {
-    if (!window.confirm("Isso apagará a cobrança e todos os pagamentos vinculados. Confirmar?")) return;
-    
+    if (!window.confirm("Isso apagará a cobrança e todos os pagamentos. Confirmar?")) return;
     try {
       setProcessing(true);
-      
-      // 1. Deleta os pagamentos vinculados primeiro (Evita erro de chave estrangeira)
+      // Deleta pagamentos primeiro
       await supabase.from('payments').delete().eq('financial_id', id);
-      
-      // 2. Agora deleta a cobrança
       const { error } = await supabase.from('financials').delete().eq('id', id);
-      
       if (error) throw error;
-
-      // Remove da lista local na hora
       setFinancials(prev => prev.filter(f => f.id !== id));
-      toast.success('Excluído com sucesso');
-      
+      toast.success('Excluído');
     } catch (error) {
-      console.error("Erro ao excluir:", error);
-      toast.error('Erro ao excluir. Tente novamente.');
+      toast.error('Erro ao excluir');
     } finally {
       setProcessing(false);
     }
@@ -130,7 +132,7 @@ const FinancialPage = () => {
 
   const handleUploadProof = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || !selectedFinancial) return;
 
     try {
       setProcessing(true);
@@ -141,12 +143,14 @@ const FinancialPage = () => {
         .eq('user_id', user.id)
         .single();
 
+      if (!player) throw new Error("Jogador não encontrado");
+
       const fileExt = file.name.split('.').pop();
-      const filePath = `${currentBaba.id}/proof_${selectedFinancial.id}_${player.id}_${Date.now()}.${fileExt}`;
+      const filePath = `proofs/${currentBaba.id}/${selectedFinancial.id}_${player.id}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('payment-proofs')
-        .upload(filePath, file);
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
@@ -154,19 +158,24 @@ const FinancialPage = () => {
         .from('payment-proofs')
         .getPublicUrl(filePath);
 
-      await supabase.from('payments').upsert([{
+      // CORREÇÃO 3: Upsert baseado na sua estrutura de colunas
+      const { error: payError } = await supabase.from('payments').upsert([{
         financial_id: selectedFinancial.id,
         player_id: player.id,
         amount: selectedFinancial.amount,
         status: 'pending',
         proof_url: publicUrl,
-        paid_at: new Date().toISOString()
+        paid_at: new Date().toISOString(),
+        proof_uploaded_at: new Date().toISOString()
       }], { onConflict: 'financial_id,player_id' });
+
+      if (payError) throw payError;
 
       toast.success('Comprovante enviado!');
       setShowPayModal(false);
       loadFinancials();
     } catch (error) {
+      console.error(error);
       toast.error('Erro no envio');
     } finally {
       setProcessing(false);
@@ -175,12 +184,14 @@ const FinancialPage = () => {
 
   const confirmPayment = async (paymentId) => {
     try {
-      await supabase.from('payments').update({ 
+      const { error } = await supabase.from('payments').update({ 
         status: 'confirmed', 
-        confirmed_at: new Date().toISOString() 
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: user.id // Adicionado conforme sua coluna no banco
       }).eq('id', paymentId);
       
-      toast.success('Pagamento Confirmado!');
+      if (error) throw error;
+      toast.success('Confirmado!');
       loadFinancials();
     } catch (error) {
       toast.error('Erro na confirmação');
@@ -194,13 +205,12 @@ const FinancialPage = () => {
   );
 
   return (
-    <div className="min-h-screen p-6 bg-[#050505] text-white font-sans">
+    <div className="min-h-screen p-6 bg-[#050505] text-white">
       <div className="max-w-4xl mx-auto">
         
-        {/* Header */}
         <div className="flex items-center justify-between mb-12">
-          <button onClick={() => navigate('/home')} className="flex items-center gap-2 text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all tracking-tighter">
-            <ArrowLeft size={14} /> Voltar ao Painel
+          <button onClick={() => navigate('/home')} className="flex items-center gap-2 text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all">
+            <ArrowLeft size={14} /> Voltar
           </button>
           <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
             <DollarSign size={16} className="text-green-500" />
@@ -213,7 +223,7 @@ const FinancialPage = () => {
             <p className="text-[10px] opacity-40 mt-2 font-black uppercase tracking-widest">Gestão de Arrecadação</p>
           </div>
           {isPresident && (
-            <button onClick={() => setShowCreateModal(true)} className="px-8 py-4 bg-green-500 text-black font-black uppercase text-[10px] tracking-widest rounded-full hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-green-500/20">
+            <button onClick={() => setShowCreateModal(true)} className="px-8 py-4 bg-green-500 text-black font-black uppercase text-[10px] tracking-widest rounded-full hover:scale-105 transition-all flex items-center gap-2">
               <Plus size={16} strokeWidth={3} /> Nova Cobrança
             </button>
           )}
@@ -221,26 +231,25 @@ const FinancialPage = () => {
 
         <div className="space-y-6">
           {financials.map(f => {
-            const myPayment = f.payments?.find(p => p.player?.user_id === user.id || p.player_id === user.id);
+            // CORREÇÃO: Busca o pagamento do usuário logado na lista de pagamentos daquela cobrança
+            const myPayment = f.payments?.find(p => p.player?.user_id === user.id);
             const isClosed = f.status === 'closed';
-            const isExpired = new Date(f.due_date) < new Date() && f.status === 'active';
             const confirmedPayments = f.payments?.filter(p => p.status === 'confirmed') || [];
+            const pendingPayments = f.payments?.filter(p => p.status === 'pending') || [];
 
             return (
-              <div key={f.id} className={`p-8 rounded-[2.5rem] border transition-all ${isClosed ? 'bg-red-500/5 border-red-500/10' : 'bg-white/[0.03] border-white/10'}`}>
+              <div key={f.id} className={`p-8 rounded-[2.5rem] border transition-all ${isClosed ? 'bg-red-500/5 border-red-500/10 opacity-80' : 'bg-white/[0.03] border-white/10'}`}>
                 
                 <div className="flex flex-col md:flex-row justify-between gap-6 mb-10">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-2xl font-black italic uppercase tracking-tighter">{f.title}</h3>
-                      {isClosed && <span className="bg-red-500 text-white text-[8px] px-2 py-1 rounded-md font-black uppercase tracking-widest">Encerrada</span>}
-                      {isExpired && !isClosed && <span className="bg-yellow-500/10 text-yellow-500 text-[8px] px-2 py-1 rounded-md font-black uppercase flex items-center gap-1">Vencida</span>}
+                      {isClosed && <span className="bg-red-500 text-white text-[8px] px-2 py-1 rounded-md font-black uppercase">Encerrada</span>}
                     </div>
-                    <p className="text-xs opacity-50 uppercase font-bold tracking-tight">{f.description}</p>
+                    <p className="text-xs opacity-50 uppercase font-bold">{f.description}</p>
                     <div className="flex items-center gap-4 pt-2">
-                       <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Vence em {new Date(f.due_date).toLocaleDateString()}</span>
-                       <div className="h-1 w-1 rounded-full bg-green-500/30" />
-                       <span className="text-[9px] font-black text-green-500/50 uppercase italic tracking-widest">PIX: {f.pix_key}</span>
+                       <span className="text-[9px] font-black text-white/30 uppercase">Vence: {new Date(f.due_date).toLocaleDateString()}</span>
+                       <span className="text-[9px] font-black text-green-500/50 uppercase italic">PIX: {f.pix_key}</span>
                     </div>
                   </div>
                   <div className="text-left md:text-right">
@@ -251,28 +260,24 @@ const FinancialPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-8 border-t border-white/5">
                   <div>
                     {isClosed ? (
-                       <div className="p-4 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-500 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                       <div className="p-4 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-500 flex items-center justify-center gap-2 text-[10px] font-black uppercase">
                          <Ban size={16} /> Cobrança Encerrada
                        </div>
-                    ) : isExpired && !myPayment ? (
-                      <div className="p-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 text-yellow-500 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                        <AlertTriangle size={16} /> Prazo Expirado
-                      </div>
                     ) : !myPayment ? (
                       <button 
                         onClick={() => { setSelectedFinancial(f); setShowPayModal(true); }}
-                        className="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-green-500 hover:text-black transition-all group/btn"
+                        className="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-green-500 hover:text-black transition-all group"
                       >
-                        <div className="flex items-center gap-3 uppercase font-black text-[10px] tracking-widest">
+                        <span className="uppercase font-black text-[10px] tracking-widest flex items-center gap-3">
                           <CreditCard size={18} /> Pagar Agora
-                        </div>
-                        <ChevronRight size={16} className="opacity-30 group-hover/btn:translate-x-1 transition-transform" />
+                        </span>
+                        <ChevronRight size={16} />
                       </button>
                     ) : (
                       <div className={`p-4 rounded-2xl border flex items-center gap-3 ${myPayment.status === 'confirmed' ? 'border-green-500/20 bg-green-500/5 text-green-500' : 'border-yellow-500/20 bg-yellow-500/5 text-yellow-500'}`}>
                         {myPayment.status === 'confirmed' ? <CheckCircle size={18} /> : <Clock size={18} />}
-                        <span className="text-[10px] font-black uppercase tracking-widest">
-                          {myPayment.status === 'confirmed' ? 'Confirmado' : 'Em Análise'}
+                        <span className="text-[10px] font-black uppercase">
+                          {myPayment.status === 'confirmed' ? 'Pagamento Confirmado' : 'Aguardando Aprovação'}
                         </span>
                       </div>
                     )}
@@ -280,41 +285,45 @@ const FinancialPage = () => {
 
                   {isPresident && (
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => toggleFinancialStatus(f.id, f.status)} className={`p-4 rounded-2xl border border-white/5 transition-colors ${isClosed ? 'bg-green-500/10 text-green-500' : 'bg-white/5 hover:text-yellow-500'}`} title={isClosed ? "Reativar" : "Encerrar"}>
+                      <button onClick={() => toggleFinancialStatus(f.id, f.status)} className="p-4 rounded-2xl bg-white/5 hover:text-yellow-500 transition-colors">
                         <Ban size={18} />
                       </button>
-                      <button onClick={() => deleteFinancial(f.id)} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:text-red-500 transition-colors">
+                      <button onClick={() => deleteFinancial(f.id)} className="p-4 rounded-2xl bg-white/5 hover:text-red-500 transition-colors">
                         <Trash2 size={18} />
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Lista de Confirmados */}
+                {/* LISTA DE QUEM JÁ PAGOU (CORRIGIDO) */}
                 {confirmedPayments.length > 0 && (
                   <div className="mt-8 pt-6 border-t border-white/5">
-                    <p className="text-[8px] font-black uppercase opacity-20 ml-2 tracking-widest mb-3">Já Pagaram ({confirmedPayments.length})</p>
+                    <p className="text-[8px] font-black uppercase opacity-20 ml-2 mb-3">Confirmados ({confirmedPayments.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {confirmedPayments.map(p => (
                         <div key={p.id} className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full flex items-center gap-2">
                           <CheckCircle size={10} className="text-green-500" />
-                          <span className="text-[9px] font-bold uppercase text-green-500/80">{p.player?.name}</span>
+                          <span className="text-[9px] font-bold text-green-500">{p.player?.name || 'Jogador'}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Pendentes (Só para o Presidente) */}
-                {isPresident && f.payments?.some(p => p.status === 'pending') && (
+                {/* PENDENTES PARA O PRESIDENTE (FOTO DO COMPROVANTE CORRIGIDA) */}
+                {isPresident && pendingPayments.length > 0 && (
                    <div className="mt-6 space-y-2">
-                      <p className="text-[8px] font-black uppercase text-yellow-500 ml-2 tracking-widest italic">Aprovações Pendentes</p>
-                      {f.payments.filter(p => p.status === 'pending').map(p => (
-                        <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
-                          <span className="text-[10px] font-bold uppercase tracking-tight">{p.player?.name}</span>
+                      <p className="text-[8px] font-black uppercase text-yellow-500 ml-2 italic">Aprovações Pendentes</p>
+                      {pendingPayments.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <span className="text-[10px] font-bold uppercase">{p.player?.name || 'Jogador'}</span>
                           <div className="flex items-center gap-3">
-                            <a href={p.proof_url} target="_blank" rel="noreferrer" className="text-white/20 hover:text-white transition-colors"><Eye size={18}/></a>
-                            <button onClick={() => confirmPayment(p.id)} className="px-4 py-2 bg-green-500 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all">Aprovar</button>
+                            {p.proof_url && (
+                              <a href={p.proof_url} target="_blank" rel="noreferrer" className="p-2 bg-white/10 rounded-lg hover:text-green-500 transition-colors">
+                                <Eye size={18}/>
+                              </a>
+                            )}
+                            <button onClick={() => confirmPayment(p.id)} className="px-4 py-2 bg-green-500 text-black rounded-xl text-[9px] font-black uppercase">Aprovar</button>
                           </div>
                         </div>
                       ))}
@@ -325,55 +334,51 @@ const FinancialPage = () => {
           })}
         </div>
 
-        {/* Modal de Pagamento */}
+        {/* MODAL PAGAMENTO */}
         {showPayModal && selectedFinancial && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
-            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem] shadow-2xl relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-8 opacity-5"><DollarSign size={120}/></div>
-              <div className="flex justify-between items-center mb-10 relative">
-                <h2 className="text-2xl font-black italic uppercase tracking-tighter">Fazer Pagamento</h2>
-                <button onClick={() => setShowPayModal(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"><X size={20}/></button>
+            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem] relative">
+              <div className="flex justify-between items-center mb-10">
+                <h2 className="text-2xl font-black italic uppercase">Pagar Taxa</h2>
+                <button onClick={() => setShowPayModal(false)} className="p-2 bg-white/5 rounded-full"><X size={20}/></button>
               </div>
-              <div className="space-y-8 relative">
+              <div className="space-y-8">
                 <div className="p-6 bg-green-500/5 rounded-3xl border border-green-500/10 text-center">
-                  <p className="text-[9px] font-black text-green-500 uppercase mb-4 tracking-widest opacity-60">Chave PIX</p>
-                  <p className="text-lg font-mono font-bold text-white mb-6 select-all tracking-tighter">{selectedFinancial.pix_key}</p>
-                  <button onClick={() => { navigator.clipboard.writeText(selectedFinancial.pix_key); toast.success('Copiado!'); }} className="flex items-center gap-2 mx-auto px-6 py-3 bg-green-500 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all">
-                    <Copy size={14} /> Copiar Chave
+                  <p className="text-[9px] font-black text-green-500 uppercase mb-2">Chave PIX</p>
+                  <p className="text-sm font-mono font-bold mb-6 break-all">{selectedFinancial.pix_key}</p>
+                  <button onClick={() => { navigator.clipboard.writeText(selectedFinancial.pix_key); toast.success('Copiado!'); }} className="flex items-center gap-2 mx-auto px-6 py-3 bg-green-500 text-black rounded-2xl text-[10px] font-black uppercase">
+                    <Copy size={14} /> Copiar
                   </button>
                 </div>
-                <div className="space-y-3">
-                  <p className="text-[9px] font-black opacity-30 uppercase ml-2 tracking-widest italic tracking-widest">Passo 2: Enviar Comprovante</p>
-                  <label className="flex flex-col items-center justify-center w-full h-40 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 hover:border-green-500/50 transition-all cursor-pointer group">
-                    {processing ? <Loader2 className="animate-spin text-green-500" /> : (
-                      <>
-                        <Camera size={28} className="opacity-10 group-hover:opacity-100 transition-opacity mb-3" />
-                        <span className="text-[10px] font-black uppercase opacity-30 group-hover:opacity-100 transition-opacity tracking-widest">Selecionar Imagem</span>
-                      </>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadProof} disabled={processing} />
-                  </label>
-                </div>
+                <label className="flex flex-col items-center justify-center w-full h-40 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 cursor-pointer hover:border-green-500/50">
+                  {processing ? <Loader2 className="animate-spin text-green-500" /> : (
+                    <>
+                      <Camera size={28} className="opacity-20 mb-3" />
+                      <span className="text-[10px] font-black uppercase opacity-40">Anexar Comprovante</span>
+                    </>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleUploadProof} disabled={processing} />
+                </label>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal de Criação */}
+        {/* MODAL CRIAÇÃO */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
             <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem]">
-              <h2 className="text-3xl font-black italic uppercase mb-10 tracking-tighter text-green-500">Nova Taxa</h2>
+              <h2 className="text-3xl font-black italic uppercase mb-10 text-green-500">Nova Taxa</h2>
               <form onSubmit={createFinancial} className="space-y-4">
-                <input placeholder="TÍTULO (EX: MENSALIDADE)" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold uppercase text-xs tracking-widest" value={newFinancial.title} onChange={e => setNewFinancial({...newFinancial, title: e.target.value.toUpperCase()})} required />
+                <input placeholder="TÍTULO" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none font-bold uppercase text-xs" value={newFinancial.title} onChange={e => setNewFinancial({...newFinancial, title: e.target.value.toUpperCase()})} required />
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="number" step="0.01" placeholder="VALOR R$" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold text-xs" value={newFinancial.amount} onChange={e => setNewFinancial({...newFinancial, amount: e.target.value})} required />
-                  <input type="date" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-green-500 font-bold text-xs text-white uppercase" value={newFinancial.due_date} onChange={e => setNewFinancial({...newFinancial, due_date: e.target.value})} required />
+                  <input type="number" placeholder="VALOR" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none font-bold text-xs" value={newFinancial.amount} onChange={e => setNewFinancial({...newFinancial, amount: e.target.value})} required />
+                  <input type="date" className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none font-bold text-xs text-white" value={newFinancial.due_date} onChange={e => setNewFinancial({...newFinancial, due_date: e.target.value})} required />
                 </div>
-                <input placeholder="CHAVE PIX PARA RECEBIMENTO" className="w-full bg-green-500/5 p-5 rounded-2xl border border-green-500/20 outline-none focus:border-green-500 font-mono text-xs text-green-500" value={newFinancial.pix_key} onChange={e => setNewFinancial({...newFinancial, pix_key: e.target.value})} required />
+                <input placeholder="CHAVE PIX" className="w-full bg-green-500/5 p-5 rounded-2xl border border-green-500/20 outline-none font-mono text-xs text-green-500" value={newFinancial.pix_key} onChange={e => setNewFinancial({...newFinancial, pix_key: e.target.value})} required />
                 <div className="flex gap-4 pt-10">
-                  <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase opacity-30 tracking-widest">Cancelar</button>
-                  <button type="submit" disabled={processing} className="flex-1 py-5 bg-green-500 text-black text-[10px] font-black uppercase rounded-2xl shadow-xl shadow-green-500/20 tracking-widest hover:scale-[1.02] transition-all">Lançar Agora</button>
+                  <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-5 text-[10px] font-black uppercase opacity-30">Cancelar</button>
+                  <button type="submit" disabled={processing} className="flex-1 py-5 bg-green-500 text-black text-[10px] font-black uppercase rounded-2xl">Lançar</button>
                 </div>
               </form>
             </div>
