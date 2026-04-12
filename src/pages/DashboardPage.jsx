@@ -5,7 +5,7 @@ import { useBaba } from '../contexts/BabaContext';
 import {
   Trophy, Users, DollarSign, LogOut,
   Calendar, Copy, Settings, MapPin, RefreshCw, Timer,
-  Zap, Camera, Edit3, ChevronRight, X, Shield, Star
+  Zap, Camera, Edit3, ChevronRight, X, Shield, Star, Share2
 } from 'lucide-react';
 import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings from '../components/BabaSettings';
@@ -44,11 +44,10 @@ const computeExpiryLabel = (expiresAt) => {
 };
 
 // ─────────────────────────────────────────────
-// MODAL DE AVALIAÇÃO (AGORA SINCRONIZADO COM SQL)
+// MODAL DE AVALIAÇÃO
 // ─────────────────────────────────────────────
 
 const RatePlayerModal = ({ player, onClose, onRate }) => {
-  // Ajustado para os nomes exatos do banco: skill, physical, commitment
   const [ratings, setRatings] = useState({
     skill: 3,
     physical: 3,
@@ -104,7 +103,7 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
 };
 
 // ─────────────────────────────────────────────
-// MODAL DE MEMBROS (EXIBINDO RATING REAL)
+// MODAL DE MEMBROS
 // ─────────────────────────────────────────────
 
 const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
@@ -129,7 +128,6 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-black text-white text-sm truncate">{p.display_name || 'Sem nome'}</p>
-                {/* EXIBIÇÃO DO RATING REAL VINDO DO SUMMARY */}
                 {p.final_rating > 0 && (
                   <span className="flex items-center gap-0.5 text-[10px] font-black text-cyan-electric bg-cyan-electric/10 px-1.5 py-0.5 rounded">
                     <Star size={8} fill="currentColor" /> {Number(p.final_rating).toFixed(1)}
@@ -159,7 +157,7 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
 );
 
 // ─────────────────────────────────────────────
-// DASHBOARD
+// DASHBOARD PAGE
 // ─────────────────────────────────────────────
 
 const DashboardPage = () => {
@@ -168,7 +166,7 @@ const DashboardPage = () => {
   const {
     currentBaba, players, loading,
     generateInviteCode, nextGameDay, uploadBabaImage,
-    ratePlayer, getAllRatings // Função carregada do Context
+    ratePlayer, getAllRatings
   } = useBaba();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -176,10 +174,9 @@ const DashboardPage = () => {
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [inviteExpiry, setInviteExpiry] = useState(null);
-  const [playerRatings, setPlayerRatings] = useState([]); // Estado para os summaries
+  const [playerRatings, setPlayerRatings] = useState([]); 
   const [countdown, setCountdown] = useState({ d: 0, h: '00', m: '00', s: '00', active: false });
 
-  // 1. CARREGAR RATINGS AO INICIAR
   useEffect(() => {
     const loadRatings = async () => {
       const data = await getAllRatings();
@@ -188,7 +185,6 @@ const DashboardPage = () => {
     if (currentBaba?.id) loadRatings();
   }, [currentBaba?.id, getAllRatings]);
 
-  // 2. MESCLAR PLAYERS COM SEUS RATINGS REAIS
   const playersWithRatings = useMemo(() => {
     return (players || []).map(p => {
       const r = playerRatings.find(x => x.player_id === p.id);
@@ -236,6 +232,15 @@ const DashboardPage = () => {
     const interval = setInterval(() => setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at)), 1000);
     return () => clearInterval(interval);
   }, [currentBaba?.invite_expires_at]);
+
+  const handleCopyCode = () => {
+    if (currentBaba?.invite_code) {
+      navigator.clipboard.writeText(currentBaba.invite_code);
+      toast.success('Código copiado!', {
+        style: { background: '#000', color: '#fff', border: '1px solid #00f3ff', fontSize: '10px', fontWeight: 'black' }
+      });
+    }
+  };
 
   const handleUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -340,7 +345,7 @@ const DashboardPage = () => {
         <div className="grid grid-cols-3 gap-3">
           {[
             { icon: <Trophy />,   label: 'Ranking', action: () => navigate('/rankings') },
-            { icon: <DollarSign />, label: 'Caixa',   action: () => navigate('/financial') },
+            { icon: <DollarSign />, label: 'Caixa',    action: () => navigate('/financial') },
             { icon: <Users />,      label: 'Times',    action: () => navigate('/teams') },
           ].map((item, i) => (
             <button key={i} onClick={item.action} className="flex flex-col items-center gap-2 py-5 bg-white/5 border border-white/5 rounded-3xl hover:bg-white/10 transition-all group">
@@ -374,12 +379,57 @@ const DashboardPage = () => {
         <PresenceConfirmation />
         {isPresident && <DrawConfigPanel />}
 
-        {/* ── INVITE E SETTINGS ── */}
+        {/* ── SEÇÃO DE CONVITE (CORRIGIDA) ── */}
         {isPresident && (
-          <div className="card-glass p-6 rounded-[2.5rem] border border-cyan-electric/20 bg-cyan-electric/5">
-             <button onClick={generateInviteCode} className="w-full py-4 bg-cyan-electric/10 text-cyan-electric font-black rounded-2xl uppercase text-[10px] tracking-widest">
-               {currentBaba.invite_code ? `Convite: ${currentBaba.invite_code}` : 'Gerar Convite'}
-             </button>
+          <div className="card-glass p-6 rounded-[2.5rem] border border-cyan-electric/20 bg-cyan-electric/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">Convite do Grupo</h3>
+                <p className="text-[9px] text-white/40 font-bold uppercase">
+                  {inviteExpiry || 'Gere um novo código'}
+                </p>
+              </div>
+              <div className="p-2 bg-cyan-electric/10 rounded-xl">
+                <Share2 size={16} className="text-cyan-electric" />
+              </div>
+            </div>
+
+            {currentBaba?.invite_code ? (
+              <div className="flex gap-2">
+                <div className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-4 flex items-center justify-center shadow-inner">
+                  <span className="text-2xl font-black tracking-[0.4em] text-white leading-none">
+                    {currentBaba.invite_code}
+                  </span>
+                </div>
+                <button
+                  onClick={handleCopyCode}
+                  className="px-6 bg-cyan-electric hover:bg-cyan-400 text-black rounded-2xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-cyan-electric/20"
+                >
+                  <Copy size={14} />
+                  Copiar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={generateInviteCode}
+                className="w-full py-5 bg-white/5 border border-dashed border-white/20 rounded-2xl text-[10px] font-black uppercase hover:border-cyan-electric/50 hover:bg-cyan-electric/5 transition-all flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={14} className="animate-pulse" />
+                Gerar Código de Convite
+              </button>
+            )}
+
+            {currentBaba?.invite_code && (
+              <div className="flex justify-center">
+                <button
+                  onClick={generateInviteCode}
+                  className="text-[9px] font-black uppercase text-white/20 hover:text-cyan-electric transition-colors flex items-center gap-2"
+                >
+                  <RefreshCw size={10} />
+                  Atualizar Código
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -387,7 +437,7 @@ const DashboardPage = () => {
       {/* ── MODAIS ── */}
       {showMembers && (
         <MembersModal 
-          players={playersWithRatings} // Usando a lista com ratings carregados
+          players={playersWithRatings} 
           onClose={() => setShowMembers(false)} 
           currentUserId={user?.id}
           onOpenRate={(p) => setSelectedPlayerForRating(p)} 
@@ -400,7 +450,6 @@ const DashboardPage = () => {
           onClose={() => setSelectedPlayerForRating(null)} 
           onRate={async (id, data) => {
             await ratePlayer(id, data);
-            // Recarregar os ratings após votar para atualizar a UI
             const updated = await getAllRatings();
             setPlayerRatings(updated || []);
           }} 
