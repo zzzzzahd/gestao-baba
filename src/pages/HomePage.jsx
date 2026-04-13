@@ -1,448 +1,351 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
-import { PlusCircle, LogIn, Trophy, Users, Edit, Clock, MapPin } from 'lucide-react';
+import { useBaba } from '../contexts/BabaContext';
+
+import {
+  PlusCircle,
+  LogIn,
+  Trophy,
+  Users,
+  User,
+  Clock,
+  Calendar,
+  MapPin,
+  ArrowRight,
+  Play,
+  Target,
+  Sparkles,
+  X
+} from 'lucide-react';
+
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
-const DAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const DAYS = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 
-/**
- * Exibe badges de dias de forma normalizada.
- * Suporta game_days_config (novo) e game_days (legado).
- * Garante: sem duplicatas, ordenado, tipos corretos.
- */
-const BabaDaysBadges = ({ baba }) => {
+// ─────────────────────────────
+// HELPERS
+// ─────────────────────────────
+const formatDays = (baba) => {
   let days = [];
 
-  if (Array.isArray(baba?.game_days_config) && baba.game_days_config.length > 0) {
-    const seen = new Set();
-    days = baba.game_days_config
-      .map((c) => Number(c.day))
-      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
-      .sort((a, b) => a - b);
-  } else if (Array.isArray(baba?.game_days) && baba.game_days.length > 0) {
-    const seen = new Set();
-    days = baba.game_days
-      .map(Number)
-      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-      .filter((d) => { if (seen.has(d)) return false; seen.add(d); return true; })
-      .sort((a, b) => a - b);
+  if (Array.isArray(baba?.game_days_config)) {
+    days = baba.game_days_config.map(d => Number(d.day));
+  } else if (Array.isArray(baba?.game_days)) {
+    days = baba.game_days.map(Number);
   }
 
-  if (days.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1 mt-2">
-      {days.map((d) => (
-        <span
-          key={d}
-          className="w-6 h-6 rounded-md bg-cyan-electric/20 border border-cyan-electric/30 text-cyan-electric text-[8px] font-black flex items-center justify-center"
-        >
-          {DAY_LABELS[d]?.charAt(0) ?? d}
-        </span>
-      ))}
-    </div>
-  );
+  return [...new Set(days)]
+    .filter(d => d >= 0 && d <= 6)
+    .sort()
+    .map(d => DAYS[d])
+    .join(' · ');
 };
 
-const HomePage = () => {
-  const navigate = useNavigate();
-  const { myBabas, createBaba, joinBaba, setCurrentBaba, loading } = useBaba();
-  const { profile } = useAuth();
+// ─────────────────────────────
+// MODAL BASE
+// ─────────────────────────────
+const Modal = ({ children, onClose }) => (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 relative">
+      <button onClick={onClose} className="absolute top-4 right-4 text-white/40">
+        <X />
+      </button>
+      {children}
+    </div>
+  </div>
+);
 
-  const [mode, setMode] = useState(null); // 'create' | 'join'
-  const [formData, setFormData] = useState({
-    name:           '',
-    modality:       'futsal',
-    game_time:      '20:00',
-    game_days:      [],
+// ─────────────────────────────
+// HOME V4
+// ─────────────────────────────
+const HomePageV4 = () => {
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { myBabas, setCurrentBaba, createBaba, joinBaba, loading } = useBaba();
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+
+  const [form, setForm] = useState({
+    name: '',
+    modality: 'futsal',
+    game_time: '20:00',
     match_duration: 10,
-    invite_code:    '',
+    game_days: []
   });
 
-  const toggleDay = (day) => {
-    const days = formData.game_days;
-    setFormData({
-      ...formData,
-      game_days: days.includes(day)
-        ? days.filter((d) => d !== day)
-        : [...days, day].sort((a, b) => a - b),
-    });
-  };
+  // ─────────────────────────────
+  // CONTEXTUAL DATA
+  // ─────────────────────────────
+  const lastBaba = useMemo(() => myBabas?.[0] || null, [myBabas]);
+  const profileInitial = profile?.name?.charAt(0)?.toUpperCase() || 'U';
 
-  // ── Criar Baba ──
-  const handleCreateBaba = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim())          { toast.error('Digite o nome do baba'); return; }
-    if (formData.game_days.length === 0) { toast.error('Selecione pelo menos um dia'); return; }
+  // ─────────────────────────────
+  // CREATE (FULL COMPAT)
+  // ─────────────────────────────
+  const handleCreate = async () => {
+    if (!form.name.trim()) return toast.error('Nome obrigatório');
+    if (!form.game_days.length) return toast.error('Selecione dias');
 
-    // Gera game_days_config no momento da criação — baba nasce já no novo formato
-    const game_days_config = formData.game_days.map((d) => ({
-      day:      Number(d),
-      time:     formData.game_time || '20:00',
-      location: '',
+    const game_days_config = form.game_days.map(d => ({
+      day: Number(d),
+      time: form.game_time,
+      location: ''
     }));
 
-    const result = await createBaba({
-      name:             formData.name.trim(),
-      modality:         formData.modality,
-      game_time:        formData.game_time,
-      match_duration:   Number(formData.match_duration),
-      game_days:        formData.game_days.map(Number),
-      game_days_config,
+    const res = await createBaba({
+      ...form,
+      game_days: form.game_days.map(Number),
+      game_days_config
     });
 
-    if (result) {
-      setMode(null);
-      toast.success('Baba criado! Clique nele abaixo para acessar.');
+    if (res) {
+      toast.success('Baba criado!');
+      setShowCreate(false);
+      setForm({ name:'', modality:'futsal', game_time:'20:00', match_duration:10, game_days:[] });
     }
   };
 
-  // ── Entrar em Baba ──
-  const handleJoinBaba = async (e) => {
-    e.preventDefault();
-    const code = formData.invite_code.trim().toUpperCase();
-    if (!code)           { toast.error('Digite o código do convite'); return; }
-    if (code.length !== 6) { toast.error('O código deve ter exatamente 6 caracteres'); return; }
+  // ─────────────────────────────
+  // JOIN (ROBUSTO)
+  // ─────────────────────────────
+  const handleJoin = async () => {
+    const code = inviteCode.trim().toUpperCase();
 
-    const result = await joinBaba(code);
-    if (result) { setMode(null); navigate('/dashboard'); }
+    if (code.length !== 6) {
+      return toast.error('Código inválido');
+    }
+
+    const res = await joinBaba(code);
+
+    if (res) {
+      toast.success('Entrou no baba!');
+      navigate('/dashboard');
+    }
   };
 
-  const handleSelectBaba = (baba) => {
+  const openBaba = (baba) => {
     setCurrentBaba(baba);
     navigate('/dashboard');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Carregando...</p>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="w-full max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white px-6 py-8 space-y-8">
 
-        {/* Logo */}
-        <div className="flex justify-center">
-          <Logo size="large" />
+      {/* ───────────────── HEADER ───────────────── */}
+      <div className="flex items-center justify-between">
+        <Logo size="small" />
+
+        <button
+          onClick={() => navigate('/profile')}
+          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center"
+        >
+          <span className="text-cyan-electric font-black">
+            {profileInitial}
+          </span>
+        </button>
+      </div>
+
+      {/* ───────────────── PLAYER INTELLIGENCE ───────────────── */}
+      <div className="card-glass p-5 rounded-3xl flex items-center gap-4">
+
+        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} className="w-full h-full object-cover" />
+          ) : (
+            <User className="text-cyan-electric" />
+          )}
         </div>
 
-        {/* Perfil */}
-        <div className="card-glass p-6 rounded-[2rem] animate-fade-in">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-electric to-blue-600 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_rgba(0,242,255,0.3)]">
-              <span className="text-2xl font-black text-black">
-                {profile?.name?.charAt(0).toUpperCase() || 'U'}
+        <div className="flex-1">
+          <p className="font-black uppercase">{profile?.name}</p>
+          <p className="text-[10px] text-white/40 uppercase">
+            {profile?.position || 'Sem posição'}
+          </p>
+        </div>
+
+        <button
+          onClick={() => navigate('/profile')}
+          className="px-3 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase"
+        >
+          Perfil
+        </button>
+
+      </div>
+
+      {/* ───────────────── QUICK ACTIONS ───────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+
+        <button
+          onClick={() => setShowCreate(true)}
+          className="p-4 bg-cyan-electric text-black font-black rounded-2xl flex flex-col items-center gap-1"
+        >
+          <PlusCircle size={18}/>
+          Criar
+        </button>
+
+        <button
+          onClick={() => setShowJoin(true)}
+          className="p-4 bg-white/5 font-black rounded-2xl flex flex-col items-center gap-1"
+        >
+          <LogIn size={18}/>
+          Entrar
+        </button>
+
+        <button
+          onClick={() => navigate('/rankings')}
+          className="p-4 bg-white/5 font-black rounded-2xl flex flex-col items-center gap-1"
+        >
+          <Trophy size={18}/>
+          Rank
+        </button>
+
+      </div>
+
+      {/* ───────────────── CONTINUE BABA ───────────────── */}
+      {lastBaba && (
+        <button
+          onClick={() => openBaba(lastBaba)}
+          className="w-full p-5 bg-gradient-to-r from-cyan-electric/20 to-transparent border border-cyan-electric/20 rounded-3xl text-left"
+        >
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-black">{lastBaba.name}</p>
+              <p className="text-[10px] text-white/40">
+                Continuar último baba
+              </p>
+            </div>
+            <Play className="text-cyan-electric" />
+          </div>
+
+          <p className="text-[10px] text-white/30 mt-2">
+            {formatDays(lastBaba)}
+          </p>
+        </button>
+      )}
+
+      {/* ───────────────── MY BABAS ───────────────── */}
+      <div className="space-y-2">
+
+        <p className="text-cyan-electric font-black text-sm uppercase">
+          Meus Babas
+        </p>
+
+        {myBabas?.length ? myBabas.map((baba) => (
+          <button
+            key={baba.id}
+            onClick={() => openBaba(baba)}
+            className="w-full p-4 bg-white/5 rounded-2xl text-left"
+          >
+            <div className="flex justify-between">
+              <p className="font-black">{baba.name}</p>
+              <span className="text-cyan-electric text-[10px]">
+                {baba.game_time?.substring(0,5)}
               </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black uppercase italic text-white truncate">
-                {profile?.name || 'Usuário'}
-              </h2>
-              {(profile?.age || profile?.position || profile?.favorite_team) && (
-                <div className="flex items-center gap-2 mt-1 text-[10px] font-black uppercase tracking-wider text-white/60 flex-wrap">
-                  {profile?.age && <span>{profile.age} anos</span>}
-                  {profile?.age && profile?.position && <span>•</span>}
-                  {profile?.position && <span>{profile.position}</span>}
-                  {(profile?.age || profile?.position) && profile?.favorite_team && <span>•</span>}
-                  {profile?.favorite_team && (
-                    <span className="truncate max-w-[100px]">{profile.favorite_team}</span>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => navigate('/profile')}
-              className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-electric/30 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/10 hover:border-cyan-electric transition-all flex items-center gap-2 flex-shrink-0"
-            >
-              <Edit size={14} />
-              <span className="hidden sm:inline">Editar</span>
-            </button>
-          </div>
-        </div>
 
-        {/* Ações principais */}
-        {mode === null && (
-          <div className="space-y-4 animate-fade-in">
-            <p className="text-center text-white/60 text-sm">Escolha uma opção para começar</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={() => setMode('create')}
-                className="p-6 rounded-[2rem] bg-gradient-to-r from-cyan-electric to-blue-600 text-black font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(0,255,242,0.2)] hover:scale-[1.02] active:scale-95 transition-all"
-              >
-                <PlusCircle size={24} /> Criar Novo Baba
-              </button>
-              <button
-                onClick={() => setMode('join')}
-                className="p-6 rounded-[2rem] bg-white/5 border border-green-neon text-green-neon font-black uppercase italic tracking-tighter flex items-center justify-center gap-3 hover:bg-green-neon/10 transition-all"
-              >
-                <LogIn size={24} /> Entrar com Convite
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Formulário: Criar Baba ── */}
-        {mode === 'create' && (
-          <form onSubmit={handleCreateBaba} className="space-y-6 animate-fade-in">
-            <div className="card-glass p-8 rounded-[2rem]">
-              <div className="flex items-center gap-3 mb-6">
-                <Trophy className="text-cyan-electric" size={24} />
-                <h2 className="text-2xl font-black italic uppercase">Criar Baba</h2>
-              </div>
-
-              <div className="space-y-4">
-                {/* Nome */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                    Nome do Baba
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Baba da Galera"
-                    className="input-tactical"
-                    required
-                  />
-                </div>
-
-                {/* Modalidade */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                    Modalidade
-                  </label>
-                  <select
-                    value={formData.modality}
-                    onChange={(e) => setFormData({ ...formData, modality: e.target.value })}
-                    className="input-tactical"
-                  >
-                    <option value="futsal">Futsal</option>
-                    <option value="society">Society</option>
-                  </select>
-                </div>
-
-                {/* Horário + Duração */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                      Horário
-                    </label>
-                    <input
-                      type="time"
-                      value={formData.game_time}
-                      onChange={(e) => setFormData({ ...formData, game_time: e.target.value })}
-                      className="input-tactical"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                      Duração (min)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.match_duration}
-                      onChange={(e) => setFormData({ ...formData, match_duration: e.target.value })}
-                      className="input-tactical"
-                      min="5" max="120"
-                    />
-                  </div>
-                </div>
-
-                {/* Dias */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
-                    Dias da Semana
-                  </label>
-                  <div className="grid grid-cols-7 gap-2">
-                    {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleDay(day)}
-                        className={`py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${
-                          formData.game_days.includes(day)
-                            ? 'bg-cyan-electric text-black border-2 border-cyan-electric shadow-[0_0_15px_rgba(0,242,255,0.4)]'
-                            : 'bg-white/5 text-white/40 border-2 border-white/10 hover:bg-white/10 hover:text-white/60'
-                        }`}
-                      >
-                        {DAY_LABELS[day]}
-                      </button>
-                    ))}
-                  </div>
-                  {formData.game_days.length === 0 && (
-                    <p className="text-[9px] text-yellow-500 mt-2">⚠️ Selecione pelo menos um dia</p>
-                  )}
-                  {formData.game_days.length > 0 && (
-                    <p className="text-[9px] text-cyan-electric mt-2">
-                      ✓ {formData.game_days.length} dia{formData.game_days.length > 1 ? 's' : ''} selecionado{formData.game_days.length > 1 ? 's' : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setMode(null)}
-                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all">
-                Voltar
-              </button>
-              <button type="submit" disabled={loading}
-                className="flex-[2] py-5 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest shadow-neon-cyan hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50">
-                {loading ? 'Criando...' : 'Criar Baba'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ── Formulário: Entrar em Baba ── */}
-        {mode === 'join' && (
-          <form onSubmit={handleJoinBaba} className="space-y-6 animate-fade-in">
-            <div className="card-glass p-8 rounded-[2rem]">
-              <div className="flex items-center gap-3 mb-6">
-                <Users className="text-green-neon" size={24} />
-                <h2 className="text-2xl font-black italic uppercase">Entrar no Baba</h2>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
-                  Código do Convite
-                </label>
-                <input
-                  type="text"
-                  value={formData.invite_code}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      invite_code: e.target.value
-                        .toUpperCase()
-                        .replace(/[^A-Z0-9]/g, '')
-                        .substring(0, 6),
-                    })
-                  }
-                  placeholder="AB12CD"
-                  className="input-tactical text-center text-2xl font-black tracking-widest"
-                  maxLength={6}
-                  required
-                />
-                <div className="mt-2 text-center min-h-[18px]">
-                  {formData.invite_code.length === 0 && (
-                    <p className="text-[9px] text-white/30">
-                      Código de 6 caracteres fornecido pelo presidente
-                    </p>
-                  )}
-                  {formData.invite_code.length > 0 && formData.invite_code.length < 6 && (
-                    <p className="text-[9px] text-yellow-500">
-                      {6 - formData.invite_code.length} caractere{6 - formData.invite_code.length !== 1 ? 's' : ''} restante{6 - formData.invite_code.length !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                  {formData.invite_code.length === 6 && (
-                    <p className="text-[9px] text-cyan-electric">✓ Código completo</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setMode(null)}
-                className="flex-1 py-5 rounded-2xl bg-white/5 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all">
-                Voltar
-              </button>
-              <button
-                type="submit"
-                disabled={loading || formData.invite_code.length !== 6}
-                className="flex-[2] py-5 rounded-2xl bg-green-neon text-black font-black uppercase text-[10px] tracking-widest shadow-neon-green hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-              >
-                {loading ? 'Entrando...' : 'Entrar'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ── Meus Babas ── */}
-        {mode === null && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent" />
-              <h2 className="text-xl font-black uppercase italic text-cyan-electric">Meus Babas</h2>
-              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-cyan-electric/30 to-transparent" />
-            </div>
-
-            {myBabas && myBabas.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {myBabas.map((baba) => (
-                  <button
-                    key={baba.id}
-                    onClick={() => handleSelectBaba(baba)}
-                    className="card-glass p-6 rounded-[2rem] hover:border-cyan-electric/50 transition-all group text-left"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Avatar com fallback de iniciais */}
-                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 flex-shrink-0">
-                          {baba.avatar_url ? (
-                            <img
-                              src={baba.avatar_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-cyan-electric/10 flex items-center justify-center">
-                              <span className="text-cyan-electric font-black text-xs">
-                                {(baba.name || 'B').charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-black uppercase italic text-white group-hover:text-cyan-electric transition-colors truncate">
-                          {baba.name}
-                        </h3>
-                      </div>
-                      <div className="w-2 h-2 rounded-full bg-green-neon animate-pulse flex-shrink-0 mt-2" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
-                        <MapPin size={12} />
-                        <span>{baba.modality === 'futsal' ? 'Futsal' : 'Society'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-white/60">
-                        <Clock size={12} />
-                        <span>{baba.game_time?.substring(0, 5) || '—'}</span>
-                      </div>
-                      <BabaDaysBadges baba={baba} />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="card-glass p-12 rounded-[2rem] text-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                    <Trophy size={32} className="text-white/20" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-black uppercase text-white/40 mb-2">Nenhum Baba Ainda</p>
-                    <p className="text-sm text-white/30">Crie ou entre com código de convite</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            <p className="text-[10px] text-white/40">
+              {formatDays(baba)}
+            </p>
+          </button>
+        )) : (
+          <p className="text-white/30 text-center">
+            Nenhum baba ainda
+          </p>
         )}
 
       </div>
+
+      {/* ───────────────── MODALS ───────────────── */}
+
+      {showCreate && (
+        <Modal onClose={() => setShowCreate(false)}>
+          <div className="space-y-3">
+            <h2 className="font-black uppercase">Criar Baba</h2>
+
+            <input
+              placeholder="Nome"
+              className="w-full p-3 bg-black/40 rounded-xl"
+              value={form.name}
+              onChange={e => setForm({...form, name: e.target.value})}
+            />
+
+            <input
+              type="time"
+              className="w-full p-3 bg-black/40 rounded-xl"
+              value={form.game_time}
+              onChange={e => setForm({...form, game_time: e.target.value})}
+            />
+
+            <div className="grid grid-cols-7 gap-1">
+              {[0,1,2,3,4,5,6].map(d => (
+                <button
+                  key={d}
+                  onClick={() =>
+                    setForm(prev => ({
+                      ...prev,
+                      game_days: prev.game_days.includes(d)
+                        ? prev.game_days.filter(x => x !== d)
+                        : [...prev.game_days, d]
+                    }))
+                  }
+                  className={`p-2 text-[10px] rounded ${
+                    form.game_days.includes(d)
+                      ? 'bg-cyan-electric text-black'
+                      : 'bg-white/5'
+                  }`}
+                >
+                  {DAYS[d]}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleCreate}
+              className="w-full p-3 bg-cyan-electric text-black font-black rounded-xl"
+            >
+              Criar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showJoin && (
+        <Modal onClose={() => setShowJoin(false)}>
+          <div className="space-y-3">
+            <h2 className="font-black uppercase">Entrar no Baba</h2>
+
+            <input
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="AB12CD"
+              className="w-full p-3 text-center tracking-widest font-black bg-black/40 rounded-xl"
+              maxLength={6}
+            />
+
+            <button
+              onClick={handleJoin}
+              className="w-full p-3 bg-green-500 text-black font-black rounded-xl"
+            >
+              Entrar
+            </button>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 };
 
-export default HomePage;
+export default HomePageV4;
