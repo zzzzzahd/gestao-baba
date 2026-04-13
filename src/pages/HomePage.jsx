@@ -4,129 +4,55 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 
 import {
-  PlusCircle,
+  Plus,
   LogIn,
   Trophy,
-  Users,
   User,
-  Clock,
-  Calendar,
-  MapPin,
   ArrowRight,
   Play,
-  Target,
-  Sparkles,
-  X
+  Calendar
 } from 'lucide-react';
 
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
-const DAYS = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+const DAY = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 
-// ─────────────────────────────
-// HELPERS
-// ─────────────────────────────
-const formatDays = (baba) => {
-  let days = [];
-
-  if (Array.isArray(baba?.game_days_config)) {
-    days = baba.game_days_config.map(d => Number(d.day));
-  } else if (Array.isArray(baba?.game_days)) {
-    days = baba.game_days.map(Number);
-  }
-
-  return [...new Set(days)]
-    .filter(d => d >= 0 && d <= 6)
-    .sort()
-    .map(d => DAYS[d])
-    .join(' · ');
-};
-
-// ─────────────────────────────
-// MODAL BASE
-// ─────────────────────────────
-const Modal = ({ children, onClose }) => (
-  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-    <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 relative">
-      <button onClick={onClose} className="absolute top-4 right-4 text-white/40">
-        <X />
-      </button>
-      {children}
-    </div>
-  </div>
-);
-
-// ─────────────────────────────
-// HOME V4
-// ─────────────────────────────
 const HomePageV4 = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { myBabas, setCurrentBaba, createBaba, joinBaba, loading } = useBaba();
+  const { myBabas, setCurrentBaba, joinBaba, loading } = useBaba();
 
-  const [showCreate, setShowCreate] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
+  const [invite, setInvite] = useState('');
 
-  const [form, setForm] = useState({
-    name: '',
-    modality: 'futsal',
-    game_time: '20:00',
-    match_duration: 10,
-    game_days: []
-  });
-
-  // ─────────────────────────────
-  // CONTEXTUAL DATA
-  // ─────────────────────────────
+  // ───────────────
+  // DERIVADOS
+  // ───────────────
   const lastBaba = useMemo(() => myBabas?.[0] || null, [myBabas]);
-  const profileInitial = profile?.name?.charAt(0)?.toUpperCase() || 'U';
 
-  // ─────────────────────────────
-  // CREATE (FULL COMPAT)
-  // ─────────────────────────────
-  const handleCreate = async () => {
-    if (!form.name.trim()) return toast.error('Nome obrigatório');
-    if (!form.game_days.length) return toast.error('Selecione dias');
+  const initials = useMemo(
+    () => profile?.name?.charAt(0)?.toUpperCase() || 'U',
+    [profile]
+  );
 
-    const game_days_config = form.game_days.map(d => ({
-      day: Number(d),
-      time: form.game_time,
-      location: ''
-    }));
-
-    const res = await createBaba({
-      ...form,
-      game_days: form.game_days.map(Number),
-      game_days_config
-    });
-
-    if (res) {
-      toast.success('Baba criado!');
-      setShowCreate(false);
-      setForm({ name:'', modality:'futsal', game_time:'20:00', match_duration:10, game_days:[] });
-    }
-  };
-
-  // ─────────────────────────────
-  // JOIN (ROBUSTO)
-  // ─────────────────────────────
+  // ───────────────
+  // JOIN
+  // ───────────────
   const handleJoin = async () => {
-    const code = inviteCode.trim().toUpperCase();
+    const code = invite.trim().toUpperCase();
 
     if (code.length !== 6) {
-      return toast.error('Código inválido');
+      toast.error('Código inválido');
+      return;
     }
 
     const res = await joinBaba(code);
-
-    if (res) {
-      toast.success('Entrou no baba!');
-      navigate('/dashboard');
-    }
+    if (res) navigate('/dashboard');
   };
 
+  // ───────────────
+  // OPEN BABA
+  // ───────────────
   const openBaba = (baba) => {
     setCurrentBaba(baba);
     navigate('/dashboard');
@@ -141,26 +67,26 @@ const HomePageV4 = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white px-6 py-8 space-y-8">
+    <div className="min-h-screen bg-black text-white px-6 py-6 space-y-6">
 
-      {/* ───────────────── HEADER ───────────────── */}
+      {/* ───────── HEADER ───────── */}
       <div className="flex items-center justify-between">
         <Logo size="small" />
 
         <button
           onClick={() => navigate('/profile')}
-          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center"
+          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20"
         >
-          <span className="text-cyan-electric font-black">
-            {profileInitial}
+          <span className="text-cyan-electric font-black text-sm">
+            {initials}
           </span>
         </button>
       </div>
 
-      {/* ───────────────── PLAYER INTELLIGENCE ───────────────── */}
-      <div className="card-glass p-5 rounded-3xl flex items-center gap-4">
+      {/* ───────── PROFILE CARD ───────── */}
+      <div className="card-glass p-5 rounded-3xl border border-white/5 flex items-center gap-4">
 
-        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden">
+        <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 flex items-center justify-center overflow-hidden">
           {profile?.avatar_url ? (
             <img src={profile.avatar_url} className="w-full h-full object-cover" />
           ) : (
@@ -169,180 +95,132 @@ const HomePageV4 = () => {
         </div>
 
         <div className="flex-1">
-          <p className="font-black uppercase">{profile?.name}</p>
+          <h2 className="font-black uppercase">
+            {profile?.name || 'Jogador'}
+          </h2>
           <p className="text-[10px] text-white/40 uppercase">
             {profile?.position || 'Sem posição'}
+          </p>
+          <p className="text-[9px] text-cyan-electric font-black uppercase">
+            PLAYER HUB
           </p>
         </div>
 
         <button
           onClick={() => navigate('/profile')}
-          className="px-3 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase"
+          className="px-3 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase border border-white/10"
         >
           Perfil
         </button>
 
       </div>
 
-      {/* ───────────────── QUICK ACTIONS ───────────────── */}
+      {/* ───────── QUICK ACTIONS (AJUSTADO) ───────── */}
       <div className="grid grid-cols-3 gap-3">
 
         <button
-          onClick={() => setShowCreate(true)}
-          className="p-4 bg-cyan-electric text-black font-black rounded-2xl flex flex-col items-center gap-1"
+          onClick={() => navigate('/create')}
+          className="p-4 rounded-2xl bg-cyan-electric text-black font-black text-[10px] uppercase flex flex-col items-center gap-2"
         >
-          <PlusCircle size={18}/>
+          <Plus size={18} />
           Criar
         </button>
 
         <button
-          onClick={() => setShowJoin(true)}
-          className="p-4 bg-white/5 font-black rounded-2xl flex flex-col items-center gap-1"
+          onClick={() => document.getElementById('joinBox').scrollIntoView()}
+          className="p-4 rounded-2xl bg-white/5 font-black text-[10px] uppercase flex flex-col items-center gap-2"
         >
-          <LogIn size={18}/>
+          <LogIn size={18} />
           Entrar
         </button>
 
         <button
           onClick={() => navigate('/rankings')}
-          className="p-4 bg-white/5 font-black rounded-2xl flex flex-col items-center gap-1"
+          className="p-4 rounded-2xl bg-white/5 font-black text-[10px] uppercase flex flex-col items-center gap-2"
         >
-          <Trophy size={18}/>
+          <Trophy size={18} />
           Rank
         </button>
 
       </div>
 
-      {/* ───────────────── CONTINUE BABA ───────────────── */}
+      {/* ───────── LAST BABA (DESTAQUE REAL) ───────── */}
       {lastBaba && (
-        <button
+        <div
           onClick={() => openBaba(lastBaba)}
-          className="w-full p-5 bg-gradient-to-r from-cyan-electric/20 to-transparent border border-cyan-electric/20 rounded-3xl text-left"
+          className="p-5 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5 flex justify-between items-center"
         >
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="font-black">{lastBaba.name}</p>
-              <p className="text-[10px] text-white/40">
-                Continuar último baba
-              </p>
-            </div>
-            <Play className="text-cyan-electric" />
+          <div>
+            <p className="font-black">{lastBaba.name}</p>
+            <p className="text-[10px] text-white/40">
+              {lastBaba.game_time?.substring(0,5)}
+            </p>
           </div>
 
-          <p className="text-[10px] text-white/30 mt-2">
-            {formatDays(lastBaba)}
-          </p>
-        </button>
+          <Play className="text-cyan-electric" />
+        </div>
       )}
 
-      {/* ───────────────── MY BABAS ───────────────── */}
-      <div className="space-y-2">
-
-        <p className="text-cyan-electric font-black text-sm uppercase">
-          Meus Babas
+      {/* ───────── JOIN BOX ───────── */}
+      <div
+        id="joinBox"
+        className="card-glass p-5 rounded-3xl space-y-3"
+      >
+        <p className="text-[10px] text-white/40 uppercase font-black">
+          Entrar com código
         </p>
 
-        {myBabas?.length ? myBabas.map((baba) => (
-          <button
-            key={baba.id}
-            onClick={() => openBaba(baba)}
-            className="w-full p-4 bg-white/5 rounded-2xl text-left"
-          >
-            <div className="flex justify-between">
-              <p className="font-black">{baba.name}</p>
-              <span className="text-cyan-electric text-[10px]">
-                {baba.game_time?.substring(0,5)}
-              </span>
-            </div>
+        <input
+          value={invite}
+          onChange={(e) =>
+            setInvite(
+              e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+            )
+          }
+          placeholder="AB12CD"
+          className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-center tracking-widest font-black"
+          maxLength={6}
+        />
 
-            <p className="text-[10px] text-white/40">
-              {formatDays(baba)}
-            </p>
-          </button>
-        )) : (
-          <p className="text-white/30 text-center">
-            Nenhum baba ainda
-          </p>
+        <button
+          onClick={handleJoin}
+          className="w-full p-4 bg-green-500 text-black font-black uppercase rounded-2xl"
+        >
+          Entrar no Baba
+        </button>
+      </div>
+
+      {/* ───────── MEUS BABAS ───────── */}
+      <div className="space-y-3">
+
+        <h3 className="text-[10px] text-cyan-electric font-black uppercase">
+          Meus Babas
+        </h3>
+
+        {myBabas?.length ? (
+          myBabas.map((baba) => (
+            <button
+              key={baba.id}
+              onClick={() => openBaba(baba)}
+              className="w-full p-4 rounded-2xl bg-white/5 flex justify-between items-center"
+            >
+              <div>
+                <p className="font-black">{baba.name}</p>
+                <p className="text-[10px] text-white/40">
+                  {baba.game_time?.substring(0,5)}
+                </p>
+              </div>
+
+              <ArrowRight className="text-cyan-electric" />
+            </button>
+          ))
+        ) : (
+          <div className="text-center text-white/30 p-6">
+            Nenhum baba criado
+          </div>
         )}
 
       </div>
-
-      {/* ───────────────── MODALS ───────────────── */}
-
-      {showCreate && (
-        <Modal onClose={() => setShowCreate(false)}>
-          <div className="space-y-3">
-            <h2 className="font-black uppercase">Criar Baba</h2>
-
-            <input
-              placeholder="Nome"
-              className="w-full p-3 bg-black/40 rounded-xl"
-              value={form.name}
-              onChange={e => setForm({...form, name: e.target.value})}
-            />
-
-            <input
-              type="time"
-              className="w-full p-3 bg-black/40 rounded-xl"
-              value={form.game_time}
-              onChange={e => setForm({...form, game_time: e.target.value})}
-            />
-
-            <div className="grid grid-cols-7 gap-1">
-              {[0,1,2,3,4,5,6].map(d => (
-                <button
-                  key={d}
-                  onClick={() =>
-                    setForm(prev => ({
-                      ...prev,
-                      game_days: prev.game_days.includes(d)
-                        ? prev.game_days.filter(x => x !== d)
-                        : [...prev.game_days, d]
-                    }))
-                  }
-                  className={`p-2 text-[10px] rounded ${
-                    form.game_days.includes(d)
-                      ? 'bg-cyan-electric text-black'
-                      : 'bg-white/5'
-                  }`}
-                >
-                  {DAYS[d]}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={handleCreate}
-              className="w-full p-3 bg-cyan-electric text-black font-black rounded-xl"
-            >
-              Criar
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {showJoin && (
-        <Modal onClose={() => setShowJoin(false)}>
-          <div className="space-y-3">
-            <h2 className="font-black uppercase">Entrar no Baba</h2>
-
-            <input
-              value={inviteCode}
-              onChange={e => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="AB12CD"
-              className="w-full p-3 text-center tracking-widest font-black bg-black/40 rounded-xl"
-              maxLength={6}
-            />
-
-            <button
-              onClick={handleJoin}
-              className="w-full p-3 bg-green-500 text-black font-black rounded-xl"
-            >
-              Entrar
-            </button>
-          </div>
-        </Modal>
-      )}
 
     </div>
   );
