@@ -1,11 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { supabase } from '../services/supabase'; 
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
 const BabaContext = createContext();
 
-// --- HELPERS (ORIGINAIS PRESERVADOS) ---
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+
 export const sanitizeGameDaysConfig = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const seen = new Set();
@@ -77,55 +80,86 @@ export const getNextGameDay = (baba) => {
   };
 };
 
+// ─────────────────────────────────────────────
+// SORTEIO BALANCEADO POR RATING
+// Distribui jogadores entre times tentando
+// equilibrar a soma dos final_rating de cada time.
+// Algoritmo: ordena por rating desc, distribui
+// em snake draft (1→N→N→1) para máximo equilíbrio.
+// ─────────────────────────────────────────────
+export const generateBalancedTeams = (players, numTeams = 2) => {
+  const n = Math.max(2, numTeams);
+
+  // Separa goleiros e linha
+  const goalies  = players.filter(p => p.position === 'goleiro')
+                          .sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+  const outfield = players.filter(p => p.position !== 'goleiro')
+                          .sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+
+  const teams = Array.from({ length: n }, (_, i) => ({
+    name: `Time ${String.fromCharCode(65 + i)}`,
+    players: [],
+    totalRating: 0,
+  }));
+
+  // Distribui goleiros round-robin
+  goalies.forEach((g, i) => {
+    const t = i % n;
+    teams[t].players.push(g);
+    teams[t].totalRating += g.final_rating || 0;
+  });
+
+  // Snake draft nos jogadores de linha:
+  // rodada 0 → 0,1,...,n-1
+  // rodada 1 → n-1,...,1,0
+  // Isso minimiza a diferença de rating entre times
+  let direction = 1;
+  let pointer   = 0;
+  outfield.forEach((p) => {
+    teams[pointer].players.push(p);
+    teams[pointer].totalRating += p.final_rating || 0;
+
+    pointer += direction;
+    if (pointer >= n) { pointer = n - 1; direction = -1; }
+    else if (pointer < 0) { pointer = 0; direction = 1; }
+  });
+
+  return teams;
+};
+
+// ─────────────────────────────────────────────
+// PROVIDER
+// ─────────────────────────────────────────────
+
 export const BabaProvider = ({ children }) => {
   const { user, profile } = useAuth();
-  const [myBabas, setMyBabas] = useState([]);
-  const [currentBaba, setCurrentBaba] = useState(null);
-  const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const [gameConfirmations, setGameConfirmations] = useState([]);
-  const [myConfirmation, setMyConfirmation] = useState(null);
-  const [confirmationDeadline, setConfirmationDeadline] = useState(null);
-  const [canConfirm, setCanConfirm] = useState(false);
-  const [nextGameDay, setNextGameDay] = useState(null);
+  const [myBabas,        setMyBabas]        = useState([]);
+  const [currentBaba,    setCurrentBaba]    = useState(null);
+  const [players,        setPlayers]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
 
-  const [countdown, setCountdown] = useState({ d: 0, h: 0, m: 0, s: 0, active: false });
+  const [gameConfirmations,   setGameConfirmations]   = useState([]);
+  const [myConfirmation,      setMyConfirmation]      = useState(null);
+  const [confirmationDeadline,setConfirmationDeadline]= useState(null);
+  const [canConfirm,          setCanConfirm]          = useState(false);
+  const [nextGameDay,         setNextGameDay]         = useState(null);
 
-  const [drawConfig, setDrawConfig] = useState({ playersPerTeam: 5, strategy: 'reserve' });
-  const [currentMatch, setCurrentMatch] = useState(null);
-  const [matchPlayers, setMatchPlayers] = useState([]);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStatus, setDrawStatus] = useState('waiting');
+  const [countdown,   setCountdown]   = useState({ d: 0, h: 0, m: 0, s: 0, active: false });
+  const [drawConfig,  setDrawConfig]  = useState({ playersPerTeam: 5, strategy: 'reserve' });
+  const [currentMatch,setCurrentMatch]= useState(null);
+  const [matchPlayers,setMatchPlayers]= useState([]);
+  const [isDrawing,   setIsDrawing]   = useState(false);
+  const [drawStatus,  setDrawStatus]  = useState('waiting');
 
   const hasAutoDrawnRef = useRef(false);
 
-  // --- MÉTODOS DE RATING (INTEGRADOS) ---
-  const ratePlayer = async (ratedId, ratings) => {
-    if (!user || !currentBaba) return;
-    try {
-      const myPlayer = players.find(p => p.user_id === user.id);
-      if (!myPlayer) throw new Error('Jogador não identificado');
+  // ─────────────────────────────────────────────
+  // RATING
+  // ─────────────────────────────────────────────
 
-      const { error } = await supabase
-        .from('player_ratings')
-        .upsert({
-          baba_id: currentBaba.id,
-          rater_id: myPlayer.id,
-          rated_id: ratedId,
-          skill: ratings.skill,
-          physical: ratings.physical,
-          commitment: ratings.commitment
-        });
-
-      if (error) throw error;
-      toast.success('Avaliação enviada!');
-    } catch (err) {
-      toast.error('Erro ao avaliar');
-    }
-  };
-
-  const getAllRatings = async () => {
+  // FIX: useCallback garante referência estável → sem loop no useEffect da Dashboard
+  const getAllRatings = useCallback(async () => {
     if (!currentBaba) return [];
     try {
       const { data, error } = await supabase
@@ -134,21 +168,93 @@ export const BabaProvider = ({ children }) => {
           *,
           player:players!player_id(name, position)
         `)
-        .eq('baba_id', currentBaba.id);
-      
+        .eq('baba_id', currentBaba.id)
+        .order('final_rating', { ascending: false });
+
       if (error) throw error;
-      return data;
+      // Normaliza: eleva player.name para o nível raiz para facilitar consumo
+      return (data || []).map(r => ({
+        ...r,
+        name:     r.player?.name     || 'Jogador',
+        position: r.player?.position || 'linha',
+      }));
     } catch (e) {
+      console.error('[getAllRatings]', e);
       return [];
     }
-  };
+  }, [currentBaba?.id]); // Só recria quando o baba muda
 
-  // --- CARREGAMENTO (ORIGINAIS) ---
+  const ratePlayer = useCallback(async (ratedId, ratings) => {
+    if (!user || !currentBaba) return;
+    try {
+      const myPlayer = players.find(p => p.user_id === user.id);
+      if (!myPlayer) throw new Error('Jogador não identificado');
+
+      // FIX: onConflict explícito — respeita a UNIQUE constraint do banco
+      const { error } = await supabase
+        .from('player_ratings')
+        .upsert(
+          {
+            baba_id:    currentBaba.id,
+            rater_id:   myPlayer.id,
+            rated_id:   ratedId,
+            skill:      ratings.skill,
+            physical:   ratings.physical,
+            commitment: ratings.commitment,
+          },
+          { onConflict: 'baba_id,rater_id,rated_id' }
+        );
+
+      if (error) throw error;
+      // O trigger do banco já recalcula o summary automaticamente
+      toast.success('Avaliação enviada! ⭐');
+    } catch (err) {
+      console.error('[ratePlayer]', err);
+      toast.error('Erro ao enviar avaliação');
+    }
+  }, [user, currentBaba, players]);
+
+  // Atualiza o peso manual (só presidente)
+  const setManualWeight = useCallback(async (playerId, weight) => {
+    if (!currentBaba) return;
+    const clamped = Math.max(0, Math.min(5, Number(weight)));
+    try {
+      const { error } = await supabase
+        .from('player_rating_summary')
+        .update({
+          manual_weight: clamped,
+          // Recalcula final_rating inline para refletir imediatamente
+          final_rating: supabase.rpc
+            ? undefined  // deixa o trigger cuidar se disponível
+            : undefined,
+        })
+        .eq('player_id', playerId)
+        .eq('baba_id', currentBaba.id);
+
+      if (error) throw error;
+
+      // Recalcula via RPC para garantir consistência
+      await supabase.rpc('recalculate_player_rating', {
+        p_rated_id: playerId,
+        p_baba_id: currentBaba.id,
+      });
+
+      toast.success('Peso manual atualizado!');
+    } catch (err) {
+      console.error('[setManualWeight]', err);
+      toast.error('Erro ao atualizar peso');
+    }
+  }, [currentBaba]);
+
+  // ─────────────────────────────────────────────
+  // CARREGAMENTO
+  // ─────────────────────────────────────────────
+
   const loadMyBabas = async () => {
     if (!user) return;
     try {
       const { data: presidentBabas } = await supabase.from('babas').select('*').eq('president_id', user.id);
-      const { data: playerRows } = await supabase.from('players').select('baba_id').eq('user_id', user.id);
+      const { data: playerRows }     = await supabase.from('players').select('baba_id').eq('user_id', user.id);
 
       let memberBabas = [];
       if (playerRows?.length > 0) {
@@ -163,12 +269,12 @@ export const BabaProvider = ({ children }) => {
 
       if (unique.length > 0) {
         const savedId = localStorage.getItem('selected_baba_id');
-        const saved = savedId ? unique.find(b => String(b.id) === savedId) : null;
+        const saved   = savedId ? unique.find(b => String(b.id) === savedId) : null;
         setCurrentBaba(saved || unique[0]);
       }
-    } catch (error) { 
-        console.error('[loadMyBabas]', error);
-        throw error;
+    } catch (error) {
+      console.error('[loadMyBabas]', error);
+      throw error;
     }
   };
 
@@ -181,7 +287,7 @@ export const BabaProvider = ({ children }) => {
     if (error) console.error('[loadPlayers]', error);
     const normalized = (data || []).map(p => ({
       ...p,
-      avatar_url: p.profile?.avatar_url || null,
+      avatar_url:   p.profile?.avatar_url || null,
       display_name: p.name || p.profile?.name || 'Jogador',
     }));
     setPlayers(normalized);
@@ -190,17 +296,29 @@ export const BabaProvider = ({ children }) => {
 
   const loadTodayMatch = async (babaId, dateStr) => {
     try {
-      const { data: draw } = await supabase.from('draw_results').select('id').eq('baba_id', babaId).eq('draw_date', dateStr).maybeSingle();
+      const { data: draw } = await supabase
+        .from('draw_results').select('id')
+        .eq('baba_id', babaId).eq('draw_date', dateStr).maybeSingle();
       if (!draw) { setCurrentMatch(null); setMatchPlayers([]); return; }
-      const { data: match } = await supabase.from('matches').select('*').eq('baba_id', babaId).eq('draw_result_id', draw.id).maybeSingle();
+
+      const { data: match } = await supabase
+        .from('matches').select('*')
+        .eq('baba_id', babaId).eq('draw_result_id', draw.id).maybeSingle();
       if (match) {
         setCurrentMatch(match);
-        const { data: mp } = await supabase.from('match_players').select('*, player:players(*, profile:profiles(avatar_url))').eq('match_id', match.id).order('team');
+        const { data: mp } = await supabase
+          .from('match_players')
+          .select('*, player:players(*, profile:profiles(avatar_url))')
+          .eq('match_id', match.id).order('team');
         setMatchPlayers(mp || []);
         setDrawStatus('ready');
       }
     } catch (e) { console.error('[loadTodayMatch]', e); }
   };
+
+  // ─────────────────────────────────────────────
+  // CONFIRMAÇÃO DE PRESENÇA
+  // ─────────────────────────────────────────────
 
   const confirmPresence = async () => {
     if (!currentBaba || !user || !nextGameDay) return;
@@ -208,12 +326,16 @@ export const BabaProvider = ({ children }) => {
     try {
       const myPlayer = players.find(p => p.user_id === user.id);
       if (!myPlayer) throw new Error('Jogador não encontrado');
-      const { data, error } = await supabase.from('game_confirmations').insert([{ baba_id: currentBaba.id, player_id: myPlayer.id, game_date: nextGameDay.dateStr }]).select('*, player:players(*)').single();
+      const { data, error } = await supabase
+        .from('game_confirmations')
+        .insert([{ baba_id: currentBaba.id, player_id: myPlayer.id, game_date: nextGameDay.dateStr }])
+        .select('*, player:players(*)')
+        .single();
       if (error) throw error;
       setGameConfirmations(prev => [...prev, data]);
       setMyConfirmation(data);
       toast.success('Presença confirmada!');
-    } catch (error) { toast.error('Erro ao confirmar'); } 
+    } catch (error) { toast.error('Erro ao confirmar'); }
     finally { setLoading(false); }
   };
 
@@ -226,11 +348,14 @@ export const BabaProvider = ({ children }) => {
       setGameConfirmations(prev => prev.filter(c => c.id !== myConfirmation.id));
       setMyConfirmation(null);
       toast.success('Presença cancelada');
-    } catch (error) { toast.error('Erro ao cancelar'); } 
+    } catch (error) { toast.error('Erro ao cancelar'); }
     finally { setLoading(false); }
   };
 
-  // --- CRUD (ORIGINAIS) ---
+  // ─────────────────────────────────────────────
+  // CRUD
+  // ─────────────────────────────────────────────
+
   const createBaba = async (babaData) => {
     setLoading(true);
     try {
@@ -241,9 +366,15 @@ export const BabaProvider = ({ children }) => {
         sanitized.game_days = clean.map(c => c.day);
         sanitized.game_time = clean[0]?.time || '20:00';
       }
-      const { data, error } = await supabase.from('babas').insert([{ ...sanitized, president_id: user.id }]).select().single();
+      const { data, error } = await supabase
+        .from('babas')
+        .insert([{ ...sanitized, president_id: user.id }])
+        .select().single();
       if (error) throw error;
-      await supabase.from('players').insert([{ baba_id: data.id, user_id: user.id, name: profile?.name || 'Presidente', position: 'linha' }]);
+      await supabase.from('players').insert([{
+        baba_id: data.id, user_id: user.id,
+        name: profile?.name || 'Presidente', position: 'linha',
+      }]);
       await loadMyBabas();
       setCurrentBaba(data);
       return data;
@@ -261,7 +392,8 @@ export const BabaProvider = ({ children }) => {
         sanitized.game_days = clean.map(c => c.day);
         sanitized.game_time = clean[0]?.time || '20:00';
       }
-      const { data, error } = await supabase.from('babas').update(sanitized).eq('id', babaId).select('*').single();
+      const { data, error } = await supabase
+        .from('babas').update(sanitized).eq('id', babaId).select('*').single();
       if (error) throw error;
       setMyBabas(prev => prev.map(b => b.id === babaId ? { ...b, ...data } : b));
       if (currentBaba?.id === babaId) setCurrentBaba({ ...data });
@@ -275,9 +407,13 @@ export const BabaProvider = ({ children }) => {
     setLoading(true);
     try {
       const code = inviteCode.trim().toUpperCase();
-      const { data: baba } = await supabase.from('babas').select('*').eq('invite_code', code).maybeSingle();
+      const { data: baba } = await supabase
+        .from('babas').select('*').eq('invite_code', code).maybeSingle();
       if (!baba) throw new Error('Código inválido');
-      await supabase.from('players').upsert([{ baba_id: baba.id, user_id: user.id, name: profile?.name || 'Jogador', position: 'linha' }]);
+      await supabase.from('players').upsert([{
+        baba_id: baba.id, user_id: user.id,
+        name: profile?.name || 'Jogador', position: 'linha',
+      }]);
       await loadMyBabas();
       setCurrentBaba(baba);
       toast.success('Entrou no Baba!');
@@ -289,14 +425,16 @@ export const BabaProvider = ({ children }) => {
   const uploadBabaImage = async (file, type = 'avatar') => {
     if (!currentBaba || !file) return null;
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-      const path = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
+      const ext    = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path   = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       const field = type === 'avatar' ? 'logo_url' : 'cover_url';
-      const { data: updatedBaba, error: updateError } = await supabase.from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
+      const { data: updatedBaba, error: updateError } = await supabase
+        .from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
       if (updateError) throw updateError;
       setMyBabas(prev => prev.map(b => b.id === currentBaba.id ? { ...b, ...updatedBaba } : b));
       setCurrentBaba(prev => ({ ...prev, ...updatedBaba }));
@@ -308,10 +446,13 @@ export const BabaProvider = ({ children }) => {
   const generateInviteCode = async () => {
     if (!currentBaba) return;
     try {
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newCode  = Math.random().toString(36).substring(2, 8).toUpperCase();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
-      const { data, error } = await supabase.from('babas').update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() }).eq('id', currentBaba.id).select('*').single();
+      const { data, error } = await supabase
+        .from('babas')
+        .update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() })
+        .eq('id', currentBaba.id).select('*').single();
       if (error) throw error;
       setCurrentBaba(data);
       setMyBabas(prev => prev.map(b => b.id === data.id ? data : b));
@@ -319,55 +460,100 @@ export const BabaProvider = ({ children }) => {
     } catch (error) { toast.error('Erro ao gerar código'); }
   };
 
-  // --- SORTEIO (ORIGINAL) ---
+  // ─────────────────────────────────────────────
+  // SORTEIO — agora usa generateBalancedTeams
+  // ─────────────────────────────────────────────
+
   const drawTeamsIntelligent = async () => {
     if (isDrawing || !currentBaba || !nextGameDay) return null;
     setIsDrawing(true);
     try {
-      const dateStr = nextGameDay.dateStr;
-      const confirmed = gameConfirmations
-        .map(c => c?.player)
-        .filter(p => p && p.id);
+      const dateStr   = nextGameDay.dateStr;
+      const confirmed = gameConfirmations.map(c => c?.player).filter(p => p && p.id);
 
-      if (confirmed.length < (drawConfig.playersPerTeam * 2)) { setDrawStatus('insufficient'); return null; }
-      let goalies = confirmed.filter(p => p.position === 'goleiro').sort(() => Math.random() - 0.5);
-      let outfield = confirmed.filter(p => p.position !== 'goleiro').sort(() => Math.random() - 0.5);
-      const numTeams = Math.floor(confirmed.length / drawConfig.playersPerTeam);
-      const teams = Array.from({ length: Math.max(2, numTeams) }, (_, i) => ({ name: `Time ${String.fromCharCode(65 + i)}`, players: [] }));
-      for (let i = 0; i < teams.length && goalies.length > 0; i++) teams[i].players.push(goalies.shift());
-      let remaining = [...outfield, ...goalies];
-      let tIdx = 0;
-      while (remaining.length > 0) {
-        if (teams[tIdx].players.length < drawConfig.playersPerTeam) teams[tIdx].players.push(remaining.shift());
-        tIdx = (tIdx + 1) % teams.length;
-        if (teams.every(t => t.players.length >= drawConfig.playersPerTeam)) break;
+      if (confirmed.length < drawConfig.playersPerTeam * 2) {
+        setDrawStatus('insufficient');
+        return null;
       }
-      const { data: drawResult } = await supabase.from('draw_results').upsert({ baba_id: currentBaba.id, draw_date: dateStr, teams, reserves: remaining, players_per_team: drawConfig.playersPerTeam }).select().single();
-      const { data: existingMatch } = await supabase.from('matches').select('id').eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
+
+      // Busca ratings dos confirmados para balancear
+      const ratingsData = await getAllRatings();
+      const ratingMap   = new Map(ratingsData.map(r => [r.player_id, r.final_rating || 0]));
+
+      // Enriquece confirmados com o final_rating
+      const enriched = confirmed.map(p => ({
+        ...p,
+        final_rating: ratingMap.get(p.id) || 0,
+      }));
+
+      const numTeams   = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));
+      const teamsRaw   = generateBalancedTeams(enriched, numTeams);
+      const teams      = teamsRaw.map(({ name, players }) => ({ name, players }));
+      const teamSlots  = drawConfig.playersPerTeam;
+      const reserves   = teamsRaw.flatMap(t => t.players.slice(teamSlots));
+      const mainTeams  = teams.map(t => ({ ...t, players: t.players.slice(0, teamSlots) }));
+
+      const { data: drawResult } = await supabase
+        .from('draw_results')
+        .upsert({
+          baba_id: currentBaba.id, draw_date: dateStr,
+          teams: mainTeams, reserves, players_per_team: drawConfig.playersPerTeam,
+        })
+        .select().single();
+
+      const { data: existingMatch } = await supabase
+        .from('matches').select('id')
+        .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
+
       if (!existingMatch) {
-        const { data: match } = await supabase.from('matches').insert([{ baba_id: currentBaba.id, match_date: `${dateStr}T${nextGameDay.time}:00`, team_a_name: teams[0].name, team_b_name: teams[1].name, draw_result_id: drawResult.id, status: 'scheduled' }]).select().single();
-        const mPlayers = teams.slice(0, 2).flatMap((t, i) => t.players.map(p => ({ match_id: match.id, player_id: p.id, team: i === 0 ? 'A' : 'B', position: p.position || 'linha' })));
+        const { data: match } = await supabase.from('matches').insert([{
+          baba_id: currentBaba.id,
+          match_date: `${dateStr}T${nextGameDay.time}:00`,
+          team_a_name: mainTeams[0]?.name || 'Time A',
+          team_b_name: mainTeams[1]?.name || 'Time B',
+          draw_result_id: drawResult.id,
+          status: 'scheduled',
+        }]).select().single();
+
+        const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
+          t.players.map(p => ({
+            match_id: match.id, player_id: p.id,
+            team: i === 0 ? 'A' : 'B', position: p.position || 'linha',
+          }))
+        );
         await supabase.from('match_players').insert(mPlayers);
       }
+
       await loadTodayMatch(currentBaba.id, dateStr);
       return true;
-    } catch (error) { console.error('[drawTeams]', error); return null; }
-    finally { setIsDrawing(false); }
+    } catch (error) {
+      console.error('[drawTeams]', error);
+      return null;
+    } finally {
+      setIsDrawing(false);
+    }
   };
 
   const tryAutoDraw = async () => {
     if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
     if (new Date() < nextGameDay.deadline) return;
-    const { data: existing } = await supabase.from('draw_results').select('id').eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
+    const { data: existing } = await supabase
+      .from('draw_results').select('id')
+      .eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
     if (existing) { hasAutoDrawnRef.current = true; return; }
     if (gameConfirmations.length >= drawConfig.playersPerTeam * 2) {
       hasAutoDrawnRef.current = true;
       const res = await drawTeamsIntelligent();
       if (res) toast.success('Sorteio automático realizado!');
-    } else { setDrawStatus('insufficient'); }
+    } else {
+      setDrawStatus('insufficient');
+    }
   };
 
-  // ✅ EFEITOS DE SINCRONIA (MANUTENÇÃO ORIGINAL)
+  // ─────────────────────────────────────────────
+  // EFFECTS
+  // ─────────────────────────────────────────────
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -388,13 +574,17 @@ export const BabaProvider = ({ children }) => {
 
     const syncData = async () => {
       const playersData = await loadPlayers(currentBaba.id);
-      const next = getNextGameDay(currentBaba);
+      const next        = getNextGameDay(currentBaba);
       setNextGameDay(next);
 
       if (next) {
         setConfirmationDeadline(next.deadline);
         setCanConfirm(new Date() < next.deadline);
-        const { data: c } = await supabase.from('game_confirmations').select('*, player:players(*)').eq('baba_id', currentBaba.id).eq('game_date', next.dateStr);
+        const { data: c } = await supabase
+          .from('game_confirmations')
+          .select('*, player:players(*)')
+          .eq('baba_id', currentBaba.id)
+          .eq('game_date', next.dateStr);
         const confirmations = c || [];
         setGameConfirmations(confirmations);
         const myP = playersData.find(p => p.user_id === user.id);
@@ -409,6 +599,7 @@ export const BabaProvider = ({ children }) => {
     syncData();
   }, [currentBaba?.id, user?.id]);
 
+  // Cronômetro — usa nextGameDay.dateStr como chave para não re-triggar por mudança de objeto
   useEffect(() => {
     let timeoutId;
     const update = () => {
@@ -416,38 +607,39 @@ export const BabaProvider = ({ children }) => {
         setCountdown({ d: 0, h: 0, m: 0, s: 0, active: false });
         return;
       }
-      const now = new Date();
-      const diff = new Date(nextGameDay.date) - now;
+      const diff = new Date(nextGameDay.date) - Date.now();
       if (diff <= 0) {
         setCountdown(prev => prev.active ? { d: 0, h: 0, m: 0, s: 0, active: false } : prev);
         return;
       }
       const totalSeconds = Math.floor(diff / 1000);
       setCountdown({
-        d: Math.floor(totalSeconds / (60 * 60 * 24)),
-        h: Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60)),
-        m: Math.floor((totalSeconds % (60 * 60)) / 60),
+        d: Math.floor(totalSeconds / 86400),
+        h: Math.floor((totalSeconds % 86400) / 3600),
+        m: Math.floor((totalSeconds % 3600) / 60),
         s: totalSeconds % 60,
-        active: true
+        active: true,
       });
-      const delay = 1000 - (Date.now() % 1000);
-      timeoutId = setTimeout(update, delay);
+      timeoutId = setTimeout(update, 1000 - (Date.now() % 1000));
     };
     update();
     return () => clearTimeout(timeoutId);
   }, [nextGameDay?.dateStr]);
 
+  // Auto-draw polling a cada minuto
   useEffect(() => {
     const interval = setInterval(() => {
       if (nextGameDay) {
         setCanConfirm(new Date() < nextGameDay.deadline);
-        if (drawStatus === 'waiting' && !isDrawing) {
-          tryAutoDraw();
-        }
+        if (drawStatus === 'waiting' && !isDrawing) tryAutoDraw();
       }
     }, 60000);
     return () => clearInterval(interval);
   }, [nextGameDay?.dateStr, gameConfirmations.length, drawStatus, isDrawing]);
+
+  // ─────────────────────────────────────────────
+  // PROVIDER VALUE
+  // ─────────────────────────────────────────────
 
   return (
     <BabaContext.Provider value={{
@@ -457,7 +649,10 @@ export const BabaProvider = ({ children }) => {
       countdown, currentMatch, matchPlayers, isDrawing, drawStatus,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
       confirmPresence, cancelConfirmation,
-      ratePlayer, getAllRatings // Expondo as novas funções
+      // Rating
+      ratePlayer, getAllRatings, setManualWeight,
+      // Util exportado para uso externo (ex: TeamsPage)
+      generateBalancedTeams,
     }}>
       {children}
     </BabaContext.Provider>
