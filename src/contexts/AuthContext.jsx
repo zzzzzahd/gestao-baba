@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
@@ -13,17 +13,13 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // ✅ ADICIONADO
+  const [user,    setUser]    = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Função para carregar perfil do usuário
-  const loadProfile = async (userId) => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
-
+  // FIX 1: useCallback → referência estável para usar em useEffect de outros contextos
+  const loadProfile = useCallback(async (userId) => {
+    if (!userId) { setProfile(null); return; }
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -32,72 +28,52 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Erro ao carregar perfil:', error);
+        console.error('[AuthContext] loadProfile:', error);
       }
-
       setProfile(data || null);
     } catch (error) {
-      console.error('Erro ao carregar perfil (catch):', error);
+      console.error('[AuthContext] loadProfile (catch):', error);
       setProfile(null);
     }
-  };
+  }, []); // sem deps — só usa supabase que é estável
 
   useEffect(() => {
-    // Verifica sessão atual
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
-      // ✅ Carrega perfil quando tiver usuário
-      if (currentUser) {
-        loadProfile(currentUser.id);
-      }
-      
+      if (currentUser) loadProfile(currentUser.id);
       setLoading(false);
     });
 
-    // Escuta mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
-      // ✅ Carrega perfil quando usuário muda
-      if (currentUser) {
-        loadProfile(currentUser.id);
-      } else {
-        setProfile(null);
-      }
+      if (currentUser) loadProfile(currentUser.id);
+      else setProfile(null);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfile]);
 
   const signUp = async (email, password, metadata = {}) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: metadata
-        }
+        options: { data: metadata },
       });
-      
       if (error) throw error;
 
-      // ✅ Se cadastro bem-sucedido, cria perfil na tabela profiles
       if (data.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([{
-            id: data.user.id,
-            email: email,
-            name: metadata.name || email.split('@')[0],
-            created_at: new Date().toISOString()
+            id:         data.user.id,
+            email:      email,
+            name:       metadata.name || email.split('@')[0],
+            created_at: new Date().toISOString(),
           }]);
-
-        if (profileError) {
-          console.error('Erro ao criar perfil:', profileError);
-        }
+        if (profileError) console.error('[AuthContext] criar perfil:', profileError);
       }
 
       toast.success('Conta criada! Verifique seu email.');
@@ -110,13 +86,8 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
     } catch (error) {
@@ -129,26 +100,19 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      // ✅ Limpa estados
       setUser(null);
       setProfile(null);
-      
-      // ✅ Limpa localStorage (remove possíveis dados antigos)
       localStorage.removeItem('selected_baba_id');
-      
       toast.success('Logout realizado!');
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // ✅ Função para atualizar perfil
-  const updateProfile = async (updates) => {
-    if (!user) {
-      return { error: 'Usuário não autenticado' };
-    }
-
+  // FIX 2: updateProfile atualiza estado local sem precisar recarregar do banco
+  // e chama o toast só quando chamado diretamente (não duplica com ProfileEdit)
+  const updateProfile = async (updates, { silent = false } = {}) => {
+    if (!user) return { error: 'Usuário não autenticado' };
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -156,11 +120,9 @@ export const AuthProvider = ({ children }) => {
         .eq('id', user.id)
         .select()
         .single();
-
       if (error) throw error;
-
       setProfile(data);
-      toast.success('Perfil atualizado!');
+      if (!silent) toast.success('Perfil atualizado!');
       return { data, error: null };
     } catch (error) {
       toast.error('Erro ao atualizar perfil');
@@ -168,15 +130,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // FIX 3: refreshProfile é useCallback estável — não causa loop em useEffect externos
+  const refreshProfile = useCallback(
+    () => loadProfile(user?.id),
+    [loadProfile, user?.id]
+  );
+
   const value = {
     user,
-    profile, // ✅ AGORA profile está incluído
+    profile,
     loading,
     signUp,
     signIn,
     signOut,
     updateProfile,
-    refreshProfile: () => loadProfile(user?.id)
+    refreshProfile,
+    loadProfile,
   };
 
   return (
