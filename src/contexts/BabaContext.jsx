@@ -408,21 +408,53 @@ export const BabaProvider = ({ children }) => {
   };
 
   const joinBaba = async (inviteCode) => {
-    // Proteção contra múltiplos cliques simultâneos
-    if (loading) return null;
+  setLoading(true);
+  try {
+    const code = inviteCode.trim().toUpperCase();
 
-    setLoading(true);
-    try {
-      const code = inviteCode.trim().toUpperCase();
+    const { data: baba, error: babaError } = await supabase
+      .from('babas')
+      .select('*')
+      .eq('invite_code', code)
+      .maybeSingle();
 
-      // 1. Busca baba pelo código — .single() garante erro se houver duplicata no banco
-      const { data: baba, error: babaError } = await supabase
-        .from('babas').select('*').eq('invite_code', code).single();
+    if (babaError) throw babaError;
+    if (!baba) throw new Error('Código inválido');
 
-      if (babaError || !baba) {
-        toast.error('Código inválido');
-        return null;
-      }
+    // valida expiração
+    if (baba.invite_expires_at && new Date(baba.invite_expires_at) < new Date()) {
+      throw new Error('Código expirado');
+    }
+
+    // entra no baba (sem duplicar)
+    const { error: insertError } = await supabase
+      .from('players')
+      .upsert(
+        [{
+          baba_id: baba.id,
+          user_id: user.id,
+          name: profile?.name || 'Jogador',
+          position: 'linha',
+        }],
+        { onConflict: 'baba_id,user_id' }
+      );
+
+    if (insertError) throw insertError;
+
+    await loadMyBabas();
+    setCurrentBaba(baba);
+
+    toast.success('Entrou no Baba! 🎉');
+    return baba;
+
+  } catch (error) {
+    console.error('[joinBaba]', error);
+    toast.error(error.message || 'Erro ao entrar no baba');
+    return null;
+  } finally {
+    setLoading(false);
+  }
+};
 
       // 2. Verifica se o código existe (pode ter sido revogado)
       if (!baba.invite_code) {
