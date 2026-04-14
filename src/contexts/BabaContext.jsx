@@ -456,56 +456,6 @@ export const BabaProvider = ({ children }) => {
   }
 };
 
-      // 2. Verifica se o código existe (pode ter sido revogado)
-      if (!baba.invite_code) {
-        toast.error('Código inválido');
-        return null;
-      }
-
-      // 3. Verifica expiração
-      if (baba.invite_expires_at && new Date(baba.invite_expires_at) < new Date()) {
-        toast.error('Código expirado. Peça um novo ao presidente.');
-        return null;
-      }
-
-      // 4. Verifica se já é membro
-      const { data: existing } = await supabase
-        .from('players')
-        .select('id')
-        .eq('baba_id', baba.id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existing) {
-        toast('Você já está nesse baba!');
-        await loadMyBabas();
-        return baba;
-      }
-
-      // 5. Insere jogador
-      const { error: insertError } = await supabase.from('players').insert([{
-        baba_id: baba.id, user_id: user.id,
-        name: profile?.name || 'Jogador', position: 'linha',
-      }]);
-
-      if (insertError) {
-        toast.error('Erro ao entrar no baba');
-        return null;
-      }
-
-      // 6. loadMyBabas já define currentBaba — NÃO setar depois para não sobrescrever
-      await loadMyBabas();
-      toast.success('Entrou no Baba! 🎉');
-      return baba;
-    } catch (err) {
-      console.error('[joinBaba]', err);
-      toast.error('Erro inesperado ao entrar no baba');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const uploadBabaImage = async (file, type = 'avatar') => {
     if (!currentBaba || !file) return null;
     try {
