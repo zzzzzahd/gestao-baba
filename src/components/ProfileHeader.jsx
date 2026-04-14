@@ -51,35 +51,35 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
   const letter = (profile?.name || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="relative">
-      {/* Background decorativo */}
-      <div className="h-40 w-full bg-black relative overflow-hidden">
+    <div>
+      {/* ── BAND de fundo — SEM overflow-hidden para o avatar não ser cortado ── */}
+      <div className="h-32 w-full bg-black relative">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,243,255,0.08)_0%,_transparent_70%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.06)_0%,_transparent_60%)]" />
+
+        {/* Botão voltar — dentro do band, posição absoluta local */}
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 text-white/40 hover:text-white transition-colors z-10"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        {/* Toggle edição */}
+        <button
+          onClick={() => onTabChange(tab === 'edit' ? 'stats' : 'edit')}
+          className={`absolute top-6 right-6 p-2.5 backdrop-blur-md rounded-2xl border transition-all z-10 ${
+            tab === 'edit'
+              ? 'bg-cyan-electric border-cyan-electric text-black'
+              : 'bg-black/60 border-white/10 text-white/40 hover:text-cyan-electric'
+          }`}
+        >
+          {tab === 'edit' ? <Check size={18} /> : <Edit3 size={18} />}
+        </button>
       </div>
 
-      {/* Botão voltar */}
-      <button
-        onClick={() => navigate(-1)}
-        className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 text-white/40 hover:text-white transition-colors z-10"
-      >
-        <ArrowLeft size={18} />
-      </button>
-
-      {/* Toggle edição */}
-      <button
-        onClick={() => onTabChange(tab === 'edit' ? 'stats' : 'edit')}
-        className={`absolute top-6 right-6 p-2.5 backdrop-blur-md rounded-2xl border transition-all z-10 ${
-          tab === 'edit'
-            ? 'bg-cyan-electric border-cyan-electric text-black'
-            : 'bg-black/60 border-white/10 text-white/40 hover:text-cyan-electric'
-        }`}
-      >
-        {tab === 'edit' ? <Check size={18} /> : <Edit3 size={18} />}
-      </button>
-
-      {/* Avatar */}
-      <div className="absolute -bottom-16 left-0 right-0 flex justify-center">
+      {/* ── AVATAR — margem negativa puxa para cima do band, sem absolute ── */}
+      <div className="flex justify-center -mt-14">
         <div className="relative">
           <div className="w-28 h-28 rounded-[2rem] border-4 border-black bg-gray-900 overflow-hidden shadow-2xl flex items-center justify-center">
             {profile?.avatar_url ? (
@@ -104,11 +104,8 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
         </div>
       </div>
 
-      {/* Espaço do avatar */}
-      <div className="h-20" />
-
-      {/* Nome + posição + rating */}
-      <div className="text-center px-6 mt-2 mb-1">
+      {/* ── NOME + posição + rating — fluxo normal abaixo do avatar ── */}
+      <div className="text-center px-6 mt-3 mb-1">
         <h1 className="text-2xl font-black italic uppercase tracking-tighter leading-none text-white">
           {profile?.name || 'Atleta'}
         </h1>
