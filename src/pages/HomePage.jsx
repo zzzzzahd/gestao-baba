@@ -42,12 +42,15 @@ const HomePageV4 = () => {
     const code = invite.trim().toUpperCase();
 
     if (code.length !== 6) {
-      toast.error('Código inválido');
+      toast.error('Código deve ter 6 caracteres');
       return;
     }
 
-    const res = await joinBaba(code);
-    if (res) navigate('/dashboard');
+    const baba = await joinBaba(code);
+
+    if (!baba) return; // joinBaba já exibiu o toast de erro
+
+    navigate('/dashboard');
   };
 
   // ───────────────
