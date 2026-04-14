@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+import { customAlphabet } from 'nanoid';
+
+// Alfabeto seguro: sem caracteres ambíguos (0/O, I/1)
+const nanoid = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 const BabaContext = createContext();
 
@@ -404,22 +408,70 @@ export const BabaProvider = ({ children }) => {
   };
 
   const joinBaba = async (inviteCode) => {
+    // Proteção contra múltiplos cliques simultâneos
+    if (loading) return null;
+
     setLoading(true);
     try {
       const code = inviteCode.trim().toUpperCase();
-      const { data: baba } = await supabase
-        .from('babas').select('*').eq('invite_code', code).maybeSingle();
-      if (!baba) throw new Error('Código inválido');
-      await supabase.from('players').upsert([{
+
+      // 1. Busca baba pelo código — .single() garante erro se houver duplicata no banco
+      const { data: baba, error: babaError } = await supabase
+        .from('babas').select('*').eq('invite_code', code).single();
+
+      if (babaError || !baba) {
+        toast.error('Código inválido');
+        return null;
+      }
+
+      // 2. Verifica se o código existe (pode ter sido revogado)
+      if (!baba.invite_code) {
+        toast.error('Código inválido');
+        return null;
+      }
+
+      // 3. Verifica expiração
+      if (baba.invite_expires_at && new Date(baba.invite_expires_at) < new Date()) {
+        toast.error('Código expirado. Peça um novo ao presidente.');
+        return null;
+      }
+
+      // 4. Verifica se já é membro
+      const { data: existing } = await supabase
+        .from('players')
+        .select('id')
+        .eq('baba_id', baba.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        toast('Você já está nesse baba!');
+        await loadMyBabas();
+        return baba;
+      }
+
+      // 5. Insere jogador
+      const { error: insertError } = await supabase.from('players').insert([{
         baba_id: baba.id, user_id: user.id,
         name: profile?.name || 'Jogador', position: 'linha',
       }]);
+
+      if (insertError) {
+        toast.error('Erro ao entrar no baba');
+        return null;
+      }
+
+      // 6. loadMyBabas já define currentBaba — NÃO setar depois para não sobrescrever
       await loadMyBabas();
-      setCurrentBaba(baba);
-      toast.success('Entrou no Baba!');
+      toast.success('Entrou no Baba! 🎉');
       return baba;
-    } catch (error) { toast.error(error.message); return null; }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error('[joinBaba]', err);
+      toast.error('Erro inesperado ao entrar no baba');
+      return null;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const uploadBabaImage = async (file, type = 'avatar') => {
@@ -444,20 +496,47 @@ export const BabaProvider = ({ children }) => {
   };
 
   const generateInviteCode = async () => {
-    if (!currentBaba) return;
+    if (!currentBaba) return null;
     try {
-      const newCode  = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Gera código garantidamente único (loop tenta até não colidir)
+      let newCode;
+      let attempts = 0;
+      while (attempts < 10) {
+        newCode = nanoid();
+        const { data: exists } = await supabase
+          .from('babas')
+          .select('id')
+          .eq('invite_code', newCode)
+          .maybeSingle();
+        if (!exists) break;
+        attempts++;
+      }
+
+      if (!newCode) {
+        toast.error('Erro ao gerar código único');
+        return null;
+      }
+
+      // Expira em 6h (mais seguro que 24h)
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
+      expiresAt.setHours(expiresAt.getHours() + 6);
+
       const { data, error } = await supabase
         .from('babas')
         .update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() })
         .eq('id', currentBaba.id).select('*').single();
+
       if (error) throw error;
+
       setCurrentBaba(data);
       setMyBabas(prev => prev.map(b => b.id === data.id ? data : b));
       toast.success('Novo código gerado!');
-    } catch (error) { toast.error('Erro ao gerar código'); }
+      return data;
+    } catch (error) {
+      console.error('[generateInviteCode]', error);
+      toast.error('Erro ao gerar código');
+      return null;
+    }
   };
 
   // ─────────────────────────────────────────────
