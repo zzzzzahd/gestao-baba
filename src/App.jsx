@@ -15,14 +15,13 @@ import MatchPageVisitor from './pages/MatchPageVisitor';
 import RankingsPage from './pages/RankingsPage';
 import FinancialPage from './pages/FinancialPage';
 import VisitorMode from './pages/VisitorMode';
-
-// 🔥 CORREÇÃO: importar DashboardPage
 import DashboardPage from './pages/DashboardPage';
+import CreatePage from './pages/CreatePage'; // ✅ NOVO
 
 // ProtectedRoute inline
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
@@ -30,7 +29,7 @@ const ProtectedRoute = ({ children }) => {
       </div>
     );
   }
-  
+
   return user ? children : <Navigate to="/login" />;
 };
 
@@ -39,7 +38,6 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <BabaProvider>
-          {/* 🔥 manter apenas UM Toaster e fora de Routes */}
           <Toaster
             position="top-center"
             toastOptions={{
@@ -66,21 +64,22 @@ function App() {
               },
             }}
           />
-          
+
           <Routes>
             {/* Rotas Públicas */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/visitor" element={<VisitorMode />} />
             <Route path="/visitor-match" element={<MatchPageVisitor />} />
-            
+
             {/* Rotas Protegidas */}
-            <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+            <Route path="/home"      element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
-            <Route path="/match" element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
-            <Route path="/rankings" element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
+            <Route path="/create"    element={<ProtectedRoute><CreatePage /></ProtectedRoute>} /> {/* ✅ NOVO */}
+            <Route path="/profile"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/teams"     element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
+            <Route path="/match"     element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
+            <Route path="/rankings"  element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
             <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
           </Routes>
 
