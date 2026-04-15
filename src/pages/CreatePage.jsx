@@ -26,11 +26,10 @@ const DAYS = [
   { short: 'SÁB', label: 'Sábado',    value: 6 },
 ];
 
+// 🔥 ALTERAÇÃO 1: remover modalidades inválidas
 const MODALITIES = [
   { value: 'society',  label: 'Society'  },
   { value: 'futsal',   label: 'Futsal'   },
-  { value: 'campo',    label: 'Campo'    },
-  { value: 'areia',    label: 'Areia'    },
 ];
 
 const DEFAULT_TIME = '20:00';
