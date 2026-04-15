@@ -101,22 +101,42 @@ const CreatePage = () => {
 
   // ── submit final ──
 
-  const handleCreate = async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      const baba = await createBaba({
-        name:             form.name.trim(),
-        modality:         form.modality,
-        location:         form.location.trim() || null,
-        players_per_team: form.playersPerTeam,
-        game_days_config: form.selectedDays,
-      });
-      if (baba) navigate('/dashboard');
-    } finally {
-      setSaving(false);
-    }
-  };
+const handleCreate = async () => {
+  if (saving) return;
+  setSaving(true);
+
+  try {
+    // 🔥 extrair dados corretamente
+    const game_days = form.selectedDays.map(d => d.day);
+
+    const game_days_config = form.selectedDays.map(d => ({
+      day: d.day,
+      time: d.time,
+      location: d.location || form.location || null,
+    }));
+
+    const game_time = form.selectedDays[0]?.time || null;
+
+    const baba = await createBaba({
+      name: form.name.trim(),
+      modality: form.modality,
+      location: form.location.trim() || null,
+      players_per_team: form.playersPerTeam,
+
+      // 🔥 CORREÇÃO REAL DO ERRO 400
+      game_days,
+      game_days_config,
+      game_time,
+    });
+
+    if (baba) navigate('/dashboard');
+
+  } catch (err) {
+    console.error('Erro ao criar baba:', err);
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ─────────────────────────────────────
   // RENDERS DE CADA STEP
