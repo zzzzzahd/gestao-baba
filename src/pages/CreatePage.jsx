@@ -17,19 +17,20 @@ import {
 // ─────────────────────────────────────
 
 const DAYS = [
-  { short: 'DOM', label: 'Domingo',    value: 0 },
-  { short: 'SEG', label: 'Segunda',    value: 1 },
-  { short: 'TER', label: 'Terça',      value: 2 },
-  { short: 'QUA', label: 'Quarta',     value: 3 },
-  { short: 'QUI', label: 'Quinta',     value: 4 },
-  { short: 'SEX', label: 'Sexta',      value: 5 },
-  { short: 'SÁB', label: 'Sábado',    value: 6 },
+  { short: 'DOM', label: 'Domingo', value: 0 },
+  { short: 'SEG', label: 'Segunda', value: 1 },
+  { short: 'TER', label: 'Terça',   value: 2 },
+  { short: 'QUA', label: 'Quarta',  value: 3 },
+  { short: 'QUI', label: 'Quinta',  value: 4 },
+  { short: 'SEX', label: 'Sexta',   value: 5 },
+  { short: 'SÁB', label: 'Sábado',  value: 6 },
 ];
 
-// 🔥 ALTERAÇÃO 1: remover modalidades inválidas
+// ✅ Alinhado com BabaSettings (3 modalidades)
 const MODALITIES = [
-  { value: 'society',  label: 'Society'  },
-  { value: 'futsal',   label: 'Futsal'   },
+  { value: 'society', label: 'Society' },
+  { value: 'futsal',  label: 'Futsal'  },
+  { value: 'campo',   label: 'Campo'   },
 ];
 
 const DEFAULT_TIME = '20:00';
@@ -41,11 +42,57 @@ const MAX_PER_TEAM = 11;
 // ─────────────────────────────────────
 
 const INITIAL = {
-  name:            '',
-  modality:        'society',
-  location:        '',
-  playersPerTeam:  5,
-  selectedDays:    [],       // [{ day, time, location }]
+  name:           '',
+  modality:       'society',
+  location:       '',
+  playersPerTeam: 5,        // usado localmente para max_players (players_per_team NÃO existe no banco)
+  selectedDays:   [],       // [{ day: number, time: string, location: string }]
+};
+
+// ─────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────
+
+/**
+ * Converte "HH:MM" → "HH:MM:00"
+ * O banco espera `time without time zone` no formato HH:MM:SS
+ */
+const toDbTime = (t) => (t && t.length === 5 ? `${t}:00` : t || '20:00:00');
+
+/**
+ * Monta o payload final compatível com a tabela `babas`.
+ * Campos que NÃO existem no schema são omitidos (ex: players_per_team).
+ */
+const buildInsertPayload = ({ name, modality, location, playersPerTeam, selectedDays }) => {
+  const cleanDays = [...selectedDays].sort((a, b) => a.day - b.day);
+
+  // game_days_config: JSONB — estrutura completa por dia
+  const game_days_config = cleanDays.map((d) => ({
+    day:      d.day,
+    time:     d.time || DEFAULT_TIME,
+    location: d.location?.trim() || location?.trim() || null,
+  }));
+
+  // game_days: ARRAY de inteiros (compatibilidade com código legado)
+  const game_days = cleanDays.map((d) => d.day);
+
+  // game_time: TIME — pega o horário do primeiro dia (HH:MM:SS)
+  const game_time = toDbTime(cleanDays[0]?.time || DEFAULT_TIME);
+
+  // max_players: INTEGER — total de jogadores titulares (2 times)
+  const max_players = playersPerTeam * 2;
+
+  return {
+    name:            name.trim(),
+    modality,
+    location:        location.trim() || null,
+    max_players,
+    game_days,
+    game_days_config,
+    game_time,
+    // Campos com default no banco — não precisam ser enviados:
+    // is_private, allow_reserves, created_at, updated_at, invite_code, etc.
+  };
 };
 
 // ─────────────────────────────────────
@@ -53,15 +100,16 @@ const INITIAL = {
 // ─────────────────────────────────────
 
 const CreatePage = () => {
-  const navigate  = useNavigate();
-  const { createBaba } = useBaba();
+  const navigate        = useNavigate();
+  const { createBaba, setCurrentBaba } = useBaba(); // ✅ precisamos de setCurrentBaba para redirecionar corretamente
 
   const [form,       setForm]       = useState(INITIAL);
   const [step,       setStep]       = useState(1);   // 1=info 2=dias 3=confirmar
   const [saving,     setSaving]     = useState(false);
-  const [dayEditing, setDayEditing] = useState(null); // índice do dia em edição
+  const [error,      setError]      = useState(null);
+  const [dayEditing, setDayEditing] = useState(null);
 
-  // ── helpers ──
+  // ── helpers de form ──
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
@@ -100,42 +148,36 @@ const CreatePage = () => {
 
   // ── submit final ──
 
-const handleCreate = async () => {
-  if (saving) return;
-  setSaving(true);
+  const handleCreate = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
 
-  try {
-    // 🔥 extrair dados corretamente
-    const game_days = form.selectedDays.map(d => d.day);
+    try {
+      const payload = buildInsertPayload(form);
 
-    const game_days_config = form.selectedDays.map(d => ({
-      day: d.day,
-      time: d.time,
-      location: d.location || form.location || null,
-    }));
+      console.log('[CreatePage] Payload enviado ao Supabase:', payload);
 
-    const game_time = form.selectedDays[0]?.time || null;
+      const baba = await createBaba(payload);
 
-    const baba = await createBaba({
-      name: form.name.trim(),
-      modality: form.modality,
-      location: form.location.trim() || null,
-      players_per_team: form.playersPerTeam,
+      if (!baba) throw new Error('createBaba retornou null — verifique o BabaContext');
 
-      // 🔥 CORREÇÃO REAL DO ERRO 400
-      game_days,
-      game_days_config,
-      game_time,
-    });
+      // ✅ Seta o baba recém-criado como atual no contexto
+      if (typeof setCurrentBaba === 'function') {
+        setCurrentBaba(baba);
+      }
 
-    if (baba) navigate('/dashboard');
+      // ✅ Redireciona para o dashboard com o baba já selecionado
+      // O DashboardPage/Home detectará o baba ativo e poderá abrir BabaSettings se necessário
+      navigate('/dashboard', { state: { openSettings: true, babaId: baba.id } });
 
-  } catch (err) {
-    console.error('Erro ao criar baba:', err);
-  } finally {
-    setSaving(false);
-  }
-};
+    } catch (err) {
+      console.error('[CreatePage] Erro ao criar baba:', err);
+      setError(err?.message || 'Erro desconhecido ao criar baba');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ─────────────────────────────────────
   // RENDERS DE CADA STEP
@@ -158,12 +200,12 @@ const handleCreate = async () => {
         />
       </div>
 
-      {/* Modalidade */}
+      {/* Modalidade — ✅ 3 opções alinhadas com BabaSettings */}
       <div className="space-y-2">
         <label className="text-[10px] text-white/40 uppercase font-black tracking-widest">
           Modalidade
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {MODALITIES.map(m => (
             <button
               key={m.value}
@@ -188,13 +230,13 @@ const handleCreate = async () => {
         <input
           value={form.location}
           onChange={e => set('location', e.target.value)}
-          placeholder="Quadra do bairro, CEP..."
+          placeholder="Quadra do bairro, Arena..."
           maxLength={80}
           className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl font-black placeholder:text-white/20 focus:border-cyan-electric/50 focus:outline-none transition-colors"
         />
       </div>
 
-      {/* Jogadores por time */}
+      {/* Jogadores por time — salvo como max_players = playersPerTeam * 2 */}
       <div className="space-y-2">
         <label className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
           <Users size={10} /> Jogadores por time
@@ -217,7 +259,7 @@ const handleCreate = async () => {
           </button>
         </div>
         <p className="text-[10px] text-white/30 text-center">
-          Total: {form.playersPerTeam * 2} titulares por jogo
+          max_players = {form.playersPerTeam * 2} titulares por jogo
         </p>
       </div>
 
@@ -257,7 +299,7 @@ const handleCreate = async () => {
         </p>
       )}
 
-      {/* Config individual por dia */}
+      {/* Config individual por dia — ✅ mesmo modelo do BabaSettings */}
       <div className="space-y-3">
         {form.selectedDays.map((sd) => {
           const dayLabel = DAYS.find(d => d.value === sd.day)?.label;
@@ -330,6 +372,7 @@ const handleCreate = async () => {
 
   const renderStep3 = () => {
     const modLabel = MODALITIES.find(m => m.value === form.modality)?.label;
+    const payload  = buildInsertPayload(form); // preview do payload real
     return (
       <div className="space-y-4">
 
@@ -337,24 +380,23 @@ const handleCreate = async () => {
           Confirme os dados
         </p>
 
-        {/* Resumo */}
         <div className="rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">
 
-          <Row label="Nome"       value={form.name} />
-          <Row label="Modalidade" value={modLabel} />
+          <Row label="Nome"         value={form.name} />
+          <Row label="Modalidade"   value={modLabel} />
           {form.location && <Row label="Local padrão" value={form.location} />}
-          <Row label="Jogadores/time" value={`${form.playersPerTeam} (${form.playersPerTeam * 2} titulares)`} />
+          <Row label="max_players"  value={`${payload.max_players} (${form.playersPerTeam} por time)`} />
 
           <div className="p-4">
-            <p className="text-[9px] text-white/30 uppercase font-black mb-2">Dias</p>
+            <p className="text-[9px] text-white/30 uppercase font-black mb-2">Agenda</p>
             <div className="space-y-1">
-              {form.selectedDays.map(sd => {
-                const dayLabel = DAYS.find(d => d.value === sd.day)?.label;
+              {payload.game_days_config.map(d => {
+                const dayLabel = DAYS.find(day => day.value === d.day)?.label;
                 return (
-                  <div key={sd.day} className="flex justify-between items-center">
+                  <div key={d.day} className="flex justify-between items-center">
                     <span className="text-[11px] font-black">{dayLabel}</span>
                     <span className="text-[10px] text-white/40">
-                      {sd.time}{sd.location ? ` · ${sd.location}` : ''}
+                      {d.time}{d.location ? ` · ${d.location}` : ''}
                     </span>
                   </div>
                 );
@@ -363,6 +405,13 @@ const handleCreate = async () => {
           </div>
 
         </div>
+
+        {/* ✅ Exibe erro se houver */}
+        {error && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-black">
+            {error}
+          </div>
+        )}
 
       </div>
     );
@@ -446,7 +495,7 @@ const handleCreate = async () => {
           <button
             disabled={saving}
             onClick={handleCreate}
-            className="w-full p-4 rounded-2xl font-black uppercase text-sm bg-green-500 text-black flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            className="w-full p-4 rounded-2xl font-black uppercase text-sm bg-green-500 text-black flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
           >
             {saving ? (
               <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
