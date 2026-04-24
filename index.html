@@ -3,83 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>DRAFT - Gestão de Baba</title>
-    
-    <meta name="description" content="Sistema profissional de gestão de peladas e babas">
-    <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="DRAFT">
-    <meta name="mobile-web-app-capable" content="yes">
-    
+    <title>Draft Play - Gestão de Baba</title>
+
+    <!-- PWA Essencial -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#00f2ff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Apple PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Draft Play" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96x96.png" />
+    <link rel="shortcut icon" href="/icons/icon-96x96.png" />
+
+    <!-- SEO e compartilhamento -->
+    <meta name="description" content="Sistema profissional de gestão de peladas e babas. Sorteio de times, rankings, presenças e financeiro." />
+    <meta name="keywords" content="baba, pelada, futebol, sorteio times, gestão futebol" />
+    <meta property="og:title" content="Draft Play - Gestão de Baba" />
+    <meta property="og:description" content="Gestão completa de peladas: times, rankings e presenças." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- html2canvas para cartões compartilháveis -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 
     <style>
-      /* --- VARIÁVEIS DO LOGO DRAFT PLAY --- */
-      :root {
-        /* Define o Azul Cyan Padrão que você usa no projeto */
-        --cyan-electric: #00f2ff; 
-      }
-
-      /* Classe para aplicar a fonte Rajdhani que você já carregou */
-      .font-display {
-        font-family: 'Rajdhani', sans-serif;
-      }
-
-      /* Animação de entrada suave para o logo */
+      :root { --cyan-electric: #00f2ff; }
+      .font-display { font-family: 'Rajdhani', sans-serif; }
       @keyframes fade-in {
         from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        to   { opacity: 1; transform: translateY(0); }
       }
-      .animate-fade-in {
-        animation: fade-in 0.6s ease-out forwards;
-      }
-      /* ------------------------------------ */
-
-      /* Reset tático original */
-      * {
-        -webkit-tap-highlight-color: transparent;
-        box-sizing: border-box;
-      }
-
+      .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
+      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
       body {
-        margin: 0;
-        padding: 0;
+        margin: 0; padding: 0;
         background-color: #000000;
         font-family: 'Inter', sans-serif;
         color: white;
         overflow-x: hidden;
         min-height: 100vh;
       }
-
-      #root {
-        min-height: 100vh;
-      }
-
-      /* Estilização da Scrollbar Neon */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #000;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #00f2ff;
-        border-radius: 10px;
-        box-shadow: 0 0 10px #00f2ff;
-      }
-
-      /* Prevenção de seleção de texto em botões para parecer App Nativo */
-      button {
-        user-select: none;
-        -webkit-user-select: none;
-      }
+      #root { min-height: 100vh; }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #000; }
+      ::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 10px; box-shadow: 0 0 10px #00f2ff; }
+      button { user-select: none; -webkit-user-select: none; }
     </style>
   </head>
   <body>
