@@ -1,42 +1,45 @@
 {
-  "name": "DRAFT - Gestão de Baba",
-  "short_name": "DRAFT",
-  "description": "Sistema profissional de gestão de peladas e babas",
+  "name": "Draft Play - Gestão de Baba",
+  "short_name": "Draft Play",
+  "description": "Sistema profissional de gestão de peladas e babas. Sorteio de times, rankings, presenças e financeiro.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0d0d0d",
+  "background_color": "#000000",
   "theme_color": "#00f2ff",
   "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-192x192.png",
@@ -48,7 +51,7 @@
       "src": "/icons/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512x512.png",
@@ -62,40 +65,34 @@
       "src": "/screenshots/home.png",
       "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Tela inicial do Draft Play"
     },
     {
       "src": "/screenshots/match.png",
       "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Confirmação de presença no jogo"
     }
   ],
-  "categories": ["sports", "utilities", "productivity"],
+  "categories": ["sports", "utilities"],
   "shortcuts": [
     {
       "name": "Próximo Jogo",
       "short_name": "Jogo",
       "description": "Ver próximo jogo e confirmar presença",
       "url": "/home",
-      "icons": [
-        {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Rankings",
       "short_name": "Rankings",
       "description": "Ver artilharia e assistências",
       "url": "/rankings",
-      "icons": [
-        {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
 }
