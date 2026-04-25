@@ -19,16 +19,14 @@ const RankingsPage = () => {
     try {
       setLoading(true);
 
-      // ── ABA NÍVEL ──────────────────────────────────────────
+      // ── ABA NÍVEL ──────────────────────────────────────────────────────────
       if (activeTab === 'nivel') {
         const data = await getAllRatings();
-        // getAllRatings já retorna ordenado por final_rating DESC
-        // e já normaliza name/position para o nível raiz
         setRankings(data || []);
         return;
       }
 
-      // ── ABAS DE ESTATÍSTICAS ───────────────────────────────
+      // ── ABAS DE ESTATÍSTICAS ────────────────────────────────────────────────
       let dateFilter = null;
       if (period === '7days') {
         const d = new Date(); d.setDate(d.getDate() - 7);
@@ -38,18 +36,22 @@ const RankingsPage = () => {
         dateFilter = d.toISOString().split('T')[0];
       }
 
+      // BUG-005 FIX: usar !inner no join para garantir que o filtro de baba_id funcione.
+      // Sem !inner, o Supabase retorna linhas onde match é null (partidas de outros babas).
       let query = supabase
         .from('match_players')
         .select(`
           player_id,
           goals,
           assists,
-          player:players(name, position),
-          match:matches(match_date, baba_id)
+          player:players!inner(name, position),
+          match:matches!inner(match_date, baba_id)
         `)
         .eq('match.baba_id', currentBaba.id);
 
-      if (dateFilter) query = query.gte('match.match_date', dateFilter);
+      if (dateFilter) {
+        query = query.gte('match.match_date', dateFilter);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -57,15 +59,16 @@ const RankingsPage = () => {
       // Agrega por jogador
       const statsMap = {};
       (data || []).forEach(mp => {
-        if (!mp.player) return;
+        // BUG-005 FIX: com !inner garantimos que mp.player e mp.match nunca são null
         const id = mp.player_id;
         if (!statsMap[id]) {
           statsMap[id] = {
             id,
-            // FIX: acessa mp.player.name (join do Supabase)
             name:     mp.player.name     || 'Jogador',
             position: mp.player.position || 'linha',
-            goals: 0, assists: 0, matches: 0,
+            goals:   0,
+            assists: 0,
+            matches: 0,
           };
         }
         statsMap[id].goals   += mp.goals   || 0;
@@ -112,10 +115,10 @@ const RankingsPage = () => {
   };
 
   const TABS = [
-    { id: 'artilheiros', icon: Trophy, label: 'Gols',  color: 'text-yellow-500'  },
-    { id: 'garcons',     icon: Target, label: 'Assist', color: 'text-blue-500'    },
-    { id: 'mvps',        icon: Award,  label: 'MVP',    color: 'text-cyan-electric'},
-    { id: 'nivel',       icon: Star,   label: 'Nível',  color: 'text-purple-500'  },
+    { id: 'artilheiros', icon: Trophy, label: 'Gols',   color: 'text-yellow-500'   },
+    { id: 'garcons',     icon: Target, label: 'Assist',  color: 'text-blue-500'     },
+    { id: 'mvps',        icon: Award,  label: 'MVP',     color: 'text-cyan-electric' },
+    { id: 'nivel',       icon: Star,   label: 'Nível',   color: 'text-purple-500'   },
   ];
 
   return (
@@ -131,13 +134,13 @@ const RankingsPage = () => {
           <div className="w-10" />
         </div>
 
-        {/* Filtro de período (oculto na aba Nível) */}
+        {/* Filtro de período */}
         {activeTab !== 'nivel' && (
           <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
             {[
-              { id: 'all',    label: 'Tudo'   },
-              { id: '7days',  label: '7 Dias' },
-              { id: '30days', label: '30 Dias'},
+              { id: 'all',    label: 'Tudo'    },
+              { id: '7days',  label: '7 Dias'  },
+              { id: '30days', label: '30 Dias' },
             ].map(p => (
               <button
                 key={p.id}
@@ -188,19 +191,15 @@ const RankingsPage = () => {
                 key={player.id || player.player_id}
                 className="p-5 rounded-2xl border border-white/5 bg-white/[0.03] flex items-center gap-4 hover:border-white/20 transition-all"
               >
-                {/* Posição */}
                 <span className={`text-2xl font-black min-w-[32px] text-center ${getMedalColor(index)}`}>
                   {getMedalLabel(index)}
                 </span>
 
-                {/* Nome + posição */}
                 <div className="flex-1 min-w-0">
-                  {/* FIX: player.name já normalizado pelo getAllRatings */}
                   <p className="text-sm font-black uppercase tracking-tight truncate">{player.name}</p>
                   <p className="text-[9px] text-white/40 font-bold uppercase">{player.position}</p>
                 </div>
 
-                {/* Stat */}
                 <div className="text-right shrink-0">
                   {activeTab === 'nivel' ? (
                     <div className="flex flex-col items-end">
@@ -208,8 +207,8 @@ const RankingsPage = () => {
                         {Number(player.final_rating || 0).toFixed(1)}
                       </p>
                       <div className="flex gap-2 text-[8px] font-bold text-white/30 uppercase mt-0.5">
-                        <span title="Habilidade">H:{Number(player.avg_skill    || 0).toFixed(1)}</span>
-                        <span title="Físico">    F:{Number(player.avg_physical  || 0).toFixed(1)}</span>
+                        <span title="Habilidade">H:{Number(player.avg_skill     || 0).toFixed(1)}</span>
+                        <span title="Físico">    F:{Number(player.avg_physical   || 0).toFixed(1)}</span>
                         <span title="Compromisso">C:{Number(player.avg_commitment || 0).toFixed(1)}</span>
                       </div>
                       <p className="text-[8px] text-white/20 font-bold uppercase mt-0.5">
