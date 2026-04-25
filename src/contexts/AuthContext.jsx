@@ -2,27 +2,44 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
+// BUG-003 FIX: O schema original criava a tabela como "users",
+// mas todo o código de aplicação usa "profiles".
+// A solução adotada é padronizar tudo para "profiles"
+// (ver supabase-migrations.sql para o ALTER TABLE correspondente).
+const PROFILE_TABLE = 'profiles';
+
 const AuthContext = createContext({});
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
+
+// Mapa de tradução para mensagens de erro do Supabase Auth
+// UX-002 FIX: erros em português
+const AUTH_ERROR_MAP = {
+  'Invalid login credentials':    'Email ou senha incorretos',
+  'Email not confirmed':          'Confirme seu email antes de entrar',
+  'User already registered':      'Este email já está cadastrado',
+  'Password should be at least 6 characters': 'A senha precisa ter pelo menos 6 caracteres',
+  'Unable to validate email address: invalid format': 'Formato de email inválido',
+  'Email rate limit exceeded':    'Muitas tentativas. Aguarde alguns minutos',
+  'over_email_send_rate_limit':   'Muitas tentativas. Aguarde alguns minutos',
+};
+
+const translateAuthError = (message) => AUTH_ERROR_MAP[message] || message;
 
 export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // FIX 1: useCallback → referência estável para usar em useEffect de outros contextos
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from(PROFILE_TABLE)  // BUG-003 FIX: constante centralizada
         .select('*')
         .eq('id', userId)
         .single();
@@ -35,7 +52,7 @@ export const AuthProvider = ({ children }) => {
       console.error('[AuthContext] loadProfile (catch):', error);
       setProfile(null);
     }
-  }, []); // sem deps — só usa supabase que é estável
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -66,7 +83,7 @@ export const AuthProvider = ({ children }) => {
 
       if (data.user) {
         const { error: profileError } = await supabase
-          .from('profiles')
+          .from(PROFILE_TABLE)  // BUG-003 FIX
           .insert([{
             id:         data.user.id,
             email:      email,
@@ -79,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
     } catch (error) {
-      toast.error(error.message);
+      toast.error(translateAuthError(error.message));  // UX-002 FIX
       return { data: null, error };
     }
   };
@@ -91,7 +108,7 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
     } catch (error) {
-      toast.error(error.message);
+      toast.error(translateAuthError(error.message));  // UX-002 FIX
       return { data: null, error };
     }
   };
@@ -109,13 +126,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // FIX 2: updateProfile atualiza estado local sem precisar recarregar do banco
-  // e chama o toast só quando chamado diretamente (não duplica com ProfileEdit)
   const updateProfile = async (updates, { silent = false } = {}) => {
     if (!user) return { error: 'Usuário não autenticado' };
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from(PROFILE_TABLE)  // BUG-003 FIX
         .update(updates)
         .eq('id', user.id)
         .select()
@@ -130,7 +145,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // FIX 3: refreshProfile é useCallback estável — não causa loop em useEffect externos
   const refreshProfile = useCallback(
     () => loadProfile(user?.id),
     [loadProfile, user?.id]
