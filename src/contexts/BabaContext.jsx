@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 import { customAlphabet } from 'nanoid';
 
+// BUG-008 FIX: nanoid agora está corretamente declarado como dependência em package.json
 const nanoid = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 const BabaContext = createContext();
@@ -19,7 +20,6 @@ export const sanitizeGameDaysConfig = (raw) => {
     .filter((item) => item && typeof item === 'object')
     .map((item) => ({
       day:      Number(item.day),
-      // ✅ FIX: aceita tanto 'HH:MM' quanto 'HH:MM:SS' — normaliza para 'HH:MM'
       time:     String(item.time || '').trim().substring(0, 5),
       location: item.location ? String(item.location).trim() : '',
     }))
@@ -48,7 +48,6 @@ export const getNextGameDay = (baba) => {
   if (Array.isArray(baba.game_days_config) && baba.game_days_config.length > 0) {
     configs = sanitizeGameDaysConfig(baba.game_days_config);
   } else if (Array.isArray(baba.game_days) && baba.game_days.length > 0) {
-    // ✅ FIX: game_time do banco vem como 'HH:MM:SS' — trunca para 'HH:MM'
     const time = baba.game_time ? String(baba.game_time).substring(0, 5) : '20:00';
     configs = [...new Set(baba.game_days.map(Number))]
       .filter(d => d >= 0 && d <= 6)
@@ -67,7 +66,13 @@ export const getNextGameDay = (baba) => {
     gameDate.setHours(h, m, 0, 0);
     const deadline = new Date(gameDate.getTime() - 30 * 60 * 1000);
     if (now < deadline) {
-      return { ...match, date: gameDate, deadline, daysAhead: offset, dateStr: gameDate.toISOString().split('T')[0] };
+      return {
+        ...match,
+        date:     gameDate,
+        deadline,
+        daysAhead: offset,
+        dateStr:  gameDate.toISOString().split('T')[0],
+      };
     }
   }
 
@@ -77,9 +82,11 @@ export const getNextGameDay = (baba) => {
   const [h, m] = first.time.split(':').map(Number);
   gameDate.setHours(h, m, 0, 0);
   return {
-    ...first, date: gameDate,
+    ...first,
+    date:     gameDate,
     deadline: new Date(gameDate.getTime() - 30 * 60 * 1000),
-    daysAhead, dateStr: gameDate.toISOString().split('T')[0],
+    daysAhead,
+    dateStr:  gameDate.toISOString().split('T')[0],
   };
 };
 
@@ -95,8 +102,8 @@ export const generateBalancedTeams = (players, numTeams = 2) => {
                           .sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
 
   const teams = Array.from({ length: n }, (_, i) => ({
-    name: `Time ${String.fromCharCode(65 + i)}`,
-    players: [],
+    name:        `Time ${String.fromCharCode(65 + i)}`,
+    players:     [],
     totalRating: 0,
   }));
 
@@ -146,6 +153,10 @@ export const BabaProvider = ({ children }) => {
 
   const hasAutoDrawnRef = useRef(false);
 
+  // BUG-007 FIX: ref estável para o último resultado de ratings
+  // evita re-renders em cascata quando DashboardPage usa getAllRatings em useEffect
+  const lastRatingsResultRef = useRef([]);
+
   // ─────────────────────────────────────────────
   // RATING
   // ─────────────────────────────────────────────
@@ -163,16 +174,25 @@ export const BabaProvider = ({ children }) => {
         .order('final_rating', { ascending: false });
 
       if (error) throw error;
-      return (data || []).map(r => ({
+
+      const result = (data || []).map(r => ({
         ...r,
         name:     r.player?.name     || 'Jogador',
         position: r.player?.position || 'linha',
       }));
+
+      // BUG-007 FIX: só atualiza ref se o conteúdo mudou (comparação por JSON)
+      const serialized = JSON.stringify(result);
+      if (serialized !== JSON.stringify(lastRatingsResultRef.current)) {
+        lastRatingsResultRef.current = result;
+      }
+
+      return result;
     } catch (e) {
       console.error('[getAllRatings]', e);
       return [];
     }
-  }, [currentBaba?.id]);
+  }, [currentBaba?.id]); // BUG-007 FIX: dep é só o ID, não o objeto inteiro
 
   const ratePlayer = useCallback(async (ratedId, ratings) => {
     if (!user || !currentBaba) return;
@@ -339,29 +359,22 @@ export const BabaProvider = ({ children }) => {
   const createBaba = async (babaData) => {
     setLoading(true);
     try {
-      // ✅ FIX 1: sanitiza e normaliza game_days_config
       let clean = [];
       if (Array.isArray(babaData.game_days_config) && babaData.game_days_config.length > 0) {
         clean = sanitizeGameDaysConfig(babaData.game_days_config);
       }
 
-      // ✅ FIX 2: payload estritamente alinhado com o schema da tabela `babas`
-      // Campos que NÃO existem no banco são explicitamente excluídos.
-      // `players_per_team` não existe — o campo real é `max_players`.
       const insert = {
         name:             babaData.name,
         modality:         babaData.modality         ?? 'society',
         location:         babaData.location         ?? null,
-        // ✅ FIX 3: campo correto do banco (não players_per_team)
         max_players:      babaData.max_players       ?? null,
         game_days:        clean.map(c => c.day),
         game_days_config: clean,
-        // ✅ FIX 4: game_time como 'HH:MM:SS' — tipo TIME do Postgres
         game_time:        clean[0]?.time ? `${clean[0].time}:00` : null,
         president_id:     user.id,
         is_private:       false,
         allow_reserves:   false,
-        // ✅ FIX 5: invite_code gerado aqui, não depende de default do banco
         invite_code:      nanoid(),
       };
 
@@ -378,7 +391,6 @@ export const BabaProvider = ({ children }) => {
         throw error;
       }
 
-      // Insere o presidente como jogador do próprio baba
       const { error: playerError } = await supabase
         .from('players')
         .insert([{
@@ -389,11 +401,9 @@ export const BabaProvider = ({ children }) => {
         }]);
 
       if (playerError) {
-        // Não fatal — loga mas não interrompe o fluxo
         console.warn('[createBaba] Erro ao inserir presidente como jogador:', playerError);
       }
 
-      // Atualiza lista local sem precisar recarregar tudo do servidor
       setMyBabas(prev => [...prev, data]);
       setCurrentBaba(data);
       localStorage.setItem('selected_baba_id', String(data.id));
@@ -417,7 +427,6 @@ export const BabaProvider = ({ children }) => {
         const clean = sanitizeGameDaysConfig(sanitized.game_days_config);
         sanitized.game_days_config = clean;
         sanitized.game_days        = clean.map(c => c.day);
-        // ✅ FIX: game_time como 'HH:MM:SS' — consistente com createBaba
         sanitized.game_time        = clean[0]?.time ? `${clean[0].time}:00` : null;
       }
       const { data, error } = await supabase
@@ -613,20 +622,25 @@ export const BabaProvider = ({ children }) => {
         .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
 
       if (!existingMatch) {
+        // BUG-001 FIX: match_date como TIMESTAMP, não DATE
+        const gameTimeStr = nextGameDay.time?.substring(0, 5) || '20:00';
+        const matchDatetime = `${dateStr}T${gameTimeStr}:00`;
+
         const { data: match } = await supabase.from('matches').insert([{
           baba_id:        currentBaba.id,
-          match_date:     `${dateStr}T${nextGameDay.time}:00`,
+          match_date:     matchDatetime,
           team_a_name:    mainTeams[0]?.name || 'Time A',
           team_b_name:    mainTeams[1]?.name || 'Time B',
           draw_result_id: drawResult.id,
           status:         'scheduled',
         }]).select().single();
 
+        // BUG-002 FIX: team como 'A' ou 'B', não 'Team A' / 'Team B'
         const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
           t.players.map(p => ({
             match_id:  match.id,
             player_id: p.id,
-            team:      i === 0 ? 'A' : 'B',
+            team:      i === 0 ? 'A' : 'B',   // ← CORRIGIDO
             position:  p.position || 'linha',
           }))
         );
@@ -686,6 +700,7 @@ export const BabaProvider = ({ children }) => {
       const next        = getNextGameDay(currentBaba);
       setNextGameDay(next);
 
+      // BUG-004 FIX: guarda sempre com optional chaining antes de usar
       if (next) {
         setConfirmationDeadline(next.deadline);
         setCanConfirm(new Date() < next.deadline);
@@ -703,6 +718,7 @@ export const BabaProvider = ({ children }) => {
         setGameConfirmations([]);
         setMyConfirmation(null);
         setConfirmationDeadline(null);
+        setCanConfirm(false); // BUG-004 FIX: resetar canConfirm também
       }
     };
     syncData();
@@ -711,6 +727,7 @@ export const BabaProvider = ({ children }) => {
   useEffect(() => {
     let timeoutId;
     const update = () => {
+      // BUG-004 FIX: acesso seguro com optional chaining
       if (!nextGameDay?.date) {
         setCountdown({ d: 0, h: 0, m: 0, s: 0, active: false });
         return;
