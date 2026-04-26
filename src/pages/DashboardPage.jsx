@@ -6,10 +6,11 @@ import {
   Trophy, Users, DollarSign, LogOut,
   Calendar, Copy, Settings, MapPin, RefreshCw,
   Zap, Camera, Edit3, ChevronRight, X, Shield, Star, Share2
-} from 'lucide-react';
-import PresenceConfirmation from '../components/PresenceConfirmation';
+} from 'lucide-react';import PresenceConfirmation from '../components/PresenceConfirmation';
 import BabaSettings         from '../components/BabaSettings';
 import DrawConfigPanel      from '../components/DrawConfigPanel';
+import QRCodeModal          from '../components/QRCodeModal';     // FEAT-006
+import SuspensionPanel      from '../components/SuspensionPanel'; // FEAT-007
 import toast from 'react-hot-toast';
 
 // ─────────────────────────────────────────────
@@ -227,6 +228,8 @@ const DashboardPage = () => {
   const [showSettings,            setShowSettings]            = useState(false);
   const [showMembers,             setShowMembers]             = useState(false);
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
+  const [showQRCode,              setShowQRCode]              = useState(false); // FEAT-006
+  const [showSuspensions,         setShowSuspensions]         = useState(false); // FEAT-007
   const [isUploading,             setIsUploading]             = useState(false);
   const [inviteExpiry,            setInviteExpiry]            = useState(null);
   const [playerRatings,           setPlayerRatings]           = useState([]);
@@ -414,11 +417,12 @@ const DashboardPage = () => {
         )}
 
         {/* Grid de atalhos */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           {[
-            { icon: <Trophy />,     label: 'Ranking', action: () => navigate('/rankings')  },
-            { icon: <DollarSign />, label: 'Caixa',   action: () => navigate('/financial') },
-            { icon: <Users />,      label: 'Times',   action: () => navigate('/teams')     },
+            { icon: <Trophy />,     label: 'Ranking',   action: () => navigate('/rankings')  },
+            { icon: <DollarSign />, label: 'Caixa',     action: () => navigate('/financial') },
+            { icon: <Users />,      label: 'Times',     action: () => navigate('/teams')     },
+            { icon: <Calendar />,   label: 'Histórico', action: () => navigate('/history')   },
           ].map((item, i) => (
             <button
               key={i} onClick={item.action}
@@ -483,7 +487,7 @@ const DashboardPage = () => {
                   {inviteExpiry || 'Gere um novo código'}
                 </p>
               </div>
-              <div className="p-2 bg-cyan-electric/10 rounded-xl">
+              <div className="p-2 bg-cyan-electric/10 rounded-xl cursor-pointer" onClick={() => setShowQRCode(true)}>
                 <Share2 size={16} className="text-cyan-electric" />
               </div>
             </div>
@@ -526,12 +530,35 @@ const DashboardPage = () => {
 
         {/* Administração */}
         {isPresident && (
-          <button
-            onClick={() => setShowSettings(true)}
-            className="w-full py-5 bg-white/5 border border-white/10 rounded-[2.5rem] text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
-          >
-            <Settings size={18} /> Administração do Grupo
-          </button>
+          <div className="space-y-3">
+            {/* FEAT-007: Suspensões */}
+            <button
+              onClick={() => setShowSuspensions(!showSuspensions)}
+              className="w-full py-4 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-red-400/60 font-black uppercase text-[10px] tracking-widest hover:bg-red-500/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
+            >
+              <Shield size={16} /> Gestão de Suspensões
+            </button>
+
+            {showSuspensions && (
+              <div className="p-5 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                <SuspensionPanel
+                  players={playersWithRatings}
+                  babaId={currentBaba.id}
+                  onPlayersUpdated={async () => {
+                    const updated = await getAllRatings();
+                    setPlayerRatings(updated || []);
+                  }}
+                />
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowSettings(true)}
+              className="w-full py-5 bg-white/5 border border-white/10 rounded-[2.5rem] text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
+            >
+              <Settings size={18} /> Administração do Grupo
+            </button>
+          </div>
         )}
       </div>
 
@@ -551,6 +578,15 @@ const DashboardPage = () => {
           onRate={handleRate}
         />
       )}
+      {/* FEAT-006: Modal QR Code de convite */}
+      <QRCodeModal
+        isOpen={showQRCode}
+        onClose={() => setShowQRCode(false)}
+        inviteCode={currentBaba?.invite_code}
+        babaName={currentBaba?.name}
+        onRefresh={generateInviteCode}
+      />
+
       {showSettings && (
         <BabaSettings baba={currentBaba} onClose={() => setShowSettings(false)} />
       )}
