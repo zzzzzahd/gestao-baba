@@ -10,6 +10,7 @@
     "generate-icons": "bash generate-icons.sh"
   },
   "dependencies": {
+    "@sentry/react": "^10.50.0",
     "@supabase/supabase-js": "^2.39.0",
     "clsx": "^2.0.0",
     "date-fns": "^3.0.0",
