@@ -4,12 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import {
   Trophy, Users, DollarSign, LogOut,
-  Calendar, Copy, Settings, MapPin, RefreshCw, Timer,
+  Calendar, Copy, Settings, MapPin, RefreshCw,
   Zap, Camera, Edit3, ChevronRight, X, Shield, Star, Share2
 } from 'lucide-react';
 import PresenceConfirmation from '../components/PresenceConfirmation';
-import BabaSettings from '../components/BabaSettings';
-import DrawConfigPanel from '../components/DrawConfigPanel';
+import BabaSettings         from '../components/BabaSettings';
+import DrawConfigPanel      from '../components/DrawConfigPanel';
 import toast from 'react-hot-toast';
 
 // ─────────────────────────────────────────────
@@ -43,12 +43,23 @@ const computeExpiryLabel = (expiresAt) => {
   return hours > 0 ? `Expira em ${hours}h ${minutes}min` : `Expira em ${minutes}min`;
 };
 
+// UX-003 FIX: formato padronizado em português
+const formatCountdown = (countdown) => {
+  if (!countdown.active) return null;
+  const { d, h, m, s } = countdown;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  if (d > 0) return `${d}d ${hh}h ${mm}m`;
+  return `${hh}:${mm}:${ss}`;
+};
+
 // ─────────────────────────────────────────────
 // MODAL DE AVALIAÇÃO
 // ─────────────────────────────────────────────
 
 const RatePlayerModal = ({ player, onClose, onRate }) => {
-  const [ratings, setRatings] = useState({ skill: 3, physical: 3, commitment: 3 });
+  const [ratings,    setRatings]    = useState({ skill: 3, physical: 3, commitment: 3 });
   const [submitting, setSubmitting] = useState(false);
 
   const categories = [
@@ -57,7 +68,6 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
     { id: 'commitment', label: '🤝 Compromisso', color: 'text-purple-500'   },
   ];
 
-  // FIX: await no onRate antes de fechar → usuário vê o feedback de erro se houver
   const handleConfirm = async () => {
     if (submitting) return;
     setSubmitting(true);
@@ -78,7 +88,6 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
         className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Avatar + nome */}
         <div className="text-center mb-6">
           <div className="w-20 h-20 rounded-full bg-gray-800 mx-auto mb-4 border-2 border-cyan-electric overflow-hidden shadow-lg shadow-cyan-electric/10 flex items-center justify-center">
             {player.avatar_url
@@ -94,7 +103,6 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           </p>
         </div>
 
-        {/* Sliders */}
         <div className="space-y-6">
           {categories.map(cat => (
             <div key={cat.id} className="space-y-2">
@@ -117,18 +125,15 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           ))}
         </div>
 
-        {/* Botões */}
         <div className="grid grid-cols-2 gap-3 mt-8">
           <button
-            onClick={onClose}
-            disabled={submitting}
+            onClick={onClose} disabled={submitting}
             className="py-4 rounded-2xl bg-white/5 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
-            onClick={handleConfirm}
-            disabled={submitting}
+            onClick={handleConfirm} disabled={submitting}
             className="py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest shadow-lg shadow-cyan-electric/20 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting
@@ -168,14 +173,12 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
       <div className="overflow-y-auto space-y-3 flex-1 pr-1">
         {players.map((p, i) => (
           <div key={p.id || i} className="flex items-center gap-4 p-3 bg-white/5 rounded-2xl border border-white/5">
-            {/* Avatar */}
             <div className="w-12 h-12 rounded-2xl bg-gray-800 border border-white/10 overflow-hidden flex items-center justify-center text-white font-black text-lg flex-shrink-0">
               {p.avatar_url
                 ? <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.display_name} />
                 : (p.display_name || '?').charAt(0).toUpperCase()
               }
             </div>
-            {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-black text-white text-sm truncate">{p.display_name || 'Sem nome'}</p>
@@ -189,7 +192,6 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
                 {POSITION_LABEL[p.position] || p.position || 'Linha'}
               </p>
             </div>
-            {/* Botão avaliar — FIX: não fecha o MembersModal, apenas abre o RateModal por cima */}
             {p.user_id !== currentUserId && (
               <button
                 onClick={() => onOpenRate(p)}
@@ -214,35 +216,31 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
 // ─────────────────────────────────────────────
 
 const DashboardPage = () => {
-  const navigate    = useNavigate();
+  const navigate = useNavigate();
   const { profile, signOut, user } = useAuth();
   const {
     currentBaba, players, loading,
     generateInviteCode, nextGameDay, uploadBabaImage,
-    // FIX: countdown vem do Context — sem duplicação
-    countdown,
-    ratePlayer, getAllRatings,
+    countdown, ratePlayer, getAllRatings,
   } = useBaba();
 
   const [showSettings,            setShowSettings]            = useState(false);
   const [showMembers,             setShowMembers]             = useState(false);
-  // FIX: selectedPlayerForRating controla o RateModal sem fechar o MembersModal
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
   const [isUploading,             setIsUploading]             = useState(false);
   const [inviteExpiry,            setInviteExpiry]            = useState(null);
   const [playerRatings,           setPlayerRatings]           = useState([]);
 
-  // Carrega ratings quando o baba muda
-  // FIX: getAllRatings agora é useCallback estável — sem loop infinito
+  // PERF-003 FIX: dep é só currentBaba?.id, sem incluir getAllRatings na dep array
   useEffect(() => {
-    const load = async () => {
-      const data = await getAllRatings();
-      setPlayerRatings(data || []);
-    };
-    if (currentBaba?.id) load();
-  }, [currentBaba?.id, getAllRatings]);
+    if (!currentBaba?.id) return;
+    let cancelled = false;
+    getAllRatings().then(data => {
+      if (!cancelled) setPlayerRatings(data || []);
+    });
+    return () => { cancelled = true; };
+  }, [currentBaba?.id]); // ← só o ID, evita loop
 
-  // Enriquece players com rating
   const playersWithRatings = useMemo(() => {
     return (players || []).map(p => {
       const r = playerRatings.find(x => x.player_id === p.id);
@@ -252,14 +250,8 @@ const DashboardPage = () => {
 
   const gameDaysDisplay = useMemo(() => formatGameDays(currentBaba), [currentBaba]);
 
-  // Formata countdown para exibição (vem do Context, já calculado)
-  const countdownDisplay = useMemo(() => ({
-    d: countdown.d || 0,
-    h: String(countdown.h || 0).padStart(2, '0'),
-    m: String(countdown.m || 0).padStart(2, '0'),
-    s: String(countdown.s || 0).padStart(2, '0'),
-    active: countdown.active,
-  }), [countdown]);
+  // UX-003 FIX: countdown formatado em português
+  const countdownStr = useMemo(() => formatCountdown(countdown), [countdown]);
 
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
@@ -285,17 +277,15 @@ const DashboardPage = () => {
       return;
     }
     setIsUploading(true);
-    const res = await uploadBabaImage(file, type);
+    await uploadBabaImage(file, type);
     setIsUploading(false);
-    if (!res) toast.error('Falha no upload');
     e.target.value = null;
   };
 
-  // Callback passado ao RateModal — atualiza ratings localmente após voto
   const handleRate = useCallback(async (playerId, ratingsData) => {
     await ratePlayer(playerId, ratingsData);
-    const updated = await getAllRatings();
-    setPlayerRatings(updated || []);
+    // PERF-003: atualiza ratings localmente sem precisar de getAllRatings no dep array
+    getAllRatings().then(updated => setPlayerRatings(updated || []));
   }, [ratePlayer, getAllRatings]);
 
   if (loading || !currentBaba) return (
@@ -307,9 +297,9 @@ const DashboardPage = () => {
   const isPresident = String(currentBaba?.president_id) === String(profile?.id);
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24 font-sans selection:bg-cyan-electric selection:text-black">
+    <div className="min-h-screen bg-black text-white pb-4 font-sans selection:bg-cyan-electric selection:text-black">
 
-      {/* ── HEADER ── */}
+      {/* Header com capa */}
       <div className="relative h-72 w-full">
         <div className="h-56 w-full bg-gray-900 relative overflow-hidden">
           {currentBaba?.cover_url ? (
@@ -344,7 +334,7 @@ const DashboardPage = () => {
         </div>
 
         <div className="absolute left-6 bottom-0 flex items-end gap-5">
-          <div className="relative group">
+          <div className="relative">
             <div className="w-32 h-32 rounded-[2.5rem] border-4 border-black bg-gray-800 shadow-2xl overflow-hidden relative">
               {currentBaba?.logo_url && (
                 <img src={currentBaba.logo_url} className="w-full h-full object-cover" alt="Logo" />
@@ -378,7 +368,7 @@ const DashboardPage = () => {
 
       <div className="max-w-xl mx-auto px-6 mt-12 space-y-6">
 
-        {/* ── CRONÔMETRO — usa countdown do Context, sem recalcular ── */}
+        {/* Countdown — UX-003: formato PT-BR limpo */}
         {nextGameDay && (
           <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
             <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
@@ -392,21 +382,12 @@ const DashboardPage = () => {
               </div>
               <div className="flex justify-between items-end">
                 <div>
-                  <div className="text-4xl font-black font-mono leading-none tracking-tighter">
-                    {countdownDisplay.active ? (
-                      <div className="flex items-baseline">
-                        {countdownDisplay.d > 0 && (
-                          <span className="mr-2 text-3xl">{countdownDisplay.d}D</span>
-                        )}
-                        <span>{countdownDisplay.h}</span>
-                        <span className="mx-0.5 opacity-30 text-2xl">:</span>
-                        <span>{countdownDisplay.m}</span>
-                        <span className="mx-0.5 opacity-30 text-2xl">:</span>
-                        <span className="text-cyan-electric">{countdownDisplay.s}</span>
-                      </div>
-                    ) : (
-                      <span className="text-2xl uppercase text-cyan-electric animate-pulse">Processando...</span>
-                    )}
+                  {/* UX-003 FIX: countdown em PT-BR padronizado */}
+                  <div className="text-4xl font-black font-mono leading-none tracking-tighter text-white">
+                    {countdownStr
+                      ? <span>{countdownStr}</span>
+                      : <span className="text-2xl uppercase text-cyan-electric animate-pulse">Em breve...</span>
+                    }
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase truncate max-w-[200px]">
                     <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
@@ -432,16 +413,15 @@ const DashboardPage = () => {
           </div>
         )}
 
-        {/* ── GRID DE ATALHOS ── */}
+        {/* Grid de atalhos */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: <Trophy />,    label: 'Ranking', action: () => navigate('/rankings')  },
+            { icon: <Trophy />,     label: 'Ranking', action: () => navigate('/rankings')  },
             { icon: <DollarSign />, label: 'Caixa',   action: () => navigate('/financial') },
             { icon: <Users />,      label: 'Times',   action: () => navigate('/teams')     },
           ].map((item, i) => (
             <button
-              key={i}
-              onClick={item.action}
+              key={i} onClick={item.action}
               className="flex flex-col items-center gap-2 py-5 bg-white/5 border border-white/5 rounded-3xl hover:bg-white/10 hover:border-white/10 transition-all active:scale-95 group"
             >
               <div className="text-cyan-electric opacity-70 group-hover:opacity-100 transition-opacity">
@@ -454,7 +434,7 @@ const DashboardPage = () => {
           ))}
         </div>
 
-        {/* ── ATLETAS ATIVOS ── */}
+        {/* Atletas ativos */}
         <div className="card-glass p-5 rounded-3xl bg-white/5 border border-white/5">
           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-3">Atletas Ativos</p>
           <div className="flex items-center justify-between">
@@ -491,7 +471,7 @@ const DashboardPage = () => {
         <PresenceConfirmation />
         {isPresident && <DrawConfigPanel />}
 
-        {/* ── CONVITE ── */}
+        {/* Convite */}
         {isPresident && (
           <div className="card-glass p-6 rounded-[2.5rem] border border-cyan-electric/20 bg-cyan-electric/5 space-y-4">
             <div className="flex items-center justify-between">
@@ -544,7 +524,7 @@ const DashboardPage = () => {
           </div>
         )}
 
-        {/* ── ADMINISTRAÇÃO ── */}
+        {/* Administração */}
         {isPresident && (
           <button
             onClick={() => setShowSettings(true)}
@@ -555,10 +535,7 @@ const DashboardPage = () => {
         )}
       </div>
 
-      {/* ── MODAIS ──
-          FIX: RatePlayerModal fica ACIMA do MembersModal (z-[60] > z-50)
-          MembersModal permanece montado durante a avaliação — sem flash de fechamento
-      */}
+      {/* Modais */}
       {showMembers && (
         <MembersModal
           players={playersWithRatings}
@@ -567,7 +544,6 @@ const DashboardPage = () => {
           onOpenRate={p => setSelectedPlayerForRating(p)}
         />
       )}
-
       {selectedPlayerForRating && (
         <RatePlayerModal
           player={selectedPlayerForRating}
@@ -575,7 +551,6 @@ const DashboardPage = () => {
           onRate={handleRate}
         />
       )}
-
       {showSettings && (
         <BabaSettings baba={currentBaba} onClose={() => setShowSettings(false)} />
       )}
