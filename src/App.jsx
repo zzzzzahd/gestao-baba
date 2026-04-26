@@ -17,6 +17,7 @@ import FinancialPage     from './pages/FinancialPage';
 import VisitorMode       from './pages/VisitorMode';
 import DashboardPage     from './pages/DashboardPage';
 import CreatePage        from './pages/CreatePage';
+import HistoryPage       from './pages/HistoryPage'; // FEAT-001
 
 // Componentes globais
 import BottomNav from './components/BottomNav'; // UX-004
@@ -72,6 +73,7 @@ function App() {
             <Route path="/match"     element={<ProtectedRoute><MatchPage /></ProtectedRoute>} />
             <Route path="/rankings"  element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
             <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
+            <Route path="/history"   element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
           </Routes>
 
           {/* UX-004: Nav inferior global — se oculta automaticamente nas rotas públicas */}
