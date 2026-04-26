@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Star, Zap, TrendingUp, Users, Trophy, Award } from 'lucide-react';
 
 // ─────────────────────────────────────────────
-// MICRO-COMPONENTES (locais, sem exportar)
+// MICRO-COMPONENTES
 // ─────────────────────────────────────────────
 
 const StarBar = ({ value, max = 5 }) => (
@@ -26,14 +26,14 @@ const StatCard = ({ icon, label, value, sub, accent = 'cyan' }) => {
     orange: 'text-orange-400     border-orange-400/20     bg-orange-400/10',
     green:  'text-emerald-400    border-emerald-400/20    bg-emerald-400/10',
   };
-  const [textCls,, bgCls] = (map[accent] || map.cyan).split(/\s{2,}/);
   const cls = map[accent] || map.cyan;
+  const textCls = cls.split(/\s+/)[0];
   return (
     <div className={`p-4 rounded-2xl border ${cls} flex flex-col gap-1`}>
-      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 opacity-60 ${cls.split(' ')[0]}`}>
+      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 opacity-60 ${textCls}`}>
         {icon}{label}
       </div>
-      <p className={`text-2xl font-black font-mono ${cls.split(' ')[0]}`}>{value}</p>
+      <p className={`text-2xl font-black font-mono ${textCls}`}>{value}</p>
       {sub && <p className="text-[9px] text-white/30 font-bold uppercase">{sub}</p>}
     </div>
   );
@@ -52,39 +52,42 @@ const SectionTitle = ({ children }) => (
 // ─────────────────────────────────────────────
 
 const ProfileStats = ({ statsData, loading }) => {
-  // ── Maps O(1) para lookup ──────────────────
+
+  // PERF-002 FIX: desestruturar arrays antes dos useMemos para que
+  // as deps sejam referências estáveis (arrays individuais, não o objeto statsData)
+  const { ratings, matchStats, bestOfMonth, ranking } = statsData;
+
   const ratingsMap = useMemo(
-    () => new Map(statsData.ratings.map(r => [r.baba_id, r])),
-    [statsData.ratings]
-  );
-  const matchMap = useMemo(
-    () => new Map(statsData.matchStats.map(m => [m.baba_id, m])),
-    [statsData.matchStats]
+    () => new Map(ratings.map(r => [r.baba_id, r])),
+    [ratings]  // ← dep é o array, não statsData inteiro
   );
 
-  // ── Agregações globais ─────────────────────
+  const matchMap = useMemo(
+    () => new Map(matchStats.map(m => [m.baba_id, m])),
+    [matchStats]
+  );
+
   const globalRating = useMemo(() => {
-    const vals = statsData.ratings.map(r => r.final_rating).filter(v => v > 0);
+    const vals = ratings.map(r => r.final_rating).filter(v => v > 0);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-  }, [statsData.ratings]);
+  }, [ratings]);
 
   const totalVotes = useMemo(
-    () => statsData.ratings.reduce((s, r) => s + (r.votes_count || 0), 0),
-    [statsData.ratings]
+    () => ratings.reduce((s, r) => s + (r.votes_count || 0), 0),
+    [ratings]
   );
 
   const { totalGoals, totalAssists, totalMatches } = useMemo(() => ({
-    totalGoals:   statsData.matchStats.reduce((s, m) => s + m.goals,   0),
-    totalAssists: statsData.matchStats.reduce((s, m) => s + m.assists, 0),
-    totalMatches: statsData.matchStats.reduce((s, m) => s + m.matches, 0),
-  }), [statsData.matchStats]);
+    totalGoals:   matchStats.reduce((s, m) => s + (m.goals   || 0), 0),
+    totalAssists: matchStats.reduce((s, m) => s + (m.assists || 0), 0),
+    totalMatches: matchStats.reduce((s, m) => s + (m.matches || 0), 0),
+  }), [matchStats]);
 
   const goalsPerGame   = totalMatches > 0 ? (totalGoals   / totalMatches).toFixed(2) : '—';
   const assistsPerGame = totalMatches > 0 ? (totalAssists / totalMatches).toFixed(2) : '—';
 
-  // ── Sub-ratings médios globais ─────────────
   const avgSubs = useMemo(() => {
-    const rs = statsData.ratings.filter(r => r.votes_count > 0);
+    const rs = ratings.filter(r => r.votes_count > 0);
     if (!rs.length) return null;
     const n = rs.length;
     return {
@@ -92,13 +95,13 @@ const ProfileStats = ({ statsData, loading }) => {
       physical:   rs.reduce((s, r) => s + (r.avg_physical   || 0), 0) / n,
       commitment: rs.reduce((s, r) => s + (r.avg_commitment || 0), 0) / n,
     };
-  }, [statsData.ratings]);
+  }, [ratings]);
 
-  // ── Performance unificada por baba (O(1) lookup) ──
+  // PERF-002 FIX: deps são arrays individuais estáveis
   const babaPerformance = useMemo(() => {
     const allBabaIds = [...new Set([
-      ...statsData.ratings.map(r => r.baba_id),
-      ...statsData.matchStats.map(m => m.baba_id),
+      ...ratings.map(r => r.baba_id),
+      ...matchStats.map(m => m.baba_id),
     ])];
     return allBabaIds
       .map(id => {
@@ -113,14 +116,14 @@ const ProfileStats = ({ statsData, loading }) => {
           avg_physical:   r?.avg_physical   || 0,
           avg_commitment: r?.avg_commitment || 0,
           votes_count:    r?.votes_count    || 0,
-          rank_position:  statsData.ranking?.find(rk => rk.baba_id === id)?.rank_position || null,
+          rank_position:  ranking?.find(rk => rk.baba_id === id)?.rank_position || null,
           goals:          m?.goals   || 0,
           assists:        m?.assists || 0,
           matches:        m?.matches || 0,
         };
       })
       .sort((a, b) => b.final_rating - a.final_rating);
-  }, [statsData, ratingsMap, matchMap]);
+  }, [ratings, matchStats, ratingsMap, matchMap, ranking]);
 
   // ─────────────────────────────────────────────
   // RENDER
@@ -129,7 +132,7 @@ const ProfileStats = ({ statsData, loading }) => {
   return (
     <div className="space-y-6">
 
-      {/* ── REPUTAÇÃO GLOBAL ── */}
+      {/* REPUTAÇÃO GLOBAL */}
       <section>
         <SectionTitle>Reputação Global</SectionTitle>
         {loading ? (
@@ -156,7 +159,6 @@ const ProfileStats = ({ statsData, loading }) => {
                 ))}
               </div>
             </div>
-
             {avgSubs && (
               <div className="space-y-2 pt-3 border-t border-white/5">
                 {[
@@ -178,17 +180,17 @@ const ProfileStats = ({ statsData, loading }) => {
           <div className="p-5 rounded-[1.75rem] bg-white/[0.03] border border-dashed border-white/10 text-center">
             <Star size={24} className="text-white/10 mx-auto mb-2" />
             <p className="text-[10px] text-white/20 font-black uppercase">Ainda sem avaliações</p>
-            <p className="text-[9px] text-white/10 mt-1">Peça para seus companheiros de baba te avaliarem</p>
+            <p className="text-[9px] text-white/10 mt-1">Peça para seus companheiros te avaliarem</p>
           </div>
         )}
       </section>
 
-      {/* ── DESTAQUES / BADGES ── */}
-      {!loading && (statsData.bestOfMonth?.length > 0 || totalGoals >= 10 || totalAssists >= 10 || totalMatches >= 10) && (
+      {/* DESTAQUES */}
+      {!loading && (bestOfMonth?.length > 0 || totalGoals >= 10 || totalAssists >= 10 || totalMatches >= 10) && (
         <section>
           <SectionTitle>Destaques</SectionTitle>
           <div className="flex flex-wrap gap-2">
-            {(statsData.bestOfMonth || []).map(babaName => (
+            {(bestOfMonth || []).map(babaName => (
               <div key={babaName} className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
                 <Trophy size={12} className="text-yellow-500" />
                 <span className="text-[10px] font-black text-yellow-500 uppercase">
@@ -224,7 +226,7 @@ const ProfileStats = ({ statsData, loading }) => {
         </section>
       )}
 
-      {/* ── ESTATÍSTICAS GERAIS ── */}
+      {/* ESTATÍSTICAS GERAIS */}
       <section>
         <SectionTitle>Estatísticas Gerais</SectionTitle>
         {loading ? (
@@ -233,15 +235,15 @@ const ProfileStats = ({ statsData, loading }) => {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <StatCard icon={<Zap size={10}/>}        label="Gols"         value={totalGoals}              sub={`${goalsPerGame}/jogo`}       accent="orange" />
-            <StatCard icon={<TrendingUp size={10}/>}  label="Assistências" value={totalAssists}            sub={`${assistsPerGame}/jogo`}     accent="cyan"   />
-            <StatCard icon={<Users size={10}/>}       label="Partidas"     value={totalMatches}            sub="jogos disputados"             accent="purple" />
-            <StatCard icon={<Trophy size={10}/>}      label="G + A"        value={totalGoals+totalAssists} sub="contribuições totais"         accent="green"  />
+            <StatCard icon={<Zap size={10}/>}        label="Gols"         value={totalGoals}              sub={`${goalsPerGame}/jogo`}   accent="orange" />
+            <StatCard icon={<TrendingUp size={10}/>}  label="Assistências" value={totalAssists}            sub={`${assistsPerGame}/jogo`} accent="cyan"   />
+            <StatCard icon={<Users size={10}/>}       label="Partidas"     value={totalMatches}            sub="jogos disputados"         accent="purple" />
+            <StatCard icon={<Trophy size={10}/>}      label="G + A"        value={totalGoals+totalAssists} sub="contribuições totais"     accent="green"  />
           </div>
         )}
       </section>
 
-      {/* ── PERFORMANCE POR BABA ── */}
+      {/* PERFORMANCE POR BABA */}
       {(loading || babaPerformance.length > 0) && (
         <section>
           <SectionTitle>Performance por Baba</SectionTitle>
@@ -250,7 +252,6 @@ const ProfileStats = ({ statsData, loading }) => {
               ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-28" />)
               : babaPerformance.map(b => (
                 <div key={b.baba_id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
-                  {/* Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center text-cyan-electric font-black text-sm shrink-0">
@@ -280,12 +281,11 @@ const ProfileStats = ({ statsData, loading }) => {
                     )}
                   </div>
 
-                  {/* Stats inline */}
                   <div className="grid grid-cols-3 gap-2 text-center">
                     {[
-                      { label: 'Gols',   value: b.goals             },
+                      { label: 'Gols',    value: b.goals             },
                       { label: 'Assists', value: b.assists           },
-                      { label: 'G+A',    value: b.goals + b.assists  },
+                      { label: 'G+A',     value: b.goals + b.assists },
                     ].map(s => (
                       <div key={s.label} className="bg-white/[0.02] rounded-xl py-2">
                         <p className="text-lg font-black font-mono text-white">{s.value}</p>
@@ -294,7 +294,6 @@ const ProfileStats = ({ statsData, loading }) => {
                     ))}
                   </div>
 
-                  {/* Sub-ratings se tiver votos */}
                   {b.votes_count > 0 && (
                     <div className="pt-2 border-t border-white/5 space-y-1.5">
                       {[
