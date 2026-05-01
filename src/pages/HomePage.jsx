@@ -1,21 +1,54 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import {
   Plus, LogIn, Trophy, User,
-  ArrowRight, Play, Zap, Users
+  ArrowRight, Zap, Users, CheckCircle2, Clock
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 
 const DAY = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-// ─── Estado vazio para quem não tem nenhum baba ──────────────────────────────
-// UX-001 FIX: orientação clara para novos usuários
+// ─── Countdown hook ───────────────────────────────────────────────────────────
+const useCountdown = (targetDayOfWeek, targetTime) => {
+  const [display, setDisplay] = useState('');
+
+  useEffect(() => {
+    if (targetDayOfWeek == null || !targetTime) return;
+
+    const calc = () => {
+      const now = new Date();
+      const [h, m] = targetTime.split(':').map(Number);
+      const target = new Date();
+      target.setHours(h, m, 0, 0);
+
+      let daysUntil = (targetDayOfWeek - now.getDay() + 7) % 7;
+      if (daysUntil === 0 && now >= target) daysUntil = 7;
+      target.setDate(target.getDate() + daysUntil);
+
+      const diff = target - now;
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+
+      if (days > 0) setDisplay(`${days}d ${hours}h ${mins}m`);
+      else if (hours > 0) setDisplay(`${hours}h ${mins}m`);
+      else setDisplay(`${mins}m`);
+    };
+
+    calc();
+    const id = setInterval(calc, 60000);
+    return () => clearInterval(id);
+  }, [targetDayOfWeek, targetTime]);
+
+  return display;
+};
+
+// ─── Estado vazio ─────────────────────────────────────────────────────────────
 const EmptyState = ({ onCreateClick, onJoinFocus }) => (
   <div className="flex flex-col items-center text-center py-12 px-4 space-y-8">
-
     <div className="w-24 h-24 rounded-[2rem] bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center shadow-[0_0_40px_rgba(0,242,255,0.08)]">
       <Users size={40} className="text-cyan-electric/60" />
     </div>
@@ -48,7 +81,6 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
       </button>
     </div>
 
-    {/* Dica rápida */}
     <div className="flex items-start gap-3 p-4 bg-white/[0.03] border border-white/5 rounded-2xl text-left max-w-xs">
       <Zap size={16} className="text-cyan-electric shrink-0 mt-0.5" />
       <p className="text-[11px] text-white/30 leading-relaxed">
@@ -58,20 +90,181 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
   </div>
 );
 
-// ─── Componente principal ────────────────────────────────────────────────────
+// ─── Hero card — próximo baba ─────────────────────────────────────────────────
+const HeroBabaCard = ({ baba, onClick }) => {
+  const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
+  const gameTime = baba.game_time?.substring(0, 5) ?? null;
+  const countdown = useCountdown(dayIndex, gameTime);
+  const dayLabel = dayIndex != null ? DAY[dayIndex] : null;
 
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left p-5 rounded-3xl border border-cyan-electric/30 active:scale-[0.98] transition-transform"
+      style={{
+        background: 'linear-gradient(135deg, rgba(0,242,255,0.08) 0%, rgba(0,102,255,0.05) 100%)',
+        boxShadow: '0 0 40px rgba(0,242,255,0.06)',
+      }}
+    >
+      {/* Label */}
+      <p className="text-[9px] font-black text-cyan-electric/50 uppercase tracking-widest mb-3">
+        próximo jogo
+      </p>
+
+      {/* Nome + logo */}
+      <div className="flex items-center gap-3 mb-4">
+        {baba.logo_url ? (
+          <img src={baba.logo_url} className="w-12 h-12 rounded-2xl object-cover border border-white/10" alt="" />
+        ) : (
+          <div className="w-12 h-12 rounded-2xl bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 text-cyan-electric font-black text-lg">
+            {baba.name.charAt(0)}
+          </div>
+        )}
+        <div>
+          <h2 className="font-black text-xl uppercase italic tracking-tight leading-none">
+            {baba.name}
+          </h2>
+          {(dayLabel || gameTime) && (
+            <p className="text-[11px] text-white/40 mt-0.5">
+              {dayLabel && <span>{dayLabel}</span>}
+              {dayLabel && gameTime && <span className="mx-1">·</span>}
+              {gameTime && <span>{gameTime}</span>}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Countdown + CTA */}
+      <div className="flex items-center justify-between">
+        {countdown ? (
+          <div className="flex items-center gap-2">
+            <Clock size={13} className="text-cyan-electric/60" />
+            <span className="text-cyan-electric font-black text-sm tracking-wide">
+              {countdown}
+            </span>
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="flex items-center gap-1 text-cyan-electric text-[11px] font-black uppercase tracking-widest">
+          Abrir
+          <ArrowRight size={13} />
+        </div>
+      </div>
+    </button>
+  );
+};
+
+// ─── Item da lista de babas ───────────────────────────────────────────────────
+const BabaListItem = ({ baba, onClick }) => {
+  const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
+  const gameTime = baba.game_time?.substring(0, 5) ?? null;
+  const dayLabel = dayIndex != null ? DAY[dayIndex] : null;
+
+  // Stub de presença — futuramente virá do contexto
+  const confirmed = baba.userConfirmed ?? false;
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 flex justify-between items-center transition-all active:scale-95"
+    >
+      <div className="flex items-center gap-3">
+        {baba.logo_url ? (
+          <img src={baba.logo_url} className="w-10 h-10 rounded-xl object-cover" alt="" />
+        ) : (
+          <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 flex items-center justify-center text-cyan-electric font-black">
+            {baba.name.charAt(0)}
+          </div>
+        )}
+        <div className="text-left">
+          <p className="font-black text-sm">{baba.name}</p>
+          <p className="text-[10px] text-white/40">
+            {dayLabel && <span>{dayLabel}</span>}
+            {dayLabel && gameTime && <span className="mx-1">·</span>}
+            {gameTime && <span>{gameTime}</span>}
+            {!dayLabel && !gameTime && <span>{baba.modality}</span>}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {confirmed && (
+          <CheckCircle2 size={14} className="text-cyan-electric" />
+        )}
+        <ArrowRight className="text-white/30" size={16} />
+      </div>
+    </button>
+  );
+};
+
+// ─── FAB ─────────────────────────────────────────────────────────────────────
+const FAB = ({ onClick }) => (
+  <button
+    onClick={onClick}
+    className="fixed bottom-24 right-5 w-14 h-14 rounded-full flex items-center justify-center z-[60] active:scale-90 transition-transform"
+    style={{
+      background: 'linear-gradient(135deg, #00f2ff, #0066ff)',
+      boxShadow: '0 8px 32px rgba(0,242,255,0.35)',
+    }}
+    aria-label="Criar ou entrar em baba"
+  >
+    <Plus size={24} className="text-black" strokeWidth={3} />
+  </button>
+);
+
+// ─── FAB Menu (criar / entrar) ────────────────────────────────────────────────
+const FABMenu = ({ onClose, onCreate, onJoin }) => (
+  <>
+    {/* Backdrop */}
+    <div
+      className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    />
+    {/* Opções */}
+    <div className="fixed bottom-44 right-5 z-[60] flex flex-col items-end gap-3">
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] text-white/60 font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-white/10">
+          Entrar com código
+        </span>
+        <button
+          onClick={onJoin}
+          className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center active:scale-90 transition-transform"
+        >
+          <LogIn size={18} className="text-white" />
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] text-white/60 font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-white/10">
+          Criar baba
+        </span>
+        <button
+          onClick={onCreate}
+          className="w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+          style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+        >
+          <Plus size={20} className="text-black" strokeWidth={3} />
+        </button>
+      </div>
+    </div>
+  </>
+);
+
+// ─── Componente principal ────────────────────────────────────────────────────
 const HomePage = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const { profile } = useAuth();
   const { myBabas, setCurrentBaba, joinBaba, loading } = useBaba();
 
-  const [invite, setInvite] = useState('');
+  const [invite, setInvite]   = useState('');
+  const [fabOpen, setFabOpen] = useState(false);
 
-  const lastBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
+  const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
+  const restBabas = useMemo(() => myBabas?.slice(1) || [], [myBabas]);
   const initials  = useMemo(() => profile?.name?.charAt(0)?.toUpperCase() || 'U', [profile]);
   const hasBabas  = myBabas?.length > 0;
 
-  const joinBoxRef = React.useRef(null);
+  const joinBoxRef = useRef(null);
 
   const handleJoin = async () => {
     const code = invite.trim().toUpperCase();
@@ -89,6 +282,7 @@ const HomePage = () => {
   };
 
   const focusJoinBox = () => {
+    setFabOpen(false);
     joinBoxRef.current?.scrollIntoView({ behavior: 'smooth' });
     setTimeout(() => {
       joinBoxRef.current?.querySelector('input')?.focus();
@@ -104,126 +298,62 @@ const HomePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white px-6 py-6 space-y-6">
+    <div className="min-h-screen bg-black text-white px-5 pt-6 pb-32 space-y-5">
 
-      {/* Header */}
+      {/* ── Topo compacto ── */}
       <div className="flex items-center justify-between">
         <Logo size="small" />
         <button
           onClick={() => navigate('/profile')}
-          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20"
+          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden"
         >
           {profile?.avatar_url ? (
-            <img src={profile.avatar_url} className="w-full h-full object-cover rounded-full" alt="" />
+            <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
           ) : (
             <span className="text-cyan-electric font-black text-sm">{initials}</span>
           )}
         </button>
       </div>
 
-      {/* Profile card */}
-      <div className="card-glass p-5 rounded-3xl border border-white/5 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-cyan-electric/10 flex items-center justify-center overflow-hidden">
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
-          ) : (
-            <User className="text-cyan-electric" />
-          )}
-        </div>
-        <div className="flex-1">
-          <h2 className="font-black uppercase">{profile?.name || 'Jogador'}</h2>
-          <p className="text-[10px] text-white/40 uppercase">{profile?.position || 'Sem posição'}</p>
-          <p className="text-[9px] text-cyan-electric font-black uppercase">PLAYER HUB</p>
-        </div>
-        <button
-          onClick={() => navigate('/profile')}
-          className="px-3 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase border border-white/10"
-        >
-          Perfil
-        </button>
-      </div>
-
-      {/* UX-001: Estado vazio OU conteúdo normal */}
+      {/* ── Estado vazio OR conteúdo ── */}
       {!hasBabas ? (
         <EmptyState onCreateClick={() => navigate('/create')} onJoinFocus={focusJoinBox} />
       ) : (
         <>
-          {/* Quick actions */}
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => navigate('/create')}
-              className="p-4 rounded-2xl bg-cyan-electric text-black font-black text-[10px] uppercase flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <Plus size={18} />
-              Criar
-            </button>
-            <button
-              onClick={focusJoinBox}
-              className="p-4 rounded-2xl bg-white/5 font-black text-[10px] uppercase flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <LogIn size={18} />
-              Entrar
-            </button>
-            <button
-              onClick={() => navigate('/rankings')}
-              className="p-4 rounded-2xl bg-white/5 font-black text-[10px] uppercase flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <Trophy size={18} />
-              Rank
-            </button>
-          </div>
+          {/* ── Hero: próximo baba ── */}
+          {nextBaba && (
+            <HeroBabaCard baba={nextBaba} onClick={() => openBaba(nextBaba)} />
+          )}
 
-          {/* Último baba em destaque */}
-          {lastBaba && (
-            <div
-              onClick={() => openBaba(lastBaba)}
-              className="p-5 rounded-3xl border border-cyan-electric/20 bg-cyan-electric/5 flex justify-between items-center cursor-pointer active:scale-95 transition-transform"
-            >
-              <div>
-                <p className="text-[9px] font-black text-cyan-electric/60 uppercase tracking-widest mb-1">
-                  Último acessado
-                </p>
-                <p className="font-black text-lg">{lastBaba.name}</p>
-                <p className="text-[10px] text-white/40">
-                  {lastBaba.game_time?.substring(0, 5)}
-                </p>
-              </div>
-              <Play className="text-cyan-electric" size={28} />
+          {/* ── Demais babas ── */}
+          {restBabas.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[10px] text-white/30 font-black uppercase tracking-widest px-1">
+                Meus Babas ({myBabas.length})
+              </h3>
+              {myBabas.map((baba) => (
+                <BabaListItem
+                  key={baba.id}
+                  baba={baba}
+                  onClick={() => openBaba(baba)}
+                />
+              ))}
             </div>
           )}
 
-          {/* Meus Babas */}
-          <div className="space-y-3">
-            <h3 className="text-[10px] text-cyan-electric font-black uppercase tracking-widest">
-              Meus Babas ({myBabas.length})
-            </h3>
-            {myBabas.map((baba) => (
-              <button
-                key={baba.id}
-                onClick={() => openBaba(baba)}
-                className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 flex justify-between items-center transition-all active:scale-95"
-              >
-                <div className="flex items-center gap-3">
-                  {baba.logo_url ? (
-                    <img src={baba.logo_url} className="w-10 h-10 rounded-xl object-cover" alt="" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 flex items-center justify-center text-cyan-electric font-black">
-                      {baba.name.charAt(0)}
-                    </div>
-                  )}
-                  <div className="text-left">
-                    <p className="font-black">{baba.name}</p>
-                    <p className="text-[10px] text-white/40">{baba.modality} · {baba.game_time?.substring(0, 5)}</p>
-                  </div>
-                </div>
-                <ArrowRight className="text-cyan-electric" size={18} />
-              </button>
-            ))}
-          </div>
+          {/* Se só tem 1 baba, ainda mostra o label */}
+          {restBabas.length === 0 && myBabas.length === 1 && (
+            <div className="space-y-2">
+              <h3 className="text-[10px] text-white/30 font-black uppercase tracking-widest px-1">
+                Meus Babas (1)
+              </h3>
+              <BabaListItem baba={nextBaba} onClick={() => openBaba(nextBaba)} />
+            </div>
+          )}
         </>
       )}
 
-      {/* Join Box — sempre visível no fundo */}
+      {/* ── Join Box — sempre no final ── */}
       <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-white/5">
         <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
           Entrar com código
@@ -238,12 +368,26 @@ const HomePage = () => {
         <button
           onClick={handleJoin}
           disabled={invite.length !== 6}
-          className="w-full p-4 bg-green-500 text-black font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all"
+          className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black"
+          style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
         >
           Entrar no Baba
         </button>
       </div>
 
+      {/* ── FAB ── */}
+      {hasBabas && (
+        <>
+          {fabOpen && (
+            <FABMenu
+              onClose={() => setFabOpen(false)}
+              onCreate={() => { setFabOpen(false); navigate('/create'); }}
+              onJoin={focusJoinBox}
+            />
+          )}
+          <FAB onClick={() => setFabOpen(v => !v)} />
+        </>
+      )}
     </div>
   );
 };
