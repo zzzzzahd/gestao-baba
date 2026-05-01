@@ -1,20 +1,20 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Shield, Trophy, DollarSign, User } from 'lucide-react';
+import { Home, Shield, Trophy, User } from 'lucide-react';
 
+// Caixa (/financial) foi removida da nav principal.
+// Acesso à Caixa agora é feito via sub-aba dentro do Dashboard (Sprint E).
 const NAV_ITEMS = [
-  { icon: Home,       label: 'Início',    path: '/home'      },
-  { icon: Shield,     label: 'Baba',      path: '/dashboard' },
-  { icon: Trophy,     label: 'Rankings',  path: '/rankings'  },
-  { icon: DollarSign, label: 'Caixa',     path: '/financial' },
-  { icon: User,       label: 'Perfil',    path: '/profile'   },
+  { icon: Home,   label: 'Início',   path: '/home'      },
+  { icon: Shield, label: 'Baba',     path: '/dashboard' },
+  { icon: Trophy, label: 'Rankings', path: '/rankings'  },
+  { icon: User,   label: 'Perfil',   path: '/profile'   },
 ];
 
 const BottomNav = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Não renderiza em rotas públicas
   const PUBLIC_ROUTES = ['/', '/login', '/visitor', '/visitor-match'];
   if (PUBLIC_ROUTES.includes(location.pathname)) return null;
 
@@ -52,7 +52,6 @@ const BottomNav = () => {
                     }`}
                     strokeWidth={isActive ? 2.5 : 1.5}
                   />
-                  {/* Ponto indicador */}
                   {isActive && (
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-cyan-electric rounded-full shadow-[0_0_6px_rgba(0,242,255,0.8)]" />
                   )}
