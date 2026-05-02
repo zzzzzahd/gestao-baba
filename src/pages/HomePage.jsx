@@ -15,7 +15,7 @@ import { useCountdown as useCountdownDate } from '../hooks/useCountdown';
 
 // ─── Countdown adaptado para o card de baba ───────────────────────────────────
 // O hook useCountdown.js recebe uma Date; aqui convertemos day-of-week+time → Date
-const useCountdown = (targetDayOfWeek, targetTime) => {
+const useBabaCountdown = (targetDayOfWeek, targetTime) => {
   const [targetDate, setTargetDate] = useState(null);
 
   useEffect(() => {
