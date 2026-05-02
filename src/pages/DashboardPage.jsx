@@ -12,16 +12,10 @@ import BabaSettings    from '../components/BabaSettings';
 import QRCodeModal     from '../components/QRCodeModal';
 import SuspensionPanel from '../components/SuspensionPanel';
 import toast from 'react-hot-toast';
+// Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no HomePage)
+import { DAY_SHORT, DAY_FULL, POSITION_LABEL } from '../utils/constants';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const DAY_SHORT = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-const DAY_FULL  = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-
-const POSITION_LABEL = {
-  goleiro: 'Goleiro', linha: 'Linha', zagueiro: 'Zagueiro',
-  lateral: 'Lateral', meia: 'Meia', atacante: 'Atacante',
-};
 
 const formatGameDays = (baba) => {
   if (!Array.isArray(baba?.game_days) || baba.game_days.length === 0) return null;
