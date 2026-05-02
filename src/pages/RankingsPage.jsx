@@ -1,19 +1,127 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import { ArrowLeft, Trophy, Target, Award } from 'lucide-react';
-// Star removido — aba Nível migrada para ProfilePage (Sprint D/F)
 import toast from 'react-hot-toast';
+
+// ─── Pódio ────────────────────────────────────────────────────────────────────
+
+const PodiumStep = ({ player, position, statValue, statUnit, isMe }) => {
+  const configs = {
+    1: { height: 'h-24', label: '🥇', labelColor: 'text-yellow-400', ring: 'ring-yellow-400/60', size: 'w-16 h-16', fontSize: 'text-4xl' },
+    2: { height: 'h-16', label: '🥈', labelColor: 'text-gray-300',   ring: 'ring-gray-300/40',   size: 'w-13 h-13', fontSize: 'text-3xl' },
+    3: { height: 'h-10', label: '🥉', labelColor: 'text-orange-500', ring: 'ring-orange-500/40', size: 'w-12 h-12', fontSize: 'text-2xl' },
+  };
+
+  const c = configs[position];
+
+  return (
+    <div className="flex flex-col items-center gap-2 flex-1">
+      {/* Avatar */}
+      <div className={`relative ${position === 1 ? 'w-16 h-16' : position === 2 ? 'w-14 h-14' : 'w-12 h-12'}`}>
+        <div className={`w-full h-full rounded-full ring-2 ${c.ring} overflow-hidden bg-white/10 flex items-center justify-center ${isMe ? 'ring-cyan-electric' : ''}`}>
+          {player.avatar_url ? (
+            <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
+          ) : (
+            <span className={`font-black text-white ${position === 1 ? 'text-xl' : 'text-base'}`}>
+              {(player.name || '?').charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        {/* Medalha */}
+        <span className="absolute -bottom-1 -right-1 text-sm leading-none">{c.label}</span>
+      </div>
+
+      {/* Nome */}
+      <div className="text-center max-w-[80px]">
+        <p className={`text-[10px] font-black uppercase truncate ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
+          {player.name}
+        </p>
+        {isMe && <p className="text-[8px] text-cyan-electric/60 font-black uppercase">Você</p>}
+      </div>
+
+      {/* Valor */}
+      <p className={`font-black ${c.fontSize} ${c.labelColor} leading-none`}>{statValue}</p>
+      <p className="text-[8px] text-white/30 font-black uppercase">{statUnit}</p>
+
+      {/* Degrau */}
+      <div className={`w-full ${c.height} rounded-t-xl flex items-end justify-center pb-2 border-t border-white/10 ${
+        position === 1 ? 'bg-yellow-400/10' : position === 2 ? 'bg-white/5' : 'bg-white/[0.03]'
+      }`}>
+        <span className={`text-xs font-black ${c.labelColor}`}>{position}º</span>
+      </div>
+    </div>
+  );
+};
+
+const Podium = ({ top3, getStatValue, myPlayerId }) => {
+  if (top3.length < 1) return null;
+
+  // Ordem visual do pódio: 2º | 1º | 3º
+  const order = [
+    top3[1] ? { player: top3[1], position: 2 } : null,
+    top3[0] ? { player: top3[0], position: 1 } : null,
+    top3[2] ? { player: top3[2], position: 3 } : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="flex items-end justify-center gap-3 pt-4 pb-2 px-2">
+      {order.map(({ player, position }) => {
+        const { value, unit } = getStatValue(player);
+        return (
+          <PodiumStep
+            key={player.id}
+            player={player}
+            position={position}
+            statValue={value}
+            statUnit={unit}
+            isMe={player.id === myPlayerId}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── Footer fixo com posição do usuário ──────────────────────────────────────
+
+const MyPositionFooter = ({ position, total, statValue, statUnit }) => (
+  <div className="fixed bottom-[96px] left-0 right-0 z-40 flex justify-center pointer-events-none">
+    <div className="mx-5 w-full max-w-xl pointer-events-auto">
+      <div className="flex items-center justify-between px-5 py-3 rounded-2xl bg-black/90 border border-cyan-electric/20 backdrop-blur-md shadow-lg shadow-cyan-electric/10">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Sua posição</span>
+          <span className="text-lg font-black text-cyan-electric">#{position}</span>
+          <span className="text-[9px] text-white/20 font-black uppercase">de {total}</span>
+        </div>
+        <div className="text-right">
+          <span className="text-lg font-black text-white">{statValue}</span>
+          <span className="text-[9px] text-white/30 font-black uppercase ml-1">{statUnit}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Rankings Page ────────────────────────────────────────────────────────────
 
 const RankingsPage = () => {
   const navigate = useNavigate();
-  const { currentBaba } = useBaba();
+  const { user }                    = useAuth();
+  const { currentBaba, players }    = useBaba();
 
   const [activeTab, setActiveTab] = useState('artilheiros');
   const [period,    setPeriod]    = useState('all');
   const [rankings,  setRankings]  = useState([]);
   const [loading,   setLoading]   = useState(true);
+
+  // Player do usuário logado dentro do baba atual
+  const myPlayer = useMemo(
+    () => (players || []).find(p => p.user_id === user?.id) || null,
+    [players, user?.id]
+  );
 
   const loadRankings = useCallback(async () => {
     if (!currentBaba?.id) return;
@@ -29,21 +137,19 @@ const RankingsPage = () => {
         dateFilter = d.toISOString().split('T')[0];
       }
 
-      // BUG-005 FIX: usar !inner para garantir que o filtro de baba_id funcione
+      // BUG-005 FIX: !inner garante que o filtro de baba_id funcione
       let query = supabase
         .from('match_players')
         .select(`
           player_id,
           goals,
           assists,
-          player:players!inner(name, position),
+          player:players!inner(name, position, user_id, profile:profiles(avatar_url)),
           match:matches!inner(match_date, baba_id)
         `)
         .eq('match.baba_id', currentBaba.id);
 
-      if (dateFilter) {
-        query = query.gte('match.match_date', dateFilter);
-      }
+      if (dateFilter) query = query.gte('match.match_date', dateFilter);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -55,8 +161,10 @@ const RankingsPage = () => {
         if (!statsMap[id]) {
           statsMap[id] = {
             id,
-            name:     mp.player.name     || 'Jogador',
-            position: mp.player.position || 'linha',
+            name:       mp.player.name                   || 'Jogador',
+            position:   mp.player.position               || 'linha',
+            avatar_url: mp.player.profile?.avatar_url    || null,
+            user_id:    mp.player.user_id                || null,
             goals:   0,
             assists: 0,
             matches: 0,
@@ -88,60 +196,59 @@ const RankingsPage = () => {
       setLoading(false);
     }
   }, [currentBaba?.id, activeTab, period]);
-  // getAllRatings removido da dependência — aba Nível migrada para Perfil
 
   useEffect(() => { loadRankings(); }, [loadRankings]);
 
-  const getMedalLabel = (i) => {
-    if (i === 0) return '🥇';
-    if (i === 1) return '🥈';
-    if (i === 2) return '🥉';
-    return `${i + 1}º`;
-  };
-
-  const getMedalColor = (i) => {
-    if (i === 0) return 'text-yellow-500';
-    if (i === 1) return 'text-gray-300';
-    if (i === 2) return 'text-orange-600';
-    return 'text-white/40';
-  };
-
-  // Aba "Nível" removida — era dado pessoal, vai para ProfilePage (Sprint D/F)
-  // Todos os ícones agora em text-cyan-electric (consistência Sprint B)
   const TABS = [
     { id: 'artilheiros', icon: Trophy, label: 'Gols'   },
     { id: 'garcons',     icon: Target, label: 'Assist' },
     { id: 'mvps',        icon: Award,  label: 'MVP'    },
   ];
 
-  const getStatValue = (player) => {
-    if (activeTab === 'artilheiros') return { value: player.goals,   unit: 'gols'   };
-    if (activeTab === 'garcons')     return { value: player.assists, unit: 'assists' };
-    return                                  { value: player.total,   unit: 'G+A'    };
+  const getStatValue = useCallback((player) => {
+    if (activeTab === 'artilheiros') return { value: player.goals,   unit: 'gols'    };
+    if (activeTab === 'garcons')     return { value: player.assists, unit: 'assists'  };
+    return                                  { value: player.total,   unit: 'G+A'     };
+  }, [activeTab]);
+
+  const getMedalColor = (i) => {
+    if (i === 0) return 'text-yellow-400';
+    if (i === 1) return 'text-gray-300';
+    if (i === 2) return 'text-orange-500';
+    return 'text-white/40';
   };
 
+  // Pódio — top 3
+  const top3    = rankings.slice(0, 3);
+  // Lista — a partir do 4º
+  const listFrom4 = rankings.slice(3);
+
+  // Posição do usuário logado
+  const myRankIndex = myPlayer
+    ? rankings.findIndex(p => p.id === myPlayer.id)
+    : -1;
+  const myRankData = myRankIndex >= 0 ? rankings[myRankIndex] : null;
+  const showFooter = myRankData !== null && rankings.length > 0;
+
   return (
-    <div className="min-h-screen bg-black text-white p-6 pb-24">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-black text-white p-6 pb-40">
+      <div className="max-w-4xl mx-auto space-y-5">
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-black uppercase italic tracking-tighter">Rankings</h1>
           <div className="w-10" />
         </div>
 
-        {/* Filtro de período — chips menores e menos dominantes */}
+        {/* Filtro de período */}
         <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
           {[
-            { id: 'all',    label: 'Tudo'   },
-            { id: '7days',  label: '7 Dias' },
-            { id: '30days', label: '30 Dias'},
+            { id: 'all',    label: 'Tudo'    },
+            { id: '7days',  label: '7 Dias'  },
+            { id: '30days', label: '30 Dias' },
           ].map(p => (
             <button
               key={p.id}
@@ -157,7 +264,7 @@ const RankingsPage = () => {
           ))}
         </div>
 
-        {/* Tabs — todos os ícones em cyan-electric */}
+        {/* Tabs */}
         <div className="grid grid-cols-3 gap-2">
           {TABS.map(tab => (
             <button
@@ -171,7 +278,7 @@ const RankingsPage = () => {
             >
               <tab.icon
                 className="mb-2 text-cyan-electric"
-                size={24}
+                size={22}
                 fill={activeTab === tab.id ? 'currentColor' : 'none'}
               />
               <p className="text-[10px] font-black uppercase">{tab.label}</p>
@@ -179,47 +286,95 @@ const RankingsPage = () => {
           ))}
         </div>
 
-        {/* Lista */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-electric" />
-            </div>
-          ) : rankings.length > 0 ? (
-            rankings.map((player, index) => {
-              const { value, unit } = getStatValue(player);
-              return (
-                <div
-                  key={player.id || player.player_id}
-                  className="p-5 rounded-2xl border border-white/5 bg-white/[0.03] flex items-center gap-4 hover:border-white/20 transition-all"
-                >
-                  <span className={`text-2xl font-black min-w-[32px] text-center ${getMedalColor(index)}`}>
-                    {getMedalLabel(index)}
-                  </span>
+        {/* Conteúdo */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-electric" />
+          </div>
+        ) : rankings.length > 0 ? (
+          <>
+            {/* ── Pódio (top 3) ── */}
+            <Podium
+              top3={top3}
+              getStatValue={getStatValue}
+              myPlayerId={myPlayer?.id}
+            />
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black uppercase tracking-tight truncate">{player.name}</p>
-                    <p className="text-[9px] text-white/40 font-bold uppercase">{player.position}</p>
-                  </div>
+            {/* ── Lista (4º em diante) ── */}
+            {listFrom4.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="h-px bg-white/5 mb-3" />
+                {listFrom4.map((player, i) => {
+                  const { value, unit } = getStatValue(player);
+                  const absIndex        = i + 3; // posição real no ranking
+                  const isMe            = player.id === myPlayer?.id;
 
-                  <div className="text-right shrink-0">
-                    <p className="text-3xl font-black text-white">{value}</p>
-                    <p className="text-[9px] text-white/40 font-bold uppercase">{unit}</p>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl">
-              <p className="text-white/20 font-black uppercase text-sm">Nenhum dado ainda</p>
-              <p className="text-white/10 text-[10px] mt-2 uppercase">
-                Joga o primeiro baba pra começar a contagem!
-              </p>
-            </div>
-          )}
-        </div>
+                  return (
+                    <div
+                      key={player.id}
+                      className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${
+                        isMe
+                          ? 'border-cyan-electric/30 bg-cyan-electric/5'
+                          : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                      }`}
+                    >
+                      <span className={`text-lg font-black min-w-[32px] text-center ${getMedalColor(absIndex)}`}>
+                        {absIndex + 1}º
+                      </span>
 
+                      {/* Avatar */}
+                      <div className="w-9 h-9 rounded-full bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                        {player.avatar_url ? (
+                          <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
+                        ) : (
+                          <span className="text-[11px] font-black text-white">
+                            {(player.name || '?').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black uppercase tracking-tight truncate ${isMe ? 'text-cyan-electric' : ''}`}>
+                          {player.name}{isMe && <span className="text-[9px] ml-1 opacity-60">• Você</span>}
+                        </p>
+                        <p className="text-[9px] text-white/30 font-bold uppercase">{player.position}</p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <p className={`text-2xl font-black ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
+                          {value}
+                        </p>
+                        <p className="text-[9px] text-white/30 font-bold uppercase">{unit}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl">
+            <Trophy size={32} className="text-white/10 mx-auto mb-4" />
+            <p className="text-white/20 font-black uppercase text-sm">Nenhum dado ainda</p>
+            <p className="text-white/10 text-[10px] mt-2 uppercase">
+              Joga o primeiro baba pra começar a contagem!
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Footer fixo — posição do usuário */}
+      {showFooter && (() => {
+        const { value, unit } = getStatValue(myRankData);
+        return (
+          <MyPositionFooter
+            position={myRankIndex + 1}
+            total={rankings.length}
+            statValue={value}
+            statUnit={unit}
+          />
+        );
+      })()}
     </div>
   );
 };
