@@ -239,7 +239,14 @@ const RankingsPage = () => {
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-black uppercase italic tracking-tighter">Rankings</h1>
+          <div className="text-center">
+            <h1 className="text-xl font-black uppercase italic tracking-tighter">Rankings</h1>
+            {currentBaba?.name && (
+              <p className="text-[9px] text-cyan-electric/60 font-black uppercase tracking-widest mt-0.5">
+                {currentBaba.name}
+              </p>
+            )}
+          </div>
           <div className="w-10" />
         </div>
 
