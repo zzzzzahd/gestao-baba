@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 const MatchPageVisitor = () => {
   const navigate = useNavigate();
@@ -9,6 +10,8 @@ const MatchPageVisitor = () => {
   const [currentMatch, setCurrentMatch] = useState(null);
   const [timer, setTimer] = useState(600); // 10 minutos
   const [isActive, setIsActive] = useState(false);
+  // Tarefa 1.2 — substitui window.confirm()
+  const [confirmExit, setConfirmExit] = useState(false);
   
   // NOVA STATE: Para jogadores que ficaram na reserva individual
   const [reserves, setReserves] = useState([]);
@@ -142,14 +145,7 @@ const MatchPageVisitor = () => {
         {/* Header */}
         <div className="flex justify-between items-center text-[10px] font-black opacity-40">
           <button 
-            onClick={() => {
-              const confirm = window.confirm('Deseja sair? O progresso será perdido.');
-              if (confirm) {
-                localStorage.removeItem('temp_teams');
-                localStorage.removeItem('temp_reserves');
-                navigate('/visitor');
-              }
-            }}
+            onClick={() => setConfirmExit(true)}
             className="hover:text-cyan-electric transition-colors"
           >
             ← SAIR
@@ -319,6 +315,21 @@ const MatchPageVisitor = () => {
           <p className="mt-1">Quem Ganha Fica • Empate Sai os Dois</p>
         </div>
       </div>
+
+      {/* Tarefa 1.2 — Modal de confirmação de saída */}
+      <ConfirmModal
+        open={confirmExit}
+        message="Sair da partida?"
+        description="O progresso desta partida será perdido e você voltará para o modo visitante."
+        confirmLabel="Sair"
+        danger
+        onConfirm={() => {
+          localStorage.removeItem('temp_teams');
+          localStorage.removeItem('temp_reserves');
+          navigate('/visitor');
+        }}
+        onCancel={() => setConfirmExit(false)}
+      />
     </div>
   );
 };
