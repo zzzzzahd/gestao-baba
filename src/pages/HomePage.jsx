@@ -10,16 +10,16 @@ import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 // Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
-// Tarefa 1.3 — usar o hook existente em vez da reimplementação inline
-import { useCountdown } from '../hooks/useCountdown';
 
-// ─── Countdown adaptado para o card de baba ───────────────────────────────────
-// O hook useCountdown.js recebe uma Date; aqui convertemos day-of-week+time → Date
-const useBabaCountdown = (targetDayOfWeek, targetTime) => {
-  const [targetDate, setTargetDate] = useState(null);
+// ─── Countdown hook inline ─────────────────────────────────────────────────────
+// Recebe índice do dia da semana (0=Dom) + horário "HH:MM" e retorna string
+// legível como "2d 3h 15m". Mantido inline para evitar conflito de contexto
+// React entre hooks aninhados em componentes definidos fora do render tree.
+const useCountdown = (targetDayOfWeek, targetTime) => {
+  const [display, setDisplay] = useState('');
 
   useEffect(() => {
-    if (targetDayOfWeek == null || !targetTime) { setTargetDate(null); return; }
+    if (targetDayOfWeek == null || !targetTime) { setDisplay(''); return; }
 
     const calc = () => {
       const now = new Date();
@@ -29,7 +29,15 @@ const useBabaCountdown = (targetDayOfWeek, targetTime) => {
       let daysUntil = (targetDayOfWeek - now.getDay() + 7) % 7;
       if (daysUntil === 0 && now >= target) daysUntil = 7;
       target.setDate(target.getDate() + daysUntil);
-      setTargetDate(target);
+
+      const diff = target - now;
+      const days  = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins  = Math.floor((diff % 3600000) / 60000);
+
+      if (days > 0)  setDisplay(`${days}d ${hours}h ${mins}m`);
+      else if (hours > 0) setDisplay(`${hours}h ${mins}m`);
+      else setDisplay(`${mins}m`);
     };
 
     calc();
@@ -37,13 +45,7 @@ const useBabaCountdown = (targetDayOfWeek, targetTime) => {
     return () => clearInterval(id);
   }, [targetDayOfWeek, targetTime]);
 
-  // AQUI ESTAVA O ERRO: Use o hook que você importou corretamente
-  const cd = useCountdown(targetDate); 
-
-  if (!cd?.active) return '';
-  if (cd.d > 0) return `${cd.d}d ${cd.h}h ${cd.m}m`;
-  if (cd.h > 0) return `${cd.h}h ${cd.m}m`;
-  return `${cd.m}m`;
+  return display;
 };
 
 // ─── Estado vazio ─────────────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
 const HeroBabaCard = ({ baba, onClick }) => {
   const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
   const gameTime = baba.game_time?.substring(0, 5) ?? null;
-  const countdown = useBabaCountdown(dayIndex, gameTime);
+  const countdown = useCountdown(dayIndex, gameTime);
   const dayLabel = dayIndex != null ? DAY_SHORT[dayIndex] : null;
 
   return (
