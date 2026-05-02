@@ -1,0 +1,125 @@
+// src/components/DrawConfigBlock.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Configuração do sorteio automático (visível apenas para o presidente).
+// Extraído do DashboardPage (Fase 2, Tarefa 2.4).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React from 'react';
+import { Settings2 } from 'lucide-react';
+
+const STRATEGIES = [
+  { id: 'reserve',    label: 'Reserva'    },
+  { id: 'substitute', label: 'Incompleto' },
+];
+
+const DrawConfigBlock = ({
+  drawConfig,
+  setDrawConfig,
+  gameConfirmations,
+  isDrawing,
+  nextGameDay,
+}) => {
+  const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
+  const confirmedCount = gameConfirmations?.length || 0;
+  const minRequired    = safeConfig.playersPerTeam * 2;
+  const totalTeams     = Math.floor(confirmedCount / safeConfig.playersPerTeam);
+  const totalMatches   = Math.floor(totalTeams / 2);
+  const reserves       = confirmedCount % safeConfig.playersPerTeam
+    + (totalTeams % 2) * safeConfig.playersPerTeam;
+
+  // Horário do sorteio automático (deadline = 30 min antes do jogo)
+  const deadlineStr = nextGameDay?.deadline
+    ? nextGameDay.deadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const handleDelta = (delta) => {
+    const next = Math.max(2, Math.min(11, safeConfig.playersPerTeam + delta));
+    setDrawConfig(prev => ({ ...prev, playersPerTeam: next }));
+  };
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-white/5">
+
+      {/* Cabeçalho com horário do sorteio automático */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <Settings2
+            size={13}
+            className={`text-cyan-electric ${isDrawing ? 'animate-spin' : ''}`}
+          />
+          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+            Config do sorteio
+          </span>
+        </div>
+        {deadlineStr && (
+          <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">
+            Automático às {deadlineStr}
+          </span>
+        )}
+      </div>
+
+      {/* Jogadores por time */}
+      <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
+        <span className="text-[10px] font-black uppercase text-white/50">Jogadores por time</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleDelta(-1)}
+            disabled={isDrawing}
+            className="w-8 h-8 bg-white/5 rounded-lg border border-white/10 font-black text-lg hover:bg-white/10 active:scale-90 transition-all disabled:opacity-30"
+          >−</button>
+          <span className="text-xl font-black w-8 text-center text-cyan-electric">
+            {safeConfig.playersPerTeam}
+          </span>
+          <button
+            onClick={() => handleDelta(1)}
+            disabled={isDrawing}
+            className="w-8 h-8 bg-white/5 rounded-lg border border-white/10 font-black text-lg hover:bg-white/10 active:scale-90 transition-all disabled:opacity-30"
+          >+</button>
+        </div>
+      </div>
+
+      {/* Estratégia de suplentes */}
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
+        <span className="text-[10px] font-black uppercase text-white/40 shrink-0">Suplentes</span>
+        <div className="flex gap-2 flex-1 justify-end">
+          {STRATEGIES.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setDrawConfig(prev => ({ ...prev, strategy: s.id }))}
+              disabled={isDrawing}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border ${
+                safeConfig.strategy === s.id
+                  ? 'bg-cyan-electric text-black border-cyan-electric'
+                  : 'bg-white/5 text-white/30 border-white/10 hover:border-white/20'
+              } disabled:opacity-40`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Prévia do sorteio — só quando tem quórum */}
+      {confirmedCount >= minRequired ? (
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: totalMatches, label: 'Partidas',   color: 'text-cyan-electric'                               },
+            { value: totalTeams,   label: 'Times',      color: 'text-white'                                       },
+            { value: reserves,     label: 'Aguardando', color: reserves > 0 ? 'text-yellow-500' : 'text-white/20' },
+          ].map(item => (
+            <div key={item.label} className="text-center p-3 bg-white/5 rounded-2xl border border-white/5">
+              <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
+              <p className="text-[8px] text-white/30 uppercase font-black mt-0.5">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-[10px] text-white/25 font-black uppercase tracking-widest py-1">
+          faltam {minRequired - confirmedCount} confirmação{minRequired - confirmedCount !== 1 ? 'ões' : ''} para o sorteio
+        </p>
+      )}
+    </div>
+  );
+};
+
+export default DrawConfigBlock;
