@@ -13,10 +13,10 @@ const MatchPageVisitor = () => {
   // Tarefa 1.2 — substitui window.confirm()
   const [confirmExit, setConfirmExit] = useState(false);
   
-  // NOVA STATE: Para jogadores que ficaram na reserva individual
+  // NOVA STATE: Para jogadores que ficaram na reserva individual.
   const [reserves, setReserves] = useState([]);
 
-  // 1. Carregar times e reservas do localStorage
+  // 1. Carregar times e reservas do localStorage.
   useEffect(() => {
     const savedTeams = localStorage.getItem('temp_teams');
     const savedReserves = localStorage.getItem('temp_reserves');
