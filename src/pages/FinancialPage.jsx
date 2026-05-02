@@ -8,22 +8,23 @@ import {
   Loader2, Trash2, Camera, Eye, Ban, CreditCard, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// Gradiente cyan reutilizável como style inline
-const CYAN_GRADIENT = { background: 'linear-gradient(135deg, #00f2ff, #0066ff)' };
+import ConfirmModal from '../components/ConfirmModal';
+import { CYAN_GRADIENT } from '../utils/constants';
 
 const FinancialPage = () => {
   const navigate = useNavigate();
   const { currentBaba } = useBaba();
   const { user } = useAuth();
   
-  const [financials, setFinancials]         = useState([]);
+  const [financials, setFinancials]           = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPayModal, setShowPayModal]       = useState(false);
   const [selectedFinancial, setSelectedFinancial] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(false);
   const [isPresident, setIsPresident] = useState(false);
+  // Tarefa 1.2 — substitui window.confirm()
+  const [confirmState, setConfirmState] = useState({ open: false, message: '', description: '', onConfirm: null });
 
   const [newFinancial, setNewFinancial] = useState({
     title: '', description: '', amount: '', due_date: '', pix_key: ''
@@ -81,21 +82,27 @@ const FinancialPage = () => {
     }
   };
 
-  const deleteFinancial = async (id) => {
-    if (!window.confirm('Deseja apagar esta cobrança e todos os registros de pagamento dela?')) return;
-    try {
-      setProcessing(true);
-      await supabase.from('payments').delete().eq('financial_id', id);
-      const { error } = await supabase.from('financials').delete().eq('id', id);
-      if (error) throw error;
-      setFinancials(prev => prev.filter(f => f.id !== id));
-      toast.success('Excluído com sucesso');
-    } catch (error) {
-      console.error('Erro ao excluir:', error);
-      toast.error('Erro ao excluir');
-    } finally {
-      setProcessing(false);
-    }
+  const deleteFinancial = (id) => {
+    setConfirmState({
+      open: true,
+      message: 'Apagar esta cobrança?',
+      description: 'Todos os registros de pagamento vinculados também serão removidos. Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          setProcessing(true);
+          await supabase.from('payments').delete().eq('financial_id', id);
+          const { error } = await supabase.from('financials').delete().eq('id', id);
+          if (error) throw error;
+          setFinancials(prev => prev.filter(f => f.id !== id));
+          toast.success('Excluído com sucesso');
+        } catch (error) {
+          console.error('Erro ao excluir:', error);
+          toast.error('Erro ao excluir');
+        } finally {
+          setProcessing(false);
+        }
+      },
+    });
   };
 
   const handleUploadProof = async (e) => {
@@ -516,6 +523,17 @@ const FinancialPage = () => {
             </div>
           </div>
         )}
+
+        {/* ── Modal de Confirmação (substitui window.confirm) ── */}
+        <ConfirmModal
+          open={confirmState.open}
+          message={confirmState.message}
+          description={confirmState.description}
+          confirmLabel="Apagar"
+          danger
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+        />
 
       </div>
     </div>
