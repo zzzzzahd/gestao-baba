@@ -8,34 +8,28 @@ import {
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
+// Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
+import { DAY_SHORT } from '../utils/constants';
+// Tarefa 1.3 — usar o hook existente em vez da reimplementação inline
+import { useCountdown as useCountdownDate } from '../hooks/useCountdown';
 
-const DAY = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-
-// ─── Countdown hook ───────────────────────────────────────────────────────────
-const useCountdown = (targetDayOfWeek, targetTime) => {
-  const [display, setDisplay] = useState('');
+// ─── Countdown adaptado para o card de baba ───────────────────────────────────
+// O hook useCountdown.js recebe uma Date; aqui convertemos day-of-week+time → Date
+const useBabaCountdown = (targetDayOfWeek, targetTime) => {
+  const [targetDate, setTargetDate] = useState(null);
 
   useEffect(() => {
-    if (targetDayOfWeek == null || !targetTime) return;
+    if (targetDayOfWeek == null || !targetTime) { setTargetDate(null); return; }
 
     const calc = () => {
       const now = new Date();
       const [h, m] = targetTime.split(':').map(Number);
       const target = new Date();
       target.setHours(h, m, 0, 0);
-
       let daysUntil = (targetDayOfWeek - now.getDay() + 7) % 7;
       if (daysUntil === 0 && now >= target) daysUntil = 7;
       target.setDate(target.getDate() + daysUntil);
-
-      const diff = target - now;
-      const days = Math.floor(diff / 86400000);
-      const hours = Math.floor((diff % 86400000) / 3600000);
-      const mins = Math.floor((diff % 3600000) / 60000);
-
-      if (days > 0) setDisplay(`${days}d ${hours}h ${mins}m`);
-      else if (hours > 0) setDisplay(`${hours}h ${mins}m`);
-      else setDisplay(`${mins}m`);
+      setTargetDate(target);
     };
 
     calc();
@@ -43,7 +37,12 @@ const useCountdown = (targetDayOfWeek, targetTime) => {
     return () => clearInterval(id);
   }, [targetDayOfWeek, targetTime]);
 
-  return display;
+  const cd = useCountdownDate(targetDate);
+
+  if (!cd?.active) return '';
+  if (cd.d > 0) return `${cd.d}d ${cd.h}h ${cd.m}m`;
+  if (cd.h > 0) return `${cd.h}h ${cd.m}m`;
+  return `${cd.m}m`;
 };
 
 // ─── Estado vazio ─────────────────────────────────────────────────────────────
@@ -94,8 +93,8 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
 const HeroBabaCard = ({ baba, onClick }) => {
   const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
   const gameTime = baba.game_time?.substring(0, 5) ?? null;
-  const countdown = useCountdown(dayIndex, gameTime);
-  const dayLabel = dayIndex != null ? DAY[dayIndex] : null;
+  const countdown = useBabaCountdown(dayIndex, gameTime);
+  const dayLabel = dayIndex != null ? DAY_SHORT[dayIndex] : null;
 
   return (
     <button
@@ -159,7 +158,7 @@ const HeroBabaCard = ({ baba, onClick }) => {
 const BabaListItem = ({ baba, onClick }) => {
   const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
   const gameTime = baba.game_time?.substring(0, 5) ?? null;
-  const dayLabel = dayIndex != null ? DAY[dayIndex] : null;
+  const dayLabel = dayIndex != null ? DAY_SHORT[dayIndex] : null;
 
   // Stub de presença — futuramente virá do contexto
   const confirmed = baba.userConfirmed ?? false;
@@ -256,8 +255,10 @@ const HomePage = () => {
   const { profile } = useAuth();
   const { myBabas, setCurrentBaba, joinBaba, loading } = useBaba();
 
-  const [invite, setInvite]   = useState('');
-  const [fabOpen, setFabOpen] = useState(false);
+  const [invite, setInvite]     = useState('');
+  const [fabOpen, setFabOpen]   = useState(false);
+  // Tarefa 1.4 — feedback visual no botão de join
+  const [joining, setJoining]   = useState(false);
 
   const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
   const restBabas = useMemo(() => myBabas?.slice(1) || [], [myBabas]);
@@ -272,8 +273,13 @@ const HomePage = () => {
       toast.error('Código deve ter 6 caracteres');
       return;
     }
-    const baba = await joinBaba(code);
-    if (baba) navigate('/dashboard');
+    setJoining(true);
+    try {
+      const baba = await joinBaba(code);
+      if (baba) navigate('/dashboard');
+    } finally {
+      setJoining(false);
+    }
   };
 
   const openBaba = (baba) => {
@@ -325,7 +331,7 @@ const HomePage = () => {
             <HeroBabaCard baba={nextBaba} onClick={() => openBaba(nextBaba)} />
           )}
 
-          {/* ── Demais babas ── */}
+          {/* ── Demais babas (a partir do 2º) ── */}
           {restBabas.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[10px] text-white/30 font-black uppercase tracking-widest px-1">
@@ -338,16 +344,6 @@ const HomePage = () => {
                   onClick={() => openBaba(baba)}
                 />
               ))}
-            </div>
-          )}
-
-          {/* Se só tem 1 baba, ainda mostra o label */}
-          {restBabas.length === 0 && myBabas.length === 1 && (
-            <div className="space-y-2">
-              <h3 className="text-[10px] text-white/30 font-black uppercase tracking-widest px-1">
-                Meus Babas (1)
-              </h3>
-              <BabaListItem baba={nextBaba} onClick={() => openBaba(nextBaba)} />
             </div>
           )}
         </>
@@ -367,11 +363,19 @@ const HomePage = () => {
         />
         <button
           onClick={handleJoin}
-          disabled={invite.length !== 6}
-          className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black"
+          disabled={invite.length !== 6 || joining}
+          className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black flex items-center justify-center gap-2"
           style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
         >
-          Entrar no Baba
+          {joining ? (
+            <>
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Entrando...
+            </>
+          ) : 'Entrar no Baba'}
         </button>
       </div>
 
