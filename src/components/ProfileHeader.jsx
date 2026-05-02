@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Camera, Edit3, Check, RefreshCw, Star } from 'lucide-react';
+import { ArrowLeft, Camera, Edit3, X, RefreshCw, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const POSITION_LABEL = {
@@ -48,16 +48,17 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
     }
   };
 
-  const letter = (profile?.name || '?').charAt(0).toUpperCase();
+  const letter   = (profile?.name || '?').charAt(0).toUpperCase();
+  const isEditing = tab === 'edit';
 
   return (
     <div>
-      {/* ── BAND de fundo — SEM overflow-hidden para o avatar não ser cortado ── */}
+      {/* Band de fundo */}
       <div className="h-32 w-full bg-black relative">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,243,255,0.08)_0%,_transparent_70%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(168,85,247,0.06)_0%,_transparent_60%)]" />
 
-        {/* Botão voltar — dentro do band, posição absoluta local */}
+        {/* Voltar */}
         <button
           onClick={() => navigate(-1)}
           className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 text-white/40 hover:text-white transition-colors z-10"
@@ -65,20 +66,23 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
           <ArrowLeft size={18} />
         </button>
 
-        {/* Toggle edição */}
+        {/* Editar perfil — Sprint F: outline cyan (CTA secundário, não preenchido) */}
         <button
-          onClick={() => onTabChange(tab === 'edit' ? 'stats' : 'edit')}
-          className={`absolute top-6 right-6 p-2.5 backdrop-blur-md rounded-2xl border transition-all z-10 ${
-            tab === 'edit'
-              ? 'bg-cyan-electric border-cyan-electric text-black'
-              : 'bg-black/60 border-white/10 text-white/40 hover:text-cyan-electric'
+          onClick={() => onTabChange(isEditing ? 'stats' : 'edit')}
+          className={`absolute top-6 right-6 flex items-center gap-2 px-4 py-2.5 backdrop-blur-md rounded-2xl border transition-all z-10 text-[10px] font-black uppercase tracking-widest ${
+            isEditing
+              ? 'bg-white/5 border-white/10 text-white/40 hover:text-white'   // cancelar: neutro
+              : 'bg-transparent border-cyan-electric/50 text-cyan-electric hover:bg-cyan-electric/10' // editar: outline cyan
           }`}
         >
-          {tab === 'edit' ? <Check size={18} /> : <Edit3 size={18} />}
+          {isEditing
+            ? <><X size={14} /> Cancelar</>
+            : <><Edit3 size={14} /> Editar</>
+          }
         </button>
       </div>
 
-      {/* ── AVATAR — margem negativa puxa para cima do band, sem absolute ── */}
+      {/* Avatar — margem negativa */}
       <div className="flex justify-center -mt-14">
         <div className="relative">
           <div className="w-28 h-28 rounded-[2rem] border-4 border-black bg-gray-900 overflow-hidden shadow-2xl flex items-center justify-center">
@@ -104,11 +108,12 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
         </div>
       </div>
 
-      {/* ── NOME + posição + rating — fluxo normal abaixo do avatar ── */}
+      {/* Nome + posição + rating global */}
       <div className="text-center px-6 mt-3 mb-1">
         <h1 className="text-2xl font-black italic uppercase tracking-tighter leading-none text-white">
           {profile?.name || 'Atleta'}
         </h1>
+
         <div className="flex items-center justify-center gap-3 mt-2 flex-wrap">
           {profile?.position && (
             <span className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">
