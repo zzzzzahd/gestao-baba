@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 // Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
 // Tarefa 1.3 — usar o hook existente em vez da reimplementação inline
-import { useCountdown as useCountdownDate } from '../hooks/useCountdown';
+import { useCountdown } from '../hooks/useCountdown';
 
 // ─── Countdown adaptado para o card de baba ───────────────────────────────────
 // O hook useCountdown.js recebe uma Date; aqui convertemos day-of-week+time → Date
