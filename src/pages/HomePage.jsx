@@ -37,7 +37,8 @@ const useBabaCountdown = (targetDayOfWeek, targetTime) => {
     return () => clearInterval(id);
   }, [targetDayOfWeek, targetTime]);
 
-  const cd = useCountdownDate(targetDate);
+  // AQUI ESTAVA O ERRO: Use o hook que você importou corretamente
+  const cd = useCountdown(targetDate); 
 
   if (!cd?.active) return '';
   if (cd.d > 0) return `${cd.d}d ${cd.h}h ${cd.m}m`;
