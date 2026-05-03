@@ -71,7 +71,7 @@ const LoginPage = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
+                className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-white/50"
               />
             </div>
           )}
@@ -84,7 +84,7 @@ const LoginPage = () => {
               value={formData.email}
               onChange={handleChange}
               required
-              className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
+              className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-white/50"
             />
           </div>
 
@@ -97,7 +97,7 @@ const LoginPage = () => {
               onChange={handleChange}
               required
               minLength={6}
-              className="w-full p-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50"
+              className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-white/50"
             />
           </div>
 
@@ -124,7 +124,7 @@ const LoginPage = () => {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="w-full p-2 text-white/50 text-sm hover:text-white transition-colors"
+            className="w-full p-2 text-text-mid text-sm hover:text-white transition-colors"
           >
             ← Voltar
           </button>
