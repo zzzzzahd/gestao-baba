@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { CYAN_GRADIENT } from '../utils/constants';
 
 const FinancialPage = () => {
@@ -192,12 +193,7 @@ const FinancialPage = () => {
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-      {/* Spinner: cyan (era green-500) */}
-      <Loader2 className="animate-spin text-cyan-electric" size={40} />
-    </div>
-  );
+  if (loading) return <PageSkeleton rows={4} />;
 
   return (
     <div className="min-h-screen p-6 bg-[#050505] text-white">
@@ -252,7 +248,7 @@ const FinancialPage = () => {
                 className={`p-8 rounded-[2.5rem] border transition-all ${
                   isClosed
                     ? 'bg-red-500/5 border-red-500/10 opacity-75'
-                    : 'bg-white/[0.03] border-white/10'
+                    : 'bg-surface-1 border-border-mid'
                 }`}
               >
                 <div className="flex flex-col md:flex-row justify-between gap-6 mb-10">
@@ -268,11 +264,11 @@ const FinancialPage = () => {
                     </div>
                     <p className="text-xs opacity-50 uppercase font-bold tracking-tight">{f.description}</p>
                     <div className="flex items-center gap-4 pt-2">
-                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">
+                      <span className="text-[9px] font-black text-text-low uppercase tracking-widest">
                         Vencimento: {new Date(f.due_date).toLocaleDateString()}
                       </span>
                       {/* Chave PIX: neutro (era green-500/50) */}
-                      <span className="text-[9px] font-black text-white/30 uppercase italic tracking-widest font-mono">
+                      <span className="text-[9px] font-black text-text-low uppercase italic tracking-widest font-mono">
                         PIX: {f.pix_key}
                       </span>
                     </div>
@@ -286,7 +282,7 @@ const FinancialPage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-8 border-t border-white/5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-8 border-t border-border-subtle">
                   <div>
                     {isClosed ? (
                       /* Status "Encerrada": vermelho — status ✅ */
@@ -297,7 +293,7 @@ const FinancialPage = () => {
                       /* Botão "Pagar Agora": hover cyan (era hover:bg-green-500) */
                       <button
                         onClick={() => { setSelectedFinancial(f); setShowPayModal(true); }}
-                        className="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-cyan-electric/30 hover:bg-cyan-electric/10 hover:text-cyan-electric transition-all group"
+                        className="w-full flex items-center justify-between p-4 bg-surface-2 rounded-2xl border border-border-mid hover:border-cyan-electric/30 hover:bg-cyan-electric/10 hover:text-cyan-electric transition-all group"
                       >
                         <span className="flex items-center gap-3 uppercase font-black text-[10px] tracking-widest">
                           <CreditCard size={18} /> Pagar Agora
@@ -324,17 +320,17 @@ const FinancialPage = () => {
                       {/* Botão reativar: cyan (era green-500) */}
                       <button
                         onClick={() => toggleFinancialStatus(f.id, f.status)}
-                        className={`p-4 rounded-2xl border border-white/5 transition-colors ${
+                        className={`p-4 rounded-2xl border border-border-subtle transition-colors ${
                           isClosed
                             ? 'bg-cyan-electric/10 text-cyan-electric'
-                            : 'bg-white/5 hover:text-white/60'
+                            : 'bg-surface-2 hover:text-text-mid'
                         }`}
                       >
                         <Ban size={18} />
                       </button>
                       <button
                         onClick={() => deleteFinancial(f.id)}
-                        className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:text-red-500 transition-colors"
+                        className="p-4 rounded-2xl bg-surface-2 border border-border-subtle hover:text-red-500 transition-colors"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -344,7 +340,7 @@ const FinancialPage = () => {
 
                 {/* Já Pagaram — verde discreto como status ✅ */}
                 {confirmedPayments.length > 0 && (
-                  <div className="mt-8 pt-6 border-t border-white/5">
+                  <div className="mt-8 pt-6 border-t border-border-subtle">
                     <p className="text-[8px] font-black uppercase opacity-20 ml-2 tracking-widest mb-3">
                       Já Pagaram ({confirmedPayments.length})
                     </p>
@@ -371,7 +367,7 @@ const FinancialPage = () => {
                     {pendingPayments.map(p => (
                       <div
                         key={p.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all"
+                        className="flex items-center justify-between p-4 bg-surface-2 rounded-2xl border border-border-subtle hover:border-border-mid transition-all"
                       >
                         <span className="text-[10px] font-bold uppercase tracking-tight">{p.player?.name}</span>
                         <div className="flex items-center gap-3">
@@ -379,7 +375,7 @@ const FinancialPage = () => {
                             href={p.proof_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-colors"
+                            className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-white transition-colors"
                           >
                             <Eye size={18} />
                           </a>
@@ -404,12 +400,12 @@ const FinancialPage = () => {
         {/* ── Modal de Pagamento ── */}
         {showPayModal && selectedFinancial && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
-            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem] shadow-2xl relative">
+            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-border-mid rounded-[3rem] shadow-2xl relative">
               <div className="flex justify-between items-center mb-10">
                 <h2 className="text-2xl font-black italic uppercase tracking-tighter">Pagar Taxa</h2>
                 <button
                   onClick={() => setShowPayModal(false)}
-                  className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"
+                  className="p-2 bg-surface-2 rounded-full hover:bg-surface-3 transition-colors"
                 >
                   <X size={20} />
                 </button>
@@ -437,7 +433,7 @@ const FinancialPage = () => {
                   <p className="text-[9px] font-black opacity-30 uppercase ml-2 tracking-widest italic">
                     Anexar Comprovante
                   </p>
-                  <label className="flex flex-col items-center justify-center w-full h-40 bg-white/5 rounded-3xl border-2 border-dashed border-white/10 hover:border-cyan-electric/40 transition-all cursor-pointer group">
+                  <label className="flex flex-col items-center justify-center w-full h-40 bg-surface-2 rounded-3xl border-2 border-dashed border-border-mid hover:border-cyan-electric/40 transition-all cursor-pointer group">
                     {processing ? (
                       <Loader2 className="animate-spin text-cyan-electric" />
                     ) : (
@@ -459,7 +455,7 @@ const FinancialPage = () => {
         {/* ── Modal de Criação ── */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-[100]">
-            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-white/10 rounded-[3rem]">
+            <div className="bg-[#0A0A0A] p-10 max-w-md w-full border border-border-mid rounded-[3rem]">
               {/* Título modal: cyan (era text-green-500) */}
               <h2 className="text-3xl font-black italic uppercase mb-10 tracking-tighter text-cyan-electric">
                 Nova Taxa
@@ -468,7 +464,7 @@ const FinancialPage = () => {
               <form onSubmit={createFinancial} className="space-y-4">
                 <input
                   placeholder="TÍTULO (EX: MENSALIDADE)"
-                  className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-cyan-electric/50 font-bold uppercase text-xs tracking-widest transition-colors"
+                  className="w-full bg-surface-2 p-5 rounded-2xl border border-border-mid outline-none focus:border-cyan-electric/50 font-bold uppercase text-xs tracking-widest transition-colors"
                   value={newFinancial.title}
                   onChange={e => setNewFinancial({ ...newFinancial, title: e.target.value.toUpperCase() })}
                   required
@@ -478,14 +474,14 @@ const FinancialPage = () => {
                     type="number"
                     step="0.01"
                     placeholder="VALOR R$"
-                    className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-cyan-electric/50 font-bold text-xs transition-colors"
+                    className="w-full bg-surface-2 p-5 rounded-2xl border border-border-mid outline-none focus:border-cyan-electric/50 font-bold text-xs transition-colors"
                     value={newFinancial.amount}
                     onChange={e => setNewFinancial({ ...newFinancial, amount: e.target.value })}
                     required
                   />
                   <input
                     type="date"
-                    className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-cyan-electric/50 font-bold text-xs text-white uppercase transition-colors"
+                    className="w-full bg-surface-2 p-5 rounded-2xl border border-border-mid outline-none focus:border-cyan-electric/50 font-bold text-xs text-white uppercase transition-colors"
                     value={newFinancial.due_date}
                     onChange={e => setNewFinancial({ ...newFinancial, due_date: e.target.value })}
                     required
@@ -495,7 +491,7 @@ const FinancialPage = () => {
                 {/* Input PIX: neutro com monospace, sem verde (era bg-green-500/5) */}
                 <input
                   placeholder="CHAVE PIX"
-                  className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-cyan-electric/50 font-mono text-xs text-white/60 transition-colors"
+                  className="w-full bg-surface-2 p-5 rounded-2xl border border-border-mid outline-none focus:border-cyan-electric/50 font-mono text-xs text-text-mid transition-colors"
                   value={newFinancial.pix_key}
                   onChange={e => setNewFinancial({ ...newFinancial, pix_key: e.target.value })}
                   required
