@@ -38,7 +38,7 @@ const ConfirmModal = ({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-[2rem] p-7 shadow-2xl"
+        className="w-full max-w-sm bg-[#0a0a0a] border border-border-mid rounded-[2rem] p-7 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Ícone */}
@@ -56,7 +56,7 @@ const ConfirmModal = ({
           {message}
         </p>
         {description && (
-          <p className="text-[11px] text-white/40 text-center mt-2 leading-relaxed font-medium">
+          <p className="text-[11px] text-text-low text-center mt-2 leading-relaxed font-medium">
             {description}
           </p>
         )}
@@ -65,7 +65,7 @@ const ConfirmModal = ({
         <div className="grid grid-cols-2 gap-3 mt-7">
           <button
             onClick={onCancel}
-            className="py-4 rounded-2xl bg-white/5 border border-white/10 text-white/50 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all active:scale-95"
+            className="py-4 rounded-2xl bg-surface-2 border border-border-mid text-text-mid font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 transition-all active:scale-95"
           >
             {cancelLabel}
           </button>
