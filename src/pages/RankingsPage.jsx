@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import { ArrowLeft, Trophy, Target, Award } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
+import { toastErrorWithRetry } from '../utils/toastUtils';
 
 // ─── Pódio ────────────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ const RankingsPage = () => {
       setRankings(arr.slice(0, 10));
     } catch (err) {
       console.error('[loadRankings]', err);
-      toast.error('Erro ao carregar rankings');
+      toastErrorWithRetry('Erro ao carregar rankings', loadRankings);
     } finally {
       setLoading(false);
     }
@@ -295,9 +296,10 @@ const RankingsPage = () => {
 
         {/* Conteúdo */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-electric" />
-          </div>
+          <>
+            <PodiumSkeleton />
+            <RankingRowSkeleton count={4} />
+          </>
         ) : rankings.length > 0 ? (
           <>
             {/* ── Pódio (top 3) ── */}
