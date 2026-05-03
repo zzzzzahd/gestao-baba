@@ -64,7 +64,7 @@ const TeamsPage = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-low">
           Carregando Times...
         </p>
       </div>
@@ -92,7 +92,7 @@ const TeamsPage = () => {
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-white/60 hover:text-white transition-all"
+            className="flex items-center gap-2 text-text-mid hover:text-white transition-all"
           >
             <ArrowLeft size={20} />
             <span className="text-xs font-black uppercase">Voltar</span>
@@ -115,10 +115,10 @@ const TeamsPage = () => {
             <Trophy className="text-cyan-electric" size={32} />
             <h1 className="text-3xl font-black uppercase italic">Times Sorteados</h1>
           </div>
-          <p className="text-sm text-white/60 uppercase tracking-widest">
+          <p className="text-sm text-text-mid uppercase tracking-widest">
             {currentBaba?.name}
           </p>
-          <div className="flex items-center justify-center gap-4 text-xs text-white/40">
+          <div className="flex items-center justify-center gap-4 text-xs text-text-low">
             <span>{teams.length} Times</span>
             <span>•</span>
             <span>{totalPlayers} Jogadores</span>
@@ -161,14 +161,14 @@ const TeamsPage = () => {
                   {teamPlayers.map((player, idx) => (
                     <div
                       key={player.id}
-                      className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5"
+                      className="flex items-center gap-3 p-3 bg-surface-2 rounded-xl border border-border-subtle"
                     >
-                      <span className="text-lg font-black text-white/40 w-6">
+                      <span className="text-lg font-black text-text-low w-6">
                         {idx + 1}
                       </span>
                       <div className="flex-1">
                         <p className="text-sm font-bold uppercase">{player.name}</p>
-                        <p className="text-[9px] text-white/40 uppercase">
+                        <p className="text-[9px] text-text-low uppercase">
                           {player.position}
                         </p>
                       </div>
@@ -185,10 +185,10 @@ const TeamsPage = () => {
 
         {/* Reservas */}
         {reserves.length > 0 && (
-          <div className="card-glass p-6 rounded-2xl border border-white/10">
+          <div className="card-glass p-6 rounded-2xl border border-border-mid">
             <div className="flex items-center gap-2 mb-4">
-              <Users className="text-white/40" size={20} />
-              <h3 className="text-sm font-black uppercase tracking-widest text-white/60">
+              <Users className="text-text-low" size={20} />
+              <h3 className="text-sm font-black uppercase tracking-widest text-text-mid">
                 Jogadores Reservas ({reserves.length})
               </h3>
             </div>
@@ -196,12 +196,12 @@ const TeamsPage = () => {
               {reserves.map((player, idx) => (
                 <div
                   key={player.id}
-                  className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-white/5"
+                  className="flex items-center gap-2 p-3 bg-surface-2 rounded-xl border border-border-subtle"
                 >
-                  <span className="text-xs font-black text-white/20">R{idx + 1}</span>
+                  <span className="text-xs font-black text-text-muted">R{idx + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate">{player.name}</p>
-                    <p className="text-[8px] text-white/40 uppercase">{player.position}</p>
+                    <p className="text-[8px] text-text-low uppercase">{player.position}</p>
                   </div>
                   {player.position === 'goleiro' && (
                     <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
@@ -214,10 +214,10 @@ const TeamsPage = () => {
 
         {/* Info adicional */}
         <div className="card-glass p-4 rounded-2xl text-center">
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-text-mid">
             Horário: <span className="text-white font-black">{currentBaba?.game_time || '--:--'}</span>
           </p>
-          <p className="text-[9px] text-white/40 mt-1">
+          <p className="text-[9px] text-text-low mt-1">
             Sorteio automático baseado nas confirmações de presença
           </p>
         </div>
