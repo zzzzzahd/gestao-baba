@@ -6,11 +6,27 @@
 
 import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 const CATEGORIES = [
-  { id: 'skill',      label: '⚽ Habilidade', color: 'text-cyan-electric' },
-  { id: 'physical',   label: '💪 Físico',      color: 'text-orange-500'   },
-  { id: 'commitment', label: '🤝 Compromisso', color: 'text-purple-500'   },
+  {
+    id: 'skill',
+    label: '⚽ Habilidade',
+    color: 'text-cyan-electric',
+    tip: 'Técnica com a bola: passe, dribble, finalização.',
+  },
+  {
+    id: 'physical',
+    label: '💪 Físico',
+    color: 'text-orange-500',
+    tip: 'Velocidade, resistência e força durante o jogo.',
+  },
+  {
+    id: 'commitment',
+    label: '🤝 Compromisso',
+    color: 'text-purple-500',
+    tip: 'Pontualidade, presença nos babas e espírito de equipe.',
+  },
 ];
 
 const RatePlayerModal = ({ player, onClose, onRate }) => {
@@ -57,9 +73,12 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           {CATEGORIES.map(cat => (
             <div key={cat.id} className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className={`text-[10px] font-black uppercase tracking-widest ${cat.color}`}>
-                  {cat.label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${cat.color}`}>
+                    {cat.label}
+                  </span>
+                  <Tooltip text={cat.tip} iconClassName={`${cat.color} opacity-50 hover:opacity-100`} />
+                </div>
                 <span className="text-lg font-black font-mono text-white">{ratings[cat.id]}</span>
               </div>
               <input
