@@ -61,18 +61,18 @@ const formatCountdown = (cd) => {
 // ─── Convite Compacto ─────────────────────────────────────────────────────────
 
 const InviteRow = ({ inviteCode, onCopy, onRefresh, onQR }) => (
-  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
-    <span className="text-[9px] text-white/20 font-black uppercase tracking-widest shrink-0">Convite</span>
+  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-surface-2 border border-border-subtle">
+    <span className="text-[9px] text-text-muted font-black uppercase tracking-widest shrink-0">Convite</span>
     <span className="flex-1 text-sm font-black tracking-[0.3em] text-white text-center">
       {inviteCode || '——'}
     </span>
     <button onClick={onCopy}    title="Copiar"    className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric hover:text-black transition-all">
       <Copy size={13} />
     </button>
-    <button onClick={onQR}      title="QR Code"   className="p-2 bg-white/5 border border-white/5 rounded-xl text-white/30 hover:text-white transition-all">
+    <button onClick={onQR}      title="QR Code"   className="p-2 bg-surface-2 border border-border-subtle rounded-xl text-text-low hover:text-white transition-all">
       <Share2 size={13} />
     </button>
-    <button onClick={onRefresh} title="Atualizar" className="p-2 bg-white/5 border border-white/5 rounded-xl text-white/20 hover:text-white transition-all">
+    <button onClick={onRefresh} title="Atualizar" className="p-2 bg-surface-2 border border-border-subtle rounded-xl text-text-muted hover:text-white transition-all">
       <RefreshCw size={13} />
     </button>
   </div>
@@ -95,7 +95,7 @@ const TeamsBlock = ({ currentMatch, navigate, isPresident }) => {
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <Swords size={13} className="text-cyan-electric" />
-          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Times sorteados</span>
+          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">Times sorteados</span>
         </div>
         <button onClick={() => navigate('/teams')} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
           Ver completo <ChevronRight size={10} />
@@ -105,12 +105,12 @@ const TeamsBlock = ({ currentMatch, navigate, isPresident }) => {
         {teams.map((team, i) => {
           const c = COLORS[i % COLORS.length];
           return (
-            <div key={i} className={`p-4 rounded-2xl border ${c.border} bg-white/[0.02]`}>
+            <div key={i} className={`p-4 rounded-2xl border ${c.border} bg-surface-1`}>
               <p className={`text-[11px] font-black uppercase italic ${c.text} mb-3`}>{team.name}</p>
               <div className="space-y-1.5">
                 {(team.players || []).map((p, idx) => (
                   <div key={p.id} className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/20 font-black w-4 text-right shrink-0">{idx + 1}</span>
+                    <span className="text-[9px] text-text-muted font-black w-4 text-right shrink-0">{idx + 1}</span>
                     <span className="text-[11px] font-black uppercase truncate flex-1">{p.name}</span>
                     {p.position === 'goleiro' && <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full shrink-0" />}
                   </div>
@@ -122,9 +122,9 @@ const TeamsBlock = ({ currentMatch, navigate, isPresident }) => {
       </div>
       {reserves.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1">
-          <span className="text-[9px] text-white/20 font-black uppercase tracking-widest w-full">Reservas ({reserves.length})</span>
+          <span className="text-[9px] text-text-muted font-black uppercase tracking-widest w-full">Reservas ({reserves.length})</span>
           {reserves.map(p => (
-            <span key={p.id} className="text-[10px] font-black text-white/30 bg-white/5 px-2 py-1 rounded-lg uppercase">{p.name}</span>
+            <span key={p.id} className="text-[10px] font-black text-text-low bg-surface-2 px-2 py-1 rounded-lg uppercase">{p.name}</span>
           ))}
         </div>
       )}
@@ -237,7 +237,7 @@ const DashboardPage = () => {
         {nextGameDay && (
           <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
             <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
-              <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-white/40">
+              <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-text-low">
                 <span>Próximo Baba em</span>
                 <span className="text-cyan-electric">
                   {nextGameDay.daysAhead === 0 ? 'Hoje' : nextGameDay.daysAhead === 1 ? 'Amanhã' : DAY_FULL[nextGameDay.day]}
@@ -245,25 +245,25 @@ const DashboardPage = () => {
               </div>
               <div className="flex justify-between items-end">
                 <div>
-                  <div className="text-4xl font-black font-mono leading-none tracking-tighter text-white">
+                  <div className="text-4xl font-black font-mono tabular-nums leading-none tracking-tighter text-white">
                     {formatCountdown(countdown)
                       ? <span>{formatCountdown(countdown)}</span>
                       : <span className="text-2xl uppercase text-cyan-electric animate-pulse">Em breve...</span>
                     }
                   </div>
-                  <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-white/40 uppercase truncate max-w-[200px]">
+                  <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-text-low uppercase truncate max-w-[200px]">
                     <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
                     <span className="truncate">{nextGameDay.location || currentBaba.location || 'Arena Principal'}</span>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="text-xl font-black text-cyan-electric italic uppercase">PARTIDA</span>
-                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-1">{nextGameDay.time?.substring(0, 5)}</p>
+                  <p className="text-[10px] font-black text-text-low uppercase tracking-widest mt-1">{nextGameDay.time?.substring(0, 5)}</p>
                 </div>
               </div>
               {gameDaysDisplay && (
-                <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-[10px] font-black text-white/30 uppercase">
-                  <Calendar size={12} className="text-white/20" />
+                <div className="mt-4 pt-4 border-t border-border-subtle flex items-center gap-2 text-[10px] font-black text-text-low uppercase">
+                  <Calendar size={12} className="text-text-muted" />
                   <span>{gameDaysDisplay}</span>
                 </div>
               )}
@@ -272,7 +272,7 @@ const DashboardPage = () => {
         )}
 
         {nextGameDay ? (
-          <div className="p-5 rounded-3xl bg-white/[0.02] border border-white/5 space-y-4">
+          <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle space-y-4">
             <PresenceBlock
               nextGameDay={nextGameDay}
               gameConfirmations={gameConfirmations}
@@ -309,7 +309,7 @@ const DashboardPage = () => {
             )}
           </div>
         ) : (
-          <p className="text-center text-[10px] text-white/20 font-black uppercase tracking-widest py-8">
+          <p className="text-center text-[10px] text-text-muted font-black uppercase tracking-widest py-8">
             Nenhum baba agendado
           </p>
         )}
@@ -319,7 +319,7 @@ const DashboardPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">Convite do Grupo</h3>
-                <p className="text-[9px] text-white/40 font-bold uppercase">{inviteExpiry || 'Gere um novo código'}</p>
+                <p className="text-[9px] text-text-low font-bold uppercase">{inviteExpiry || 'Gere um novo código'}</p>
               </div>
               <button className="p-2 bg-cyan-electric/10 rounded-xl" onClick={() => setShowQRCode(true)}>
                 <Share2 size={16} className="text-cyan-electric" />
@@ -328,7 +328,7 @@ const DashboardPage = () => {
             {currentBaba?.invite_code ? (
               <>
                 <div className="flex gap-2">
-                  <div className="flex-1 bg-black/60 border border-white/10 rounded-2xl p-4 flex items-center justify-center">
+                  <div className="flex-1 bg-black/60 border border-border-mid rounded-2xl p-4 flex items-center justify-center">
                     <span className="text-2xl font-black tracking-[0.4em] text-white">{currentBaba.invite_code}</span>
                   </div>
                   <button onClick={handleCopyCode} className="px-6 bg-cyan-electric text-black rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 active:scale-95 transition-all">
@@ -336,13 +336,13 @@ const DashboardPage = () => {
                   </button>
                 </div>
                 <div className="flex justify-center">
-                  <button onClick={generateInviteCode} className="text-[9px] font-black uppercase text-white/20 hover:text-cyan-electric transition-colors flex items-center gap-2">
+                  <button onClick={generateInviteCode} className="text-[9px] font-black uppercase text-text-muted hover:text-cyan-electric transition-colors flex items-center gap-2">
                     <RefreshCw size={10} /> Atualizar Código
                   </button>
                 </div>
               </>
             ) : (
-              <button onClick={generateInviteCode} className="w-full py-5 bg-white/5 border border-dashed border-white/20 rounded-2xl text-[10px] font-black uppercase hover:border-cyan-electric/50 transition-all flex items-center justify-center gap-2">
+              <button onClick={generateInviteCode} className="w-full py-5 bg-surface-2 border border-dashed border-border-strong rounded-2xl text-[10px] font-black uppercase hover:border-cyan-electric/50 transition-all flex items-center justify-center gap-2">
                 <RefreshCw size={14} className="animate-pulse" /> Gerar Código de Convite
               </button>
             )}
@@ -355,7 +355,7 @@ const DashboardPage = () => {
     teams: (
       <div className="space-y-5">
         {currentMatch && !isDrawing ? (
-          <div className="p-5 rounded-3xl bg-white/[0.02] border border-white/5">
+          <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle">
             <TeamsBlock currentMatch={currentMatch} navigate={navigate} isPresident={isPresident} />
           </div>
         ) : isDrawing ? (
@@ -365,9 +365,9 @@ const DashboardPage = () => {
           </div>
         ) : (
           <div className="text-center py-12 space-y-3">
-            <Swords size={32} className="text-white/10 mx-auto" />
-            <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">Times ainda não sorteados</p>
-            <p className="text-[9px] text-white/10 font-bold">O sorteio ocorre 30 min antes do baba</p>
+            <Swords size={32} className="text-text-muted mx-auto" />
+            <p className="text-[10px] text-text-muted font-black uppercase tracking-widest">Times ainda não sorteados</p>
+            <p className="text-[9px] text-text-muted font-bold">O sorteio ocorre 30 min antes do baba</p>
           </div>
         )}
       </div>
@@ -377,14 +377,14 @@ const DashboardPage = () => {
     history: (
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">Partidas anteriores</p>
+          <p className="text-[10px] text-text-low font-black uppercase tracking-widest">Partidas anteriores</p>
           <button onClick={() => navigate('/history')} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
             Ver tudo <ChevronRight size={10} />
           </button>
         </div>
-        <div className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 flex flex-col items-center gap-3 cursor-pointer hover:bg-white/5 transition-all" onClick={() => navigate('/history')}>
+        <div className="p-8 rounded-3xl bg-surface-1 border border-border-subtle flex flex-col items-center gap-3 cursor-pointer hover:bg-surface-2 transition-all" onClick={() => navigate('/history')}>
           <Calendar size={28} className="text-cyan-electric/40" />
-          <p className="text-[11px] font-black text-white/30 uppercase tracking-widest">Abrir histórico completo</p>
+          <p className="text-[11px] font-black text-text-low uppercase tracking-widest">Abrir histórico completo</p>
         </div>
       </div>
     ),
@@ -393,14 +393,14 @@ const DashboardPage = () => {
     financial: (
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">Cobranças e pagamentos</p>
+          <p className="text-[10px] text-text-low font-black uppercase tracking-widest">Cobranças e pagamentos</p>
           <button onClick={() => navigate('/financial')} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
             Abrir caixa <ChevronRight size={10} />
           </button>
         </div>
-        <div className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 flex flex-col items-center gap-3 cursor-pointer hover:bg-white/5 transition-all" onClick={() => navigate('/financial')}>
+        <div className="p-8 rounded-3xl bg-surface-1 border border-border-subtle flex flex-col items-center gap-3 cursor-pointer hover:bg-surface-2 transition-all" onClick={() => navigate('/financial')}>
           <DollarSign size={28} className="text-cyan-electric/40" />
-          <p className="text-[11px] font-black text-white/30 uppercase tracking-widest">Abrir caixa completo</p>
+          <p className="text-[11px] font-black text-text-low uppercase tracking-widest">Abrir caixa completo</p>
         </div>
       </div>
     ),
@@ -417,7 +417,7 @@ const DashboardPage = () => {
           {currentBaba?.cover_url ? (
             <img src={currentBaba.cover_url} className={`w-full h-full object-cover transition-opacity duration-700 ${isUploading ? 'opacity-30' : 'opacity-60'}`} alt="Capa" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/5 font-black text-6xl italic">DRAFT PLAY</div>
+            <div className="w-full h-full flex items-center justify-center text-text-muted font-black text-6xl italic">DRAFT PLAY</div>
           )}
           {isUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-10">
@@ -426,12 +426,12 @@ const DashboardPage = () => {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
           {isPresident && !isUploading && (
-            <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 text-white/60 hover:text-cyan-electric cursor-pointer transition-colors">
+            <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-mid hover:text-cyan-electric cursor-pointer transition-colors">
               <Camera size={20} />
               <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'cover')} />
             </label>
           )}
-          <button onClick={signOut} className="absolute top-6 right-6 p-3 bg-black/40 rounded-2xl text-white/40 hover:text-red-500 z-20 transition-colors">
+          <button onClick={signOut} className="absolute top-6 right-6 p-3 bg-black/40 rounded-2xl text-text-low hover:text-red-500 z-20 transition-colors">
             <LogOut size={20} />
           </button>
         </div>
@@ -467,8 +467,8 @@ const DashboardPage = () => {
       <div className="max-w-xl mx-auto px-5 mt-12 space-y-5">
 
         {/* Atletas */}
-        <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-3">Atletas Ativos</p>
+        <div className="p-5 rounded-3xl bg-surface-2 border border-border-subtle">
+          <p className="text-[9px] font-black text-text-low uppercase tracking-widest mb-3">Atletas Ativos</p>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex -space-x-3">
@@ -480,12 +480,12 @@ const DashboardPage = () => {
                   </div>
                 ))}
                 {players.length > 4 && (
-                  <div className="w-9 h-9 rounded-full border-2 border-black bg-white/10 flex items-center justify-center text-[9px] font-black text-white/60 shadow-lg">
+                  <div className="w-9 h-9 rounded-full border-2 border-black bg-surface-3 flex items-center justify-center text-[9px] font-black text-text-mid shadow-lg">
                     +{players.length - 4}
                   </div>
                 )}
               </div>
-              <span className="text-sm font-black text-white/80">{players?.length || 0} atletas</span>
+              <span className="text-sm font-black text-text-high">{players?.length || 0} atletas</span>
             </div>
             <button onClick={() => setShowMembers(true)} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
               Ver todos <ChevronRight size={10} />
@@ -494,7 +494,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Sub-tabs */}
-        <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-white/5">
+        <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
           <div className="flex gap-1">
             {TABS.map(tab => (
               <button
@@ -503,10 +503,10 @@ const DashboardPage = () => {
                 className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${
                   activeTab === tab.id
                     ? 'bg-cyan-electric/10 text-cyan-electric border border-cyan-electric/20'
-                    : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
+                    : 'text-text-low hover:text-text-mid hover:bg-surface-2 border border-transparent'
                 }`}
               >
-                <span className={activeTab === tab.id ? 'text-cyan-electric' : 'text-white/20'}>
+                <span className={activeTab === tab.id ? 'text-cyan-electric' : 'text-text-muted'}>
                   {tab.icon}
                 </span>
                 {tab.label}
@@ -522,7 +522,7 @@ const DashboardPage = () => {
 
         {/* Administração */}
         {isPresident && (
-          <div className="space-y-3 pt-4 border-t border-white/5">
+          <div className="space-y-3 pt-4 border-t border-border-subtle">
             <button
               onClick={() => setShowSuspensions(!showSuspensions)}
               className="w-full py-4 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-red-400 font-black uppercase text-[10px] tracking-widest hover:bg-red-500/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
@@ -530,7 +530,7 @@ const DashboardPage = () => {
               <Shield size={16} /> Gestão de Suspensões
             </button>
             {showSuspensions && (
-              <div className="p-5 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+              <div className="p-5 bg-surface-1 border border-border-subtle rounded-[2rem]">
                 <SuspensionPanel
                   players={playersWithRatings}
                   babaId={currentBaba.id}
@@ -540,7 +540,7 @@ const DashboardPage = () => {
             )}
             <button
               onClick={() => setShowSettings(true)}
-              className="w-full py-5 bg-white/5 border border-white/10 rounded-[2.5rem] text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
+              className="w-full py-5 bg-surface-2 border border-border-mid rounded-[2.5rem] text-text-low font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 flex items-center justify-center gap-3 transition-colors active:scale-95"
             >
               <Settings size={18} /> Administração do Grupo
             </button>
