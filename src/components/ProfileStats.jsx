@@ -116,22 +116,22 @@ const BadgeCard = ({ badge, unlocked }) => (
   <div className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${
     unlocked
       ? badge.bg
-      : 'bg-white/[0.02] border-white/5 opacity-40 grayscale'
+      : 'bg-surface-1 border-border-subtle opacity-40 grayscale'
   }`}>
     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-      unlocked ? badge.bg : 'bg-white/5 border border-white/10'
+      unlocked ? badge.bg : 'bg-surface-2 border border-border-mid'
     }`}>
-      <span className={unlocked ? badge.color : 'text-white/20'}>
+      <span className={unlocked ? badge.color : 'text-text-muted'}>
         {badge.icon}
       </span>
     </div>
     <div className="min-w-0">
       <p className={`text-[11px] font-black uppercase tracking-wide leading-none ${
-        unlocked ? badge.color : 'text-white/20'
+        unlocked ? badge.color : 'text-text-muted'
       }`}>
         {badge.label}
       </p>
-      <p className="text-[9px] text-white/25 font-medium mt-0.5 leading-tight truncate">
+      <p className="text-[9px] text-text-low font-medium mt-0.5 leading-tight truncate">
         {badge.description}
       </p>
     </div>
@@ -147,13 +147,13 @@ const BadgeCard = ({ badge, unlocked }) => (
 
 const StarBar = ({ value, max = 5 }) => (
   <div className="flex items-center gap-2">
-    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+    <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
       <div
         className="h-full bg-gradient-to-r from-cyan-electric to-purple-500 rounded-full transition-all duration-700"
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
     </div>
-    <span className="text-[10px] font-black font-mono text-white/60 w-6 text-right">
+    <span className="text-[10px] font-black font-mono text-text-mid w-6 text-right">
       {Number(value).toFixed(1)}
     </span>
   </div>
@@ -174,19 +174,19 @@ const StatCard = ({ icon, label, value, sub, accent = 'cyan' }) => {
         {icon}{label}
       </div>
       <p className={`text-2xl font-black font-mono ${textCls}`}>{value}</p>
-      {sub && <p className="text-[9px] text-white/30 font-bold uppercase">{sub}</p>}
+      {sub && <p className="text-[9px] text-text-low font-bold uppercase">{sub}</p>}
     </div>
   );
 };
 
 const Skeleton = ({ className = '' }) => (
-  <div className={`animate-pulse bg-white/5 rounded-xl ${className}`} />
+  <div className={`animate-pulse bg-surface-2 rounded-xl ${className}`} />
 );
 
 const SectionTitle = ({ children, sub }) => (
   <div className="mb-3">
-    <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">{children}</p>
-    {sub && <p className="text-[8px] text-white/15 font-bold uppercase mt-0.5">{sub}</p>}
+    <p className="text-[9px] font-black text-text-low uppercase tracking-[0.2em]">{children}</p>
+    {sub && <p className="text-[8px] text-text-muted font-bold uppercase mt-0.5">{sub}</p>}
   </div>
 );
 
@@ -294,13 +294,13 @@ const ProfileStats = ({ statsData, loading }) => {
         {loading ? (
           <Skeleton className="h-32" />
         ) : globalRating > 0 ? (
-          <div className="p-5 rounded-[1.75rem] bg-white/[0.03] border border-white/5 space-y-4">
+          <div className="p-5 rounded-[1.75rem] bg-surface-1 border border-border-subtle space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-4xl font-black font-mono text-white leading-none">
                   {Number(globalRating).toFixed(2)}
                 </p>
-                <p className="text-[10px] text-white/30 font-bold uppercase mt-1">
+                <p className="text-[10px] text-text-low font-bold uppercase mt-1">
                   {totalVotes} voto{totalVotes !== 1 ? 's' : ''} recebido{totalVotes !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -309,21 +309,21 @@ const ProfileStats = ({ statsData, loading }) => {
                   <Star
                     key={i}
                     size={16}
-                    className={i <= Math.round(globalRating) ? 'text-cyan-electric' : 'text-white/10'}
+                    className={i <= Math.round(globalRating) ? 'text-cyan-electric' : 'text-text-muted'}
                     fill={i <= Math.round(globalRating) ? 'currentColor' : 'none'}
                   />
                 ))}
               </div>
             </div>
             {avgSubs && (
-              <div className="space-y-2 pt-3 border-t border-white/5">
+              <div className="space-y-2 pt-3 border-t border-border-subtle">
                 {[
                   { label: '⚽ Habilidade',  val: avgSubs.skill      },
                   { label: '💪 Físico',       val: avgSubs.physical   },
                   { label: '🤝 Compromisso',  val: avgSubs.commitment },
                 ].map(item => (
                   <div key={item.label}>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1">
                       {item.label}
                     </p>
                     <StarBar value={item.val} />
@@ -333,10 +333,10 @@ const ProfileStats = ({ statsData, loading }) => {
             )}
           </div>
         ) : (
-          <div className="p-5 rounded-[1.75rem] bg-white/[0.03] border border-dashed border-white/10 text-center">
-            <Star size={24} className="text-white/10 mx-auto mb-2" />
-            <p className="text-[10px] text-white/20 font-black uppercase">Ainda sem avaliações</p>
-            <p className="text-[9px] text-white/10 mt-1">Peça para seus companheiros te avaliarem</p>
+          <div className="p-5 rounded-[1.75rem] bg-surface-1 border border-dashed border-border-mid text-center">
+            <Star size={24} className="text-text-muted mx-auto mb-2" />
+            <p className="text-[10px] text-text-muted font-black uppercase">Ainda sem avaliações</p>
+            <p className="text-[9px] text-text-muted mt-1">Peça para seus companheiros te avaliarem</p>
           </div>
         )}
       </section>
@@ -363,10 +363,10 @@ const ProfileStats = ({ statsData, loading }) => {
               <BadgeCard key={badge.id} badge={badge} unlocked={false} />
             ))}
             {unlockedBadges.length === 0 && (
-              <div className="text-center py-6 border border-dashed border-white/5 rounded-2xl">
-                <Trophy size={24} className="text-white/10 mx-auto mb-2" />
-                <p className="text-[10px] text-white/20 font-black uppercase">Nenhuma conquista ainda</p>
-                <p className="text-[9px] text-white/10 mt-1">Jogue mais babas para desbloquear!</p>
+              <div className="text-center py-6 border border-dashed border-border-subtle rounded-2xl">
+                <Trophy size={24} className="text-text-muted mx-auto mb-2" />
+                <p className="text-[10px] text-text-muted font-black uppercase">Nenhuma conquista ainda</p>
+                <p className="text-[9px] text-text-muted mt-1">Jogue mais babas para desbloquear!</p>
               </div>
             )}
           </div>
@@ -398,7 +398,7 @@ const ProfileStats = ({ statsData, loading }) => {
             {loading
               ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-28" />)
               : babaPerformance.map(b => (
-                <div key={b.baba_id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+                <div key={b.baba_id} className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center text-cyan-electric font-black text-sm shrink-0">
@@ -407,7 +407,7 @@ const ProfileStats = ({ statsData, loading }) => {
                       <div>
                         <p className="text-sm font-black text-white leading-none">{b.baba_name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[9px] text-white/30 font-bold uppercase">
+                          <p className="text-[9px] text-text-low font-bold uppercase">
                             {b.matches} jogo{b.matches !== 1 ? 's' : ''}
                           </p>
                           {b.rank_position && (
@@ -434,28 +434,28 @@ const ProfileStats = ({ statsData, loading }) => {
                       { label: 'Assists', value: b.assists           },
                       { label: 'G+A',     value: b.goals + b.assists },
                     ].map(s => (
-                      <div key={s.label} className="bg-white/[0.02] rounded-xl py-2">
+                      <div key={s.label} className="bg-surface-1 rounded-xl py-2">
                         <p className="text-lg font-black font-mono text-white">{s.value}</p>
-                        <p className="text-[8px] font-bold text-white/30 uppercase">{s.label}</p>
+                        <p className="text-[8px] font-bold text-text-low uppercase">{s.label}</p>
                       </div>
                     ))}
                   </div>
 
                   {b.votes_count > 0 && (
-                    <div className="pt-2 border-t border-white/5 space-y-1.5">
+                    <div className="pt-2 border-t border-border-subtle space-y-1.5">
                       {[
                         { label: 'Hab', val: b.avg_skill      },
                         { label: 'Fís', val: b.avg_physical   },
                         { label: 'Cmp', val: b.avg_commitment },
                       ].map(item => (
                         <div key={item.label} className="flex items-center gap-2">
-                          <span className="text-[8px] font-black text-white/20 uppercase w-6 shrink-0">
+                          <span className="text-[8px] font-black text-text-muted uppercase w-6 shrink-0">
                             {item.label}
                           </span>
                           <StarBar value={item.val} />
                         </div>
                       ))}
-                      <p className="text-[8px] text-white/20 font-bold uppercase text-right">
+                      <p className="text-[8px] text-text-muted font-bold uppercase text-right">
                         {b.votes_count} voto{b.votes_count !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -469,10 +469,10 @@ const ProfileStats = ({ statsData, loading }) => {
 
       {/* Estado vazio total */}
       {!loading && babaPerformance.length === 0 && !globalRating && (
-        <div className="text-center py-16 border-2 border-dashed border-white/5 rounded-3xl">
-          <Users size={32} className="text-white/10 mx-auto mb-3" />
-          <p className="text-white/20 font-black uppercase text-sm">Nenhuma estatística ainda</p>
-          <p className="text-white/10 text-[10px] mt-1">Participe de um baba para começar</p>
+        <div className="text-center py-16 border-2 border-dashed border-border-subtle rounded-3xl">
+          <Users size={32} className="text-text-muted mx-auto mb-3" />
+          <p className="text-text-muted font-black uppercase text-sm">Nenhuma estatística ainda</p>
+          <p className="text-text-muted text-[10px] mt-1">Participe de um baba para começar</p>
         </div>
       )}
     </div>
@@ -480,4 +480,3 @@ const ProfileStats = ({ statsData, loading }) => {
 };
 
 export default ProfileStats;
-
