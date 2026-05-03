@@ -164,7 +164,7 @@ const MatchPage = () => {
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   if (loading || !currentMatch) return (
-    <div className="min-h-screen bg-black flex items-center justify-center text-white/20 uppercase font-black italic">
+    <div className="min-h-screen bg-black flex items-center justify-center text-text-muted uppercase font-black italic">
       Carregando Partida...
     </div>
   );
@@ -178,21 +178,21 @@ const MatchPage = () => {
           <span className="text-cyan-electric italic tracking-widest">JOGO AO VIVO</span>
         </div>
 
-        <div className="card-glass p-8 border border-white/10 text-center relative overflow-hidden rounded-[2.5rem]">
-          <div className={`text-7xl font-black mb-6 font-mono tracking-tighter ${timer < 60 ? 'text-red-500' : 'text-white'}`}>
+        <div className="card-glass p-8 border border-border-mid text-center relative overflow-hidden rounded-[2.5rem]">
+          <div className={`text-7xl font-black mb-6 font-mono tabular-nums tracking-tighter ${timer < 60 ? 'text-red-500' : 'text-white'}`}>
             {formatTime(timer)}
           </div>
           <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
               <p className="text-[10px] font-black mb-2 text-cyan-electric uppercase truncate">{currentMatch.teamA.name}</p>
-              <button onClick={() => handleGoalClick('A')} className="text-6xl font-black w-full py-6 bg-white/5 rounded-3xl border border-white/10 hover:bg-white/10 active:scale-90 transition-all">
+              <button onClick={() => handleGoalClick('A')} className="text-6xl font-black w-full py-6 bg-surface-2 rounded-3xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all">
                 {currentMatch.scoreA}
               </button>
             </div>
             <div className="text-xl font-black opacity-10 italic mt-6">VS</div>
             <div className="flex-1">
               <p className="text-[10px] font-black mb-2 text-yellow-500 uppercase truncate">{currentMatch.teamB.name}</p>
-              <button onClick={() => handleGoalClick('B')} className="text-6xl font-black w-full py-6 bg-white/5 rounded-3xl border border-white/10 hover:bg-white/10 active:scale-90 transition-all">
+              <button onClick={() => handleGoalClick('B')} className="text-6xl font-black w-full py-6 bg-surface-2 rounded-3xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all">
                 {currentMatch.scoreB}
               </button>
             </div>
@@ -200,12 +200,12 @@ const MatchPage = () => {
           <button onClick={() => setIsActive(!isActive)} className={`mt-10 w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[4px] transition-all ${isActive ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-cyan-electric text-black'}`}>
             {isActive ? '⏸ PAUSAR JOGO' : '▶ INICIAR CRONÔMETRO'}
           </button>
-          <button onClick={handleMatchEnd} className="mt-3 w-full py-3 bg-white/5 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all">
+          <button onClick={handleMatchEnd} className="mt-3 w-full py-3 bg-surface-2 border border-border-mid rounded-xl font-black text-xs uppercase tracking-widest text-text-mid hover:text-white hover:bg-surface-3 transition-all">
             Finalizar Partida
           </button>
         </div>
 
-        <div className="card-glass p-4 border border-white/5 rounded-2xl">
+        <div className="card-glass p-4 border border-border-subtle rounded-2xl">
           <p className="text-[10px] font-black opacity-40 mb-3 uppercase tracking-widest">Jogando Agora:</p>
           <div className="grid grid-cols-2 gap-4">
             {[{team: currentMatch.teamA, color: 'text-cyan-electric', dot: 'bg-cyan-electric'},{team: currentMatch.teamB, color: 'text-yellow-500', dot: 'bg-yellow-500'}].map(({team, color, dot}) => (
@@ -227,8 +227,8 @@ const MatchPage = () => {
         <div className="space-y-3">
           <h3 className="text-[10px] font-black opacity-30 italic px-2 uppercase tracking-[0.2em]">Próximo na Fila:</h3>
           {allTeams.length > 2
-            ? <div className="bg-white/5 p-5 rounded-[1.5rem] border border-white/5 flex justify-between items-center"><span className="font-black text-sm text-cyan-electric italic uppercase">{allTeams[2].name}</span><span className="text-[8px] opacity-40 font-black uppercase bg-white/10 px-2 py-1 rounded">Aguardando</span></div>
-            : <p className="text-[10px] opacity-20 text-center uppercase font-black py-4 border border-dashed border-white/10 rounded-2xl">Apenas dois times em campo</p>
+            ? <div className="bg-surface-2 p-5 rounded-[1.5rem] border border-border-subtle flex justify-between items-center"><span className="font-black text-sm text-cyan-electric italic uppercase">{allTeams[2].name}</span><span className="text-[8px] opacity-40 font-black uppercase bg-surface-3 px-2 py-1 rounded">Aguardando</span></div>
+            : <p className="text-[10px] opacity-20 text-center uppercase font-black py-4 border border-dashed border-border-mid rounded-2xl">Apenas dois times em campo</p>
           }
         </div>
 
@@ -242,27 +242,27 @@ const MatchPage = () => {
           <div className="bg-[#0d0d0d] border border-cyan-electric/30 rounded-3xl p-6 max-w-sm w-full space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><Target className="text-cyan-electric" size={24} /><h3 className="text-xl font-black uppercase">GOL!</h3></div>
-              <button onClick={() => setShowGoalModal(false)} className="text-white/40 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setShowGoalModal(false)} className="text-text-low hover:text-white"><X size={24} /></button>
             </div>
             <div className={`p-3 rounded-xl text-center font-black ${goalTeam === 'A' ? 'bg-cyan-electric/10 text-cyan-electric' : 'bg-yellow-500/10 text-yellow-500'}`}>
               {goalTeam === 'A' ? currentMatch.teamA.name : currentMatch.teamB.name}
             </div>
             <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-white/60 mb-2">Quem fez o gol? *</label>
-              <select value={selectedScorer} onChange={e => setSelectedScorer(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-cyan-electric">
+              <label className="block text-xs font-black uppercase tracking-wider text-text-mid mb-2">Quem fez o gol? *</label>
+              <select value={selectedScorer} onChange={e => setSelectedScorer(e.target.value)} className="w-full bg-surface-2 border border-border-mid rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-cyan-electric">
                 <option value="">Selecione...</option>
                 {(goalTeam === 'A' ? currentMatch.teamA.players : currentMatch.teamB.players)?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-white/60 mb-2 flex items-center gap-2"><UserPlus size={14} /> Assistência (opcional)</label>
-              <select value={selectedAssist} onChange={e => setSelectedAssist(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-cyan-electric">
+              <label className="block text-xs font-black uppercase tracking-wider text-text-mid mb-2 flex items-center gap-2"><UserPlus size={14} /> Assistência (opcional)</label>
+              <select value={selectedAssist} onChange={e => setSelectedAssist(e.target.value)} className="w-full bg-surface-2 border border-border-mid rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-cyan-electric">
                 <option value="">Nenhuma</option>
                 {(goalTeam === 'A' ? currentMatch.teamA.players : currentMatch.teamB.players)?.filter(p => p.id !== selectedScorer).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setShowGoalModal(false)} className="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl font-black uppercase text-xs">Cancelar</button>
+              <button onClick={() => setShowGoalModal(false)} className="flex-1 py-3 bg-surface-2 border border-border-mid rounded-xl font-black uppercase text-xs">Cancelar</button>
               <button onClick={handleSaveGoal} className="flex-1 py-3 bg-cyan-electric text-black rounded-xl font-black uppercase text-xs active:scale-95 transition-all">Confirmar</button>
             </div>
           </div>
