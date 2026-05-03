@@ -6,6 +6,8 @@ import {
   ArrowLeft, Calendar, Trophy, Target,
   ChevronDown, ChevronUp, Clock,
 } from 'lucide-react';
+import { MatchCardSkeleton } from '../components/SkeletonLoader';
+import { toastErrorWithRetry } from '../utils/toastUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -228,7 +230,12 @@ const HistoryPage = () => {
     }
 
     const { data, count, error } = await query;
-    if (error) { console.error('[HistoryPage]', error); setLoading(false); return; }
+    if (error) {
+      console.error('[HistoryPage]', error);
+      toastErrorWithRetry('Erro ao carregar histórico', () => setPage(1));
+      setLoading(false);
+      return;
+    }
 
     setMatches(prev => reset ? (data || []) : [...prev, ...(data || [])]);
     setHasMore((currentPage + 1) * PAGE_SIZE < (count || 0));
@@ -302,10 +309,7 @@ const HistoryPage = () => {
         {/* Lista */}
         <div className="space-y-4">
           {loading && matches.length === 0 ? (
-            // Skeletons
-            [...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 rounded-[2rem] bg-white/5 animate-pulse" />
-            ))
+            <MatchCardSkeleton count={3} />
           ) : matches.length > 0 ? (
             <>
               {matches.map(match => <MatchCard key={match.id} match={match} />)}
