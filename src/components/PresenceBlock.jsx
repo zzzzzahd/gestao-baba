@@ -40,10 +40,10 @@ const PresenceBlock = ({
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <Users size={13} className="text-cyan-electric" />
-          <span className="text-[11px] font-black text-white/50 uppercase tracking-widest">
+          <span className="text-[11px] font-black text-text-mid uppercase tracking-widest">
             <span className="text-white">{confirmedCount}</span> confirmados
             {confirmedCount < minRequired && (
-              <span className="text-white/25"> · faltam {minRequired - confirmedCount}</span>
+              <span className="text-text-low"> · faltam {minRequired - confirmedCount}</span>
             )}
           </span>
         </div>
@@ -57,11 +57,11 @@ const PresenceBlock = ({
           {/* Contador regressivo */}
           {cdStr && (
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] text-white/30 font-black uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 text-[10px] text-text-low font-black uppercase tracking-widest">
                 <Clock size={12} />
                 <span>Prazo</span>
               </div>
-              <span className={`text-sm font-black font-mono ${isUrgent ? 'text-red-400 animate-pulse' : 'text-white/60'}`}>
+              <span className={`text-sm font-black font-mono ${isUrgent ? 'text-red-400 animate-pulse' : 'text-text-mid'}`}>
                 {cdStr}
               </span>
             </div>
@@ -77,7 +77,7 @@ const PresenceBlock = ({
               <button
                 onClick={cancelConfirmation}
                 disabled={loading}
-                className="w-full py-3 bg-white/5 border border-white/10 rounded-2xl text-white/30 text-[10px] font-black uppercase hover:bg-white/10 transition-all disabled:opacity-40"
+                className="w-full py-3 bg-surface-2 border border-border-mid rounded-2xl text-text-low text-[10px] font-black uppercase hover:bg-surface-3 transition-all disabled:opacity-40"
               >
                 {loading ? 'Processando...' : 'Cancelar Presença'}
               </button>
@@ -101,7 +101,7 @@ const PresenceBlock = ({
         <div className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase border ${
           myConfirmation
             ? 'bg-green-500/5 border-green-500/20 text-green-500'
-            : 'bg-white/5 border-white/5 text-white/25'
+            : 'bg-surface-2 border-border-subtle text-text-low'
         }`}>
           {myConfirmation ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
           <span>
