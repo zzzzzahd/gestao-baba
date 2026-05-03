@@ -56,13 +56,13 @@ const SuspendModal = ({ player, onClose, onConfirm }) => {
               <p className="text-[10px] text-red-400/60 font-black uppercase">{player.display_name || player.name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-white/5 rounded-xl text-white/40 hover:text-white">
+          <button onClick={onClose} className="p-2 bg-surface-2 rounded-xl text-text-low hover:text-white">
             <X size={18} />
           </button>
         </div>
 
         {/* Indefinida */}
-        <label className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10 cursor-pointer">
+        <label className="flex items-center gap-3 p-4 bg-surface-2 rounded-2xl border border-border-mid cursor-pointer">
           <input
             type="checkbox"
             checked={indefinite}
@@ -71,28 +71,28 @@ const SuspendModal = ({ player, onClose, onConfirm }) => {
           />
           <div>
             <p className="text-sm font-black">Suspensão indefinida</p>
-            <p className="text-[10px] text-white/30">Jogador só volta quando o presidente liberar</p>
+            <p className="text-[10px] text-text-low">Jogador só volta quando o presidente liberar</p>
           </div>
         </label>
 
         {/* Seletor de dias */}
         {!indefinite && (
           <div className="space-y-3">
-            <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+            <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
               Suspender por quantos dias?
             </p>
-            <div className="flex items-center gap-4 p-4 bg-black/40 border border-white/10 rounded-2xl">
+            <div className="flex items-center gap-4 p-4 bg-black/40 border border-border-mid rounded-2xl">
               <button
                 onClick={() => setDays(d => Math.max(1, d - 1))}
-                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center font-black text-lg active:bg-white/20"
+                className="w-9 h-9 rounded-xl bg-surface-3 flex items-center justify-center font-black text-lg active:bg-surface-3"
               >-</button>
               <span className="flex-1 text-center font-black text-3xl text-red-400">{days}</span>
               <button
                 onClick={() => setDays(d => Math.min(365, d + 1))}
-                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center font-black text-lg active:bg-white/20"
+                className="w-9 h-9 rounded-xl bg-surface-3 flex items-center justify-center font-black text-lg active:bg-surface-3"
               >+</button>
             </div>
-            <p className="text-[9px] text-white/30 text-center">
+            <p className="text-[9px] text-text-low text-center">
               Volta automaticamente em {days} dia{days !== 1 ? 's' : ''}
             </p>
           </div>
@@ -101,7 +101,7 @@ const SuspendModal = ({ player, onClose, onConfirm }) => {
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={onClose}
-            className="py-4 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+            className="py-4 bg-surface-2 border border-border-mid rounded-2xl font-black uppercase text-[10px] tracking-widest"
           >
             Cancelar
           </button>
@@ -196,15 +196,15 @@ const SuspensionPanel = ({ players, babaId, onPlayersUpdated }) => {
 
         {/* Jogadores ativos */}
         <div className="space-y-3">
-          <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">
+          <p className="text-[9px] font-black text-text-low uppercase tracking-widest">
             Atletas ativos ({active.length})
           </p>
           {active.map(p => (
             <div
               key={p.id}
-              className="flex items-center gap-3 p-4 bg-white/[0.03] border border-white/5 rounded-2xl"
+              className="flex items-center gap-3 p-4 bg-surface-1 border border-border-subtle rounded-2xl"
             >
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white font-black text-sm flex-shrink-0 overflow-hidden">
+              <div className="w-10 h-10 rounded-xl bg-surface-3 flex items-center justify-center text-white font-black text-sm flex-shrink-0 overflow-hidden">
                 {p.avatar_url
                   ? <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />
                   : (p.display_name || p.name || '?').charAt(0)
@@ -212,7 +212,7 @@ const SuspensionPanel = ({ players, babaId, onPlayersUpdated }) => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-black text-sm truncate">{p.display_name || p.name}</p>
-                <p className="text-[9px] text-white/30 uppercase font-black">
+                <p className="text-[9px] text-text-low uppercase font-black">
                   {POSITION_LABEL[p.position] || p.position || 'Linha'}
                 </p>
               </div>
@@ -229,7 +229,7 @@ const SuspensionPanel = ({ players, babaId, onPlayersUpdated }) => {
         </div>
 
         {players.length === 0 && (
-          <div className="text-center py-10 text-white/20 font-black uppercase text-sm">
+          <div className="text-center py-10 text-text-muted font-black uppercase text-sm">
             Nenhum jogador no baba
           </div>
         )}
