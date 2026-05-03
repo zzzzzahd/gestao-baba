@@ -64,7 +64,7 @@ const buildInsertPayload = ({ name, modality, location, playersPerTeam, selected
 
 const Row = ({ label, value }) => (
   <div className="p-4 flex justify-between items-center">
-    <span className="text-[10px] text-white/30 uppercase font-black">{label}</span>
+    <span className="text-[10px] text-text-low uppercase font-black">{label}</span>
     <span className="font-black text-sm">{value}</span>
   </div>
 );
@@ -109,12 +109,12 @@ const SuccessScreen = ({ baba, onEnterDashboard }) => {
         <h1 className="text-3xl font-black italic uppercase tracking-tighter text-white">
           Baba Criado!
         </h1>
-        <p className="text-white/40 text-sm">{baba?.name}</p>
+        <p className="text-text-low text-sm">{baba?.name}</p>
       </div>
 
       {/* Código de convite */}
       <div className="w-full max-w-xs space-y-3">
-        <p className="text-[9px] text-white/30 font-black uppercase tracking-widest text-center">
+        <p className="text-[9px] text-text-low font-black uppercase tracking-widest text-center">
           Código de convite
         </p>
 
@@ -130,7 +130,7 @@ const SuccessScreen = ({ baba, onEnterDashboard }) => {
           </button>
         </div>
 
-        <p className="text-[10px] text-white/20 text-center">
+        <p className="text-[10px] text-text-muted text-center">
           Compartilhe esse código com seus jogadores para eles entrarem no baba.
         </p>
       </div>
@@ -149,7 +149,7 @@ const SuccessScreen = ({ baba, onEnterDashboard }) => {
         {/* Entrar no baba — secundário */}
         <button
           onClick={onEnterDashboard}
-          className="w-full py-4 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 active:scale-95 transition-all bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+          className="w-full py-4 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 active:scale-95 transition-all bg-surface-2 border border-border-mid text-text-mid hover:text-white hover:bg-surface-3"
         >
           Entrar no Baba <ArrowRight size={16} />
         </button>
@@ -239,7 +239,7 @@ const CreatePage = () => {
   const renderStep1 = () => (
     <div className="space-y-5">
       <div className="space-y-2">
-        <label className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+        <label className="text-[10px] text-text-low uppercase font-black tracking-widest">
           Nome do Baba *
         </label>
         <input
@@ -247,12 +247,12 @@ const CreatePage = () => {
           onChange={e => set('name', e.target.value)}
           placeholder="Ex: Baba da Pelada"
           maxLength={40}
-          className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl font-black placeholder:text-white/20 focus:border-cyan-electric/50 focus:outline-none transition-colors"
+          className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl font-black placeholder:text-text-muted focus:border-cyan-electric/50 focus:outline-none transition-colors"
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+        <label className="text-[10px] text-text-low uppercase font-black tracking-widest">
           Modalidade
         </label>
         <div className="grid grid-cols-3 gap-2">
@@ -263,7 +263,7 @@ const CreatePage = () => {
               className={`p-3 rounded-2xl text-[11px] font-black uppercase transition-all ${
                 form.modality === m.value
                   ? 'bg-cyan-electric text-black'
-                  : 'bg-white/5 text-white/60 border border-white/10'
+                  : 'bg-surface-2 text-text-mid border border-border-mid'
               }`}
             >
               {m.label}
@@ -273,7 +273,7 @@ const CreatePage = () => {
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
+        <label className="text-[10px] text-text-low uppercase font-black tracking-widest flex items-center gap-1">
           <MapPin size={10} /> Local (padrão)
         </label>
         <input
@@ -281,18 +281,18 @@ const CreatePage = () => {
           onChange={e => set('location', e.target.value)}
           placeholder="Quadra do bairro, Arena..."
           maxLength={80}
-          className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl font-black placeholder:text-white/20 focus:border-cyan-electric/50 focus:outline-none transition-colors"
+          className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl font-black placeholder:text-text-muted focus:border-cyan-electric/50 focus:outline-none transition-colors"
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] text-white/40 uppercase font-black tracking-widest flex items-center gap-1">
+        <label className="text-[10px] text-text-low uppercase font-black tracking-widest flex items-center gap-1">
           <Users size={10} /> Jogadores por time
         </label>
-        <div className="flex items-center gap-4 p-4 bg-black/40 border border-white/10 rounded-2xl">
+        <div className="flex items-center gap-4 p-4 bg-black/40 border border-border-mid rounded-2xl">
           <button
             onClick={() => set('playersPerTeam', Math.max(MIN_PER_TEAM, form.playersPerTeam - 1))}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20 transition"
+            className="w-9 h-9 rounded-xl bg-surface-3 flex items-center justify-center active:bg-surface-3 transition"
           >
             <Minus size={14} />
           </button>
@@ -301,12 +301,12 @@ const CreatePage = () => {
           </span>
           <button
             onClick={() => set('playersPerTeam', Math.min(MAX_PER_TEAM, form.playersPerTeam + 1))}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20 transition"
+            className="w-9 h-9 rounded-xl bg-surface-3 flex items-center justify-center active:bg-surface-3 transition"
           >
             <Plus size={14} />
           </button>
         </div>
-        <p className="text-[10px] text-white/30 text-center">
+        <p className="text-[10px] text-text-low text-center">
           {form.playersPerTeam} jogadores por time · {form.playersPerTeam * 2} em campo por partida
         </p>
       </div>
@@ -315,7 +315,7 @@ const CreatePage = () => {
 
   const renderStep2 = () => (
     <div className="space-y-4">
-      <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+      <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
         Dias de jogo *
       </p>
 
@@ -329,7 +329,7 @@ const CreatePage = () => {
               className={`py-3 rounded-xl text-[9px] font-black uppercase transition-all ${
                 selected
                   ? 'bg-cyan-electric text-black'
-                  : 'bg-white/5 text-white/40 border border-white/10'
+                  : 'bg-surface-2 text-text-low border border-border-mid'
               }`}
             >
               {d.short}
@@ -339,7 +339,7 @@ const CreatePage = () => {
       </div>
 
       {form.selectedDays.length === 0 && (
-        <p className="text-center text-white/20 text-[11px] py-4">
+        <p className="text-center text-text-muted text-[11px] py-4">
           Selecione pelo menos um dia
         </p>
       )}
@@ -349,10 +349,10 @@ const CreatePage = () => {
           const dayLabel = DAYS.find(d => d.value === sd.day)?.label;
           const isOpen   = dayEditing === sd.day;
           return (
-            <div key={sd.day} className="rounded-2xl border border-white/10 overflow-hidden">
+            <div key={sd.day} className="rounded-2xl border border-border-mid overflow-hidden">
               <button
                 onClick={() => setDayEditing(isOpen ? null : sd.day)}
-                className="w-full p-4 flex justify-between items-center bg-white/5"
+                className="w-full p-4 flex justify-between items-center bg-surface-2"
               >
                 <div className="flex items-center gap-3">
                   <span className="w-8 h-8 rounded-xl bg-cyan-electric/10 flex items-center justify-center text-cyan-electric text-[10px] font-black">
@@ -360,32 +360,32 @@ const CreatePage = () => {
                   </span>
                   <div className="text-left">
                     <p className="font-black text-sm">{dayLabel}</p>
-                    <p className="text-[10px] text-white/40">
+                    <p className="text-[10px] text-text-low">
                       {sd.time}{sd.location ? ` · ${sd.location}` : ''}
                     </p>
                   </div>
                 </div>
                 <ChevronRight
                   size={14}
-                  className={`text-white/30 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                  className={`text-text-low transition-transform ${isOpen ? 'rotate-90' : ''}`}
                 />
               </button>
 
               {isOpen && (
-                <div className="p-4 space-y-3 bg-black/40 border-t border-white/5">
+                <div className="p-4 space-y-3 bg-black/40 border-t border-border-subtle">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-white/30 uppercase font-black flex items-center gap-1">
+                    <label className="text-[9px] text-text-low uppercase font-black flex items-center gap-1">
                       <Clock size={8} /> Horário
                     </label>
                     <input
                       type="time"
                       value={sd.time}
                       onChange={e => updateDayField(sd.day, 'time', e.target.value)}
-                      className="w-full p-3 bg-black/40 border border-white/10 rounded-xl font-black focus:border-cyan-electric/50 focus:outline-none transition-colors"
+                      className="w-full p-3 bg-black/40 border border-border-mid rounded-xl font-black focus:border-cyan-electric/50 focus:outline-none transition-colors"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-white/30 uppercase font-black flex items-center gap-1">
+                    <label className="text-[9px] text-text-low uppercase font-black flex items-center gap-1">
                       <MapPin size={8} /> Local específico (opcional)
                     </label>
                     <input
@@ -393,7 +393,7 @@ const CreatePage = () => {
                       onChange={e => updateDayField(sd.day, 'location', e.target.value)}
                       placeholder={form.location || 'Local deste dia em particular'}
                       maxLength={80}
-                      className="w-full p-3 bg-black/40 border border-white/10 rounded-xl font-black placeholder:text-white/20 focus:border-cyan-electric/50 focus:outline-none transition-colors"
+                      className="w-full p-3 bg-black/40 border border-border-mid rounded-xl font-black placeholder:text-text-muted focus:border-cyan-electric/50 focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -410,11 +410,11 @@ const CreatePage = () => {
     const payload  = buildInsertPayload(form);
     return (
       <div className="space-y-4">
-        <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+        <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
           Confirme os dados
         </p>
 
-        <div className="rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">
+        <div className="rounded-3xl border border-border-mid overflow-hidden divide-y divide-white/5">
           <Row label="Nome"       value={form.name} />
           <Row label="Modalidade" value={modLabel} />
           {form.location && <Row label="Local padrão" value={form.location} />}
@@ -423,14 +423,14 @@ const CreatePage = () => {
             value={`${form.playersPerTeam} x ${form.playersPerTeam} — ${form.playersPerTeam * 2} em campo`}
           />
           <div className="p-4">
-            <p className="text-[9px] text-white/30 uppercase font-black mb-2">Agenda</p>
+            <p className="text-[9px] text-text-low uppercase font-black mb-2">Agenda</p>
             <div className="space-y-1">
               {payload.game_days_config.map(d => {
                 const dayLabel = DAYS.find(day => day.value === d.day)?.label;
                 return (
                   <div key={d.day} className="flex justify-between items-center">
                     <span className="text-[11px] font-black">{dayLabel}</span>
-                    <span className="text-[10px] text-white/40">
+                    <span className="text-[10px] text-text-low">
                       {d.time}{d.location ? ` · ${d.location}` : ''}
                     </span>
                   </div>
@@ -460,13 +460,13 @@ const CreatePage = () => {
       <div className="flex items-center gap-4 px-6 pt-6 pb-4">
         <button
           onClick={() => step > 1 ? setStep(s => s - 1) : navigate('/home')}
-          className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10 active:scale-90 transition-transform"
+          className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center border border-border-mid active:scale-90 transition-transform"
         >
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1">
           <h1 className="font-black uppercase text-sm">Criar Baba</h1>
-          <p className="text-[10px] text-white/30">Passo {step} de {STEPS.length}</p>
+          <p className="text-[10px] text-text-low">Passo {step} de {STEPS.length}</p>
         </div>
       </div>
 
@@ -477,7 +477,7 @@ const CreatePage = () => {
             <div
               key={i}
               className={`h-1 rounded-full flex-1 transition-all duration-300 ${
-                i + 1 <= step ? 'bg-cyan-electric' : 'bg-white/10'
+                i + 1 <= step ? 'bg-cyan-electric' : 'bg-surface-3'
               }`}
             />
           ))}
@@ -487,7 +487,7 @@ const CreatePage = () => {
             <span
               key={i}
               className={`text-[8px] font-black uppercase transition-colors ${
-                i + 1 === step ? 'text-cyan-electric' : 'text-white/20'
+                i + 1 === step ? 'text-cyan-electric' : 'text-text-muted'
               }`}
             >
               {label}
@@ -504,7 +504,7 @@ const CreatePage = () => {
       </div>
 
       {/* Botões de ação — sempre visíveis */}
-      <div className="px-6 pb-8 pt-4 border-t border-white/5">
+      <div className="px-6 pb-8 pt-4 border-t border-border-subtle">
         {step < 3 ? (
           <button
             disabled={!canProceed()}
@@ -512,7 +512,7 @@ const CreatePage = () => {
             className={`w-full p-4 rounded-2xl font-black uppercase text-sm transition-all flex items-center justify-center gap-2 active:scale-95 ${
               canProceed()
                 ? 'text-black'
-                : 'bg-white/5 text-white/20 cursor-not-allowed'
+                : 'bg-surface-2 text-text-muted cursor-not-allowed'
             }`}
             style={canProceed() ? { background: 'linear-gradient(135deg, #00f2ff, #0066ff)' } : {}}
           >
