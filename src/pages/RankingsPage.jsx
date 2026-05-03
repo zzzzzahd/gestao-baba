@@ -5,7 +5,7 @@ import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import { ArrowLeft, Trophy, Target, Award } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
-import { toastErrorWithRetry } from '../utils/toastUtils';
+import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 
 // ─── Pódio ────────────────────────────────────────────────────────────────────
 
