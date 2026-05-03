@@ -22,7 +22,7 @@ const PodiumStep = ({ player, position, statValue, statUnit, isMe }) => {
     <div className="flex flex-col items-center gap-2 flex-1">
       {/* Avatar */}
       <div className={`relative ${position === 1 ? 'w-16 h-16' : position === 2 ? 'w-14 h-14' : 'w-12 h-12'}`}>
-        <div className={`w-full h-full rounded-full ring-2 ${c.ring} overflow-hidden bg-white/10 flex items-center justify-center ${isMe ? 'ring-cyan-electric' : ''}`}>
+        <div className={`w-full h-full rounded-full ring-2 ${c.ring} overflow-hidden bg-surface-3 flex items-center justify-center ${isMe ? 'ring-cyan-electric' : ''}`}>
           {player.avatar_url ? (
             <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
           ) : (
@@ -45,11 +45,11 @@ const PodiumStep = ({ player, position, statValue, statUnit, isMe }) => {
 
       {/* Valor */}
       <p className={`font-black ${c.fontSize} ${c.labelColor} leading-none`}>{statValue}</p>
-      <p className="text-[8px] text-white/30 font-black uppercase">{statUnit}</p>
+      <p className="text-[8px] text-text-low font-black uppercase">{statUnit}</p>
 
       {/* Degrau */}
-      <div className={`w-full ${c.height} rounded-t-xl flex items-end justify-center pb-2 border-t border-white/10 ${
-        position === 1 ? 'bg-yellow-400/10' : position === 2 ? 'bg-white/5' : 'bg-white/[0.03]'
+      <div className={`w-full ${c.height} rounded-t-xl flex items-end justify-center pb-2 border-t border-border-mid ${
+        position === 1 ? 'bg-yellow-400/10' : position === 2 ? 'bg-surface-2' : 'bg-surface-1'
       }`}>
         <span className={`text-xs font-black ${c.labelColor}`}>{position}º</span>
       </div>
@@ -93,13 +93,13 @@ const MyPositionFooter = ({ position, total, statValue, statUnit }) => (
     <div className="mx-5 w-full max-w-xl pointer-events-auto">
       <div className="flex items-center justify-between px-5 py-3 rounded-2xl bg-black/90 border border-cyan-electric/20 backdrop-blur-md shadow-lg shadow-cyan-electric/10">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Sua posição</span>
+          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">Sua posição</span>
           <span className="text-lg font-black text-cyan-electric">#{position}</span>
-          <span className="text-[9px] text-white/20 font-black uppercase">de {total}</span>
+          <span className="text-[9px] text-text-muted font-black uppercase">de {total}</span>
         </div>
         <div className="text-right">
           <span className="text-lg font-black text-white">{statValue}</span>
-          <span className="text-[9px] text-white/30 font-black uppercase ml-1">{statUnit}</span>
+          <span className="text-[9px] text-text-low font-black uppercase ml-1">{statUnit}</span>
         </div>
       </div>
     </div>
@@ -217,7 +217,7 @@ const RankingsPage = () => {
     if (i === 0) return 'text-yellow-400';
     if (i === 1) return 'text-gray-300';
     if (i === 2) return 'text-orange-500';
-    return 'text-white/40';
+    return 'text-text-low';
   };
 
   // Pódio — top 3
@@ -238,7 +238,7 @@ const RankingsPage = () => {
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-surface-3 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
           <div className="text-center flex-1">
@@ -254,7 +254,7 @@ const RankingsPage = () => {
                   <ChevronDown size={10} className={`transition-transform ${showSelector ? 'rotate-180' : ''}`} />
                 </button>
                 {showSelector && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-48 bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-48 bg-[#0a0a0a] border border-border-mid rounded-2xl overflow-hidden shadow-2xl">
                     {myBabas.map(b => (
                       <button
                         key={b.id}
@@ -262,7 +262,7 @@ const RankingsPage = () => {
                         className={`w-full px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide transition-colors ${
                           b.id === currentBaba?.id
                             ? 'text-cyan-electric bg-cyan-electric/10'
-                            : 'text-white/50 hover:text-white hover:bg-white/5'
+                            : 'text-text-mid hover:text-white hover:bg-surface-2'
                         }`}
                       >
                         {b.name}
@@ -281,7 +281,7 @@ const RankingsPage = () => {
         </div>
 
         {/* Filtro de período */}
-        <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid">
           {[
             { id: 'all',    label: 'Tudo'    },
             { id: '7days',  label: '7 Dias'  },
@@ -293,7 +293,7 @@ const RankingsPage = () => {
               className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
                 period === p.id
                   ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
-                  : 'text-white/40'
+                  : 'text-text-low'
               }`}
             >
               {p.label}
@@ -310,7 +310,7 @@ const RankingsPage = () => {
               className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center ${
                 activeTab === tab.id
                   ? 'border-cyan-electric/30 bg-cyan-electric/5'
-                  : 'border-white/10 bg-transparent'
+                  : 'border-border-mid bg-transparent'
               }`}
             >
               <tab.icon
@@ -341,7 +341,7 @@ const RankingsPage = () => {
             {/* ── Lista (4º em diante) ── */}
             {listFrom4.length > 0 && (
               <div className="space-y-2 pt-2">
-                <div className="h-px bg-white/5 mb-3" />
+                <div className="h-px bg-surface-2 mb-3" />
                 {listFrom4.map((player, i) => {
                   const { value, unit } = getStatValue(player);
                   const absIndex        = i + 3; // posição real no ranking
@@ -353,7 +353,7 @@ const RankingsPage = () => {
                       className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${
                         isMe
                           ? 'border-cyan-electric/30 bg-cyan-electric/5'
-                          : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                          : 'border-border-subtle bg-surface-1 hover:border-border-mid'
                       }`}
                     >
                       <span className={`text-lg font-black min-w-[32px] text-center ${getMedalColor(absIndex)}`}>
@@ -361,7 +361,7 @@ const RankingsPage = () => {
                       </span>
 
                       {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-surface-3 overflow-hidden flex items-center justify-center shrink-0">
                         {player.avatar_url ? (
                           <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
                         ) : (
@@ -375,14 +375,14 @@ const RankingsPage = () => {
                         <p className={`text-sm font-black uppercase tracking-tight truncate ${isMe ? 'text-cyan-electric' : ''}`}>
                           {player.name}{isMe && <span className="text-[9px] ml-1 opacity-60">• Você</span>}
                         </p>
-                        <p className="text-[9px] text-white/30 font-bold uppercase">{player.position}</p>
+                        <p className="text-[9px] text-text-low font-bold uppercase">{player.position}</p>
                       </div>
 
                       <div className="text-right shrink-0">
                         <p className={`text-2xl font-black ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
                           {value}
                         </p>
-                        <p className="text-[9px] text-white/30 font-bold uppercase">{unit}</p>
+                        <p className="text-[9px] text-text-low font-bold uppercase">{unit}</p>
                       </div>
                     </div>
                   );
@@ -391,10 +391,10 @@ const RankingsPage = () => {
             )}
           </>
         ) : (
-          <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl">
-            <Trophy size={32} className="text-white/10 mx-auto mb-4" />
-            <p className="text-white/20 font-black uppercase text-sm">Nenhum dado ainda</p>
-            <p className="text-white/10 text-[10px] mt-2 uppercase">
+          <div className="text-center py-20 border-2 border-dashed border-border-subtle rounded-3xl">
+            <Trophy size={32} className="text-text-muted mx-auto mb-4" />
+            <p className="text-text-muted font-black uppercase text-sm">Nenhum dado ainda</p>
+            <p className="text-text-muted text-[10px] mt-2 uppercase">
               Joga o primeiro baba pra começar a contagem!
             </p>
           </div>
