@@ -8,14 +8,14 @@ import React from 'react';
 
 // Bloco pulsante base
 const Pulse = ({ className = '' }) => (
-  <div className={`animate-pulse bg-white/5 rounded-2xl ${className}`} />
+  <div className={`animate-pulse bg-surface-2 rounded-2xl ${className}`} />
 );
 
 // ─── Skeleton de linha de jogador (lista de atletas) ─────────────────────────
 export const PlayerRowSkeleton = ({ count = 5 }) => (
   <div className="space-y-3">
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className="flex items-center gap-4 p-3 bg-white/[0.02] rounded-2xl border border-white/5">
+      <div key={i} className="flex items-center gap-4 p-3 bg-surface-1 rounded-2xl border border-border-subtle">
         <Pulse className="w-12 h-12 rounded-2xl shrink-0" />
         <div className="flex-1 space-y-2">
           <Pulse className="h-3 w-32 rounded-lg" />
@@ -58,7 +58,7 @@ export const PodiumSkeleton = () => (
 export const RankingRowSkeleton = ({ count = 4 }) => (
   <div className="space-y-2 pt-2">
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className="flex items-center gap-4 p-4 bg-white/[0.02] rounded-2xl border border-white/5">
+      <div key={i} className="flex items-center gap-4 p-4 bg-surface-1 rounded-2xl border border-border-subtle">
         <Pulse className="w-8 h-6 rounded-lg shrink-0" />
         <Pulse className="w-9 h-9 rounded-full shrink-0" />
         <div className="flex-1 space-y-2">
@@ -78,7 +78,7 @@ export const RankingRowSkeleton = ({ count = 4 }) => (
 export const MatchCardSkeleton = ({ count = 3 }) => (
   <div className="space-y-3">
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className="p-5 bg-white/[0.02] rounded-3xl border border-white/5 space-y-4">
+      <div key={i} className="p-5 bg-surface-1 rounded-3xl border border-border-subtle space-y-4">
         {/* Header do card */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
@@ -100,7 +100,7 @@ export const MatchCardSkeleton = ({ count = 3 }) => (
 
 // ─── Skeleton do dashboard (bloco de presença) ────────────────────────────────
 export const PresenceSkeleton = () => (
-  <div className="space-y-3 p-5 bg-white/[0.02] rounded-3xl border border-white/5">
+  <div className="space-y-3 p-5 bg-surface-1 rounded-3xl border border-border-subtle">
     <div className="flex justify-between">
       <Pulse className="h-3 w-24 rounded-lg" />
       <Pulse className="h-3 w-12 rounded-lg" />
