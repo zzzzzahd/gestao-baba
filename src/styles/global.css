@@ -4,17 +4,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Tokens de Design System ────────────────────────────────────────────────
+   Fase 3, Tarefas 3.2 e 3.4 — padronização de radius, surface e espaçamento.
+   Use estas variáveis em vez de valores hardcoded nos componentes.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root {
+  /* Cores */
   --bg-dark: #0d0d0d;
   --card-glass: rgba(255, 255, 255, 0.05);
   --cyan-electric: #00f2ff;
   --green-neon: #39ff14;
   --text-white: #ffffff;
+
+  /* Superfícies (Tarefa 3.4 — consistência de cards) */
+  --surface-1: rgba(255, 255, 255, 0.02);  /* card mais escuro */
+  --surface-2: rgba(255, 255, 255, 0.04);  /* card padrão */
+  --surface-3: rgba(255, 255, 255, 0.08);  /* card destacado */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-medium: rgba(255, 255, 255, 0.10);
+
+  /* Radius (Tarefa 3.2 — escala padronizada) */
+  --radius-sm:  0.75rem;   /* 12px — inputs, badges */
+  --radius-md:  1rem;      /* 16px — botões */
+  --radius-lg:  1.5rem;    /* 24px — cards internos */
+  --radius-xl:  2rem;      /* 32px — cards principais */
+  --radius-2xl: 2.5rem;    /* 40px — modais, hero cards */
+
+  /* Espaçamento interno de cards (Tarefa 3.4) */
+  --card-padding: 1.25rem; /* 20px = p-5 */
 }
 
 @layer base {
   * {
-    /* Corrigido: Tailwind usa m-0 e p-0, não margin-0 */
     @apply m-0 p-0 box-border;
     -webkit-tap-highlight-color: transparent;
   }
@@ -30,11 +51,21 @@
 }
 
 @layer components {
+  /* ── Cards padronizados (Tarefa 3.2 + 3.4) ── */
   .card-glass {
     background: var(--card-glass);
-    @apply border border-white/10 rounded-[1.5rem] backdrop-blur-md shadow-lg;
+    @apply border border-white/10 rounded-[var(--radius-xl)] backdrop-blur-md shadow-lg;
   }
 
+  /* Card padrão — p-5 fixo (Tarefa 3.4) */
+  .card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--card-padding);
+  }
+
+  /* Inputs */
   .input-tactical {
     @apply w-full px-5 py-4 rounded-2xl bg-white/5 border border-cyan-electric/20 
            text-white outline-none transition-all duration-200 font-tactical;
@@ -44,36 +75,60 @@
     @apply border-cyan-electric shadow-[0_0_15px_rgba(0,242,255,0.2)];
   }
 
+  /* Botões padronizados (Tarefa 3.2) */
   .btn-primary {
-    @apply w-full px-6 py-4 rounded-2xl font-black uppercase italic tracking-tighter 
-           transition-all duration-300 flex items-center justify-center gap-2;
-    background: var(--cyan-electric);
+    @apply w-full px-6 py-4 font-black uppercase italic tracking-tighter 
+           transition-all duration-300 flex items-center justify-center gap-2
+           active:scale-95;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #00f2ff, #0066ff);
     color: #000;
   }
 
   .btn-secondary {
-    @apply w-full px-6 py-4 rounded-2xl font-black uppercase italic tracking-tighter 
-           transition-all duration-300 border flex items-center justify-center gap-2;
-    border-color: var(--green-neon);
-    color: var(--green-neon);
+    @apply w-full px-6 py-4 font-black uppercase italic tracking-tighter 
+           transition-all duration-300 border flex items-center justify-center gap-2
+           text-white/50 hover:text-white hover:bg-white/10 active:scale-95;
+    border-radius: var(--radius-md);
+    border-color: var(--border-medium);
     background: transparent;
+  }
+
+  /* Botão de ação destrutiva (Tarefa 3.3 — contraste admin) */
+  .btn-danger {
+    @apply w-full px-6 py-4 font-black uppercase tracking-widest text-[10px]
+           transition-all flex items-center justify-center gap-2
+           bg-red-500/10 border border-red-500/20 text-red-400
+           hover:bg-red-500/20 hover:border-red-500/40 active:scale-95;
+    border-radius: var(--radius-xl);
+  }
+
+  /* Skeleton pulse base */
+  .skeleton {
+    @apply animate-pulse bg-white/5;
+    border-radius: var(--radius-lg);
   }
 }
 
 /* Animações */
-.animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+.animate-fade-in  { animation: fadeIn 0.4s ease-out forwards; }
 .animate-slide-up { animation: slideInUp 0.5s ease-out forwards; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 
-::-webkit-scrollbar { width: 6px; }
+/* Scrollbar */
+::-webkit-scrollbar       { width: 6px; }
 ::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb {
-  background: var(--cyan-electric);
-  border-radius: 10px;
+::-webkit-scrollbar-thumb { background: var(--cyan-electric); border-radius: 10px; }
+
+/* Tarefa 3.5 — Toast de erro com estilo customizado */
+.toast-error-retry {
+  background: #1a0505;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fff;
+  border-radius: var(--radius-lg);
 }
-    
