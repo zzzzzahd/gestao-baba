@@ -12,12 +12,17 @@ export const DAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Se
 
 /** Mapeamento de posição (valor do banco → label exibido) */
 export const POSITION_LABEL = {
+  // Society / Futebol de campo
   goleiro:  'Goleiro',
-  linha:    'Linha',
   zagueiro: 'Zagueiro',
   lateral:  'Lateral',
   meia:     'Meia',
   atacante: 'Atacante',
+  linha:    'Linha',
+  // Futsal
+  fixo:     'Fixo',
+  ala:      'Ala',
+  pivo:     'Pivô',
 };
 
 /** Gradiente padrão cyan-electric → blue (botão primário) */
