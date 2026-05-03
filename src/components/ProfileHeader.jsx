@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 const POSITION_LABEL = {
   goleiro: 'Goleiro', zagueiro: 'Zagueiro', lateral: 'Lateral',
   meia: 'Meia', atacante: 'Atacante', linha: 'Linha',
+  fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
 };
 
 const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefresh }) => {
