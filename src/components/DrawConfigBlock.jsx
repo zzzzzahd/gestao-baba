@@ -6,10 +6,19 @@
 
 import React from 'react';
 import { Settings2 } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 const STRATEGIES = [
-  { id: 'reserve',    label: 'Reserva'    },
-  { id: 'substitute', label: 'Incompleto' },
+  {
+    id: 'reserve',
+    label: 'Reserva',
+    tip: 'Jogadores que não cabem nos times ficam de reserva e entram quando alguém sai.',
+  },
+  {
+    id: 'substitute',
+    label: 'Incompleto',
+    tip: 'Os times são formados mesmo sem o número ideal de jogadores.',
+  },
 ];
 
 const DrawConfigBlock = ({
@@ -50,6 +59,10 @@ const DrawConfigBlock = ({
           <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
             Config do sorteio
           </span>
+          <Tooltip
+            title="Sorteio automático"
+            text="Os times são balanceados pela avaliação técnica dos jogadores (habilidade, físico e compromisso)."
+          />
         </div>
         {deadlineStr && (
           <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">
@@ -80,7 +93,13 @@ const DrawConfigBlock = ({
 
       {/* Estratégia de suplentes */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
-        <span className="text-[10px] font-black uppercase text-white/40 shrink-0">Suplentes</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-black uppercase text-white/40">Suplentes</span>
+          <Tooltip
+            title="Modo de suplentes"
+            text="'Reserva' — jogadores extras aguardam na beira. 'Incompleto' — times jogam com menos jogadores."
+          />
+        </div>
         <div className="flex gap-2 flex-1 justify-end">
           {STRATEGIES.map(s => (
             <button
