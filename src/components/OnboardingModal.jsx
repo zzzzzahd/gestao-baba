@@ -74,7 +74,7 @@ const OnboardingModal = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md p-4">
-      <div className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl animate-slide-up">
+      <div className="w-full max-w-sm bg-[#0a0a0a] border border-border-mid rounded-[2.5rem] overflow-hidden shadow-2xl animate-slide-up">
 
         {/* Barra de progresso */}
         <div className="flex gap-1.5 p-5 pb-0">
@@ -95,7 +95,7 @@ const OnboardingModal = ({ onClose }) => {
         <div className="flex justify-end px-5 pt-3">
           <button
             onClick={handleSkip}
-            className="p-2 text-white/20 hover:text-white/60 transition-colors"
+            className="p-2 text-text-muted hover:text-text-mid transition-colors"
           >
             <X size={16} />
           </button>
@@ -117,7 +117,7 @@ const OnboardingModal = ({ onClose }) => {
             <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white leading-tight">
               {current.title}
             </h2>
-            <p className="text-[13px] text-white/40 font-medium leading-relaxed">
+            <p className="text-[13px] text-text-low font-medium leading-relaxed">
               {current.description}
             </p>
           </div>
@@ -136,7 +136,7 @@ const OnboardingModal = ({ onClose }) => {
           {!isLast && (
             <button
               onClick={handleSkip}
-              className="text-[10px] text-white/20 font-black uppercase tracking-widest hover:text-white/40 transition-colors"
+              className="text-[10px] text-text-muted font-black uppercase tracking-widest hover:text-text-low transition-colors"
             >
               Pular introdução
             </button>
