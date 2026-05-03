@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Trophy, Target, Award } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Award, ChevronDown } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 
@@ -110,13 +110,14 @@ const MyPositionFooter = ({ position, total, statValue, statUnit }) => (
 
 const RankingsPage = () => {
   const navigate = useNavigate();
-  const { user }                    = useAuth();
-  const { currentBaba, players }    = useBaba();
+  const { user }                                          = useAuth();
+  const { currentBaba, players, myBabas, setCurrentBaba } = useBaba();
 
-  const [activeTab, setActiveTab] = useState('artilheiros');
-  const [period,    setPeriod]    = useState('all');
-  const [rankings,  setRankings]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [activeTab,    setActiveTab]    = useState('artilheiros');
+  const [period,       setPeriod]       = useState('all');
+  const [rankings,     setRankings]     = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showSelector, setShowSelector] = useState(false);
 
   // Player do usuário logado dentro do baba atual
   const myPlayer = useMemo(
@@ -240,13 +241,41 @@ const RankingsPage = () => {
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <div className="text-center">
+          <div className="text-center flex-1">
             <h1 className="text-xl font-black uppercase italic tracking-tighter">Rankings</h1>
-            {currentBaba?.name && (
+            {/* Seletor de baba — Tarefa 4.3 */}
+            {myBabas?.length > 1 ? (
+              <div className="relative inline-block mt-0.5">
+                <button
+                  onClick={() => setShowSelector(s => !s)}
+                  className="flex items-center gap-1 text-[9px] text-cyan-electric/70 font-black uppercase tracking-widest hover:text-cyan-electric transition-colors"
+                >
+                  {currentBaba?.name}
+                  <ChevronDown size={10} className={`transition-transform ${showSelector ? 'rotate-180' : ''}`} />
+                </button>
+                {showSelector && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-48 bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                    {myBabas.map(b => (
+                      <button
+                        key={b.id}
+                        onClick={() => { setCurrentBaba(b); setShowSelector(false); setRankings([]); }}
+                        className={`w-full px-4 py-3 text-left text-[11px] font-black uppercase tracking-wide transition-colors ${
+                          b.id === currentBaba?.id
+                            ? 'text-cyan-electric bg-cyan-electric/10'
+                            : 'text-white/50 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {b.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : currentBaba?.name ? (
               <p className="text-[9px] text-cyan-electric/60 font-black uppercase tracking-widest mt-0.5">
                 {currentBaba.name}
               </p>
-            )}
+            ) : null}
           </div>
           <div className="w-10" />
         </div>
