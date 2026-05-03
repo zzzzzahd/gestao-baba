@@ -47,7 +47,7 @@ const DrawConfigBlock = ({
   };
 
   return (
-    <div className="space-y-3 pt-3 border-t border-white/5">
+    <div className="space-y-3 pt-3 border-t border-border-subtle">
 
       {/* Cabeçalho com horário do sorteio automático */}
       <div className="flex items-center justify-between px-1">
@@ -56,7 +56,7 @@ const DrawConfigBlock = ({
             size={13}
             className={`text-cyan-electric ${isDrawing ? 'animate-spin' : ''}`}
           />
-          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">
             Config do sorteio
           </span>
           <Tooltip
@@ -65,20 +65,20 @@ const DrawConfigBlock = ({
           />
         </div>
         {deadlineStr && (
-          <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">
+          <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">
             Automático às {deadlineStr}
           </span>
         )}
       </div>
 
       {/* Jogadores por time */}
-      <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
-        <span className="text-[10px] font-black uppercase text-white/50">Jogadores por time</span>
+      <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-surface-2 border border-border-subtle">
+        <span className="text-[10px] font-black uppercase text-text-mid">Jogadores por time</span>
         <div className="flex items-center gap-3">
           <button
             onClick={() => handleDelta(-1)}
             disabled={isDrawing}
-            className="w-8 h-8 bg-white/5 rounded-lg border border-white/10 font-black text-lg hover:bg-white/10 active:scale-90 transition-all disabled:opacity-30"
+            className="w-8 h-8 bg-surface-2 rounded-lg border border-border-mid font-black text-lg hover:bg-surface-3 active:scale-90 transition-all disabled:opacity-30"
           >−</button>
           <span className="text-xl font-black w-8 text-center text-cyan-electric">
             {safeConfig.playersPerTeam}
@@ -86,15 +86,15 @@ const DrawConfigBlock = ({
           <button
             onClick={() => handleDelta(1)}
             disabled={isDrawing}
-            className="w-8 h-8 bg-white/5 rounded-lg border border-white/10 font-black text-lg hover:bg-white/10 active:scale-90 transition-all disabled:opacity-30"
+            className="w-8 h-8 bg-surface-2 rounded-lg border border-border-mid font-black text-lg hover:bg-surface-3 active:scale-90 transition-all disabled:opacity-30"
           >+</button>
         </div>
       </div>
 
       {/* Estratégia de suplentes */}
-      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 border border-white/5">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-surface-2 border border-border-subtle">
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-black uppercase text-white/40">Suplentes</span>
+          <span className="text-[10px] font-black uppercase text-text-low">Suplentes</span>
           <Tooltip
             title="Modo de suplentes"
             text="'Reserva' — jogadores extras aguardam na beira. 'Incompleto' — times jogam com menos jogadores."
@@ -109,7 +109,7 @@ const DrawConfigBlock = ({
               className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border ${
                 safeConfig.strategy === s.id
                   ? 'bg-cyan-electric text-black border-cyan-electric'
-                  : 'bg-white/5 text-white/30 border-white/10 hover:border-white/20'
+                  : 'bg-surface-2 text-text-low border-border-mid hover:border-border-strong'
               } disabled:opacity-40`}
             >
               {s.label}
@@ -124,16 +124,16 @@ const DrawConfigBlock = ({
           {[
             { value: totalMatches, label: 'Partidas',   color: 'text-cyan-electric'                               },
             { value: totalTeams,   label: 'Times',      color: 'text-white'                                       },
-            { value: reserves,     label: 'Aguardando', color: reserves > 0 ? 'text-yellow-500' : 'text-white/20' },
+            { value: reserves,     label: 'Aguardando', color: reserves > 0 ? 'text-yellow-500' : 'text-text-muted' },
           ].map(item => (
-            <div key={item.label} className="text-center p-3 bg-white/5 rounded-2xl border border-white/5">
+            <div key={item.label} className="text-center p-3 bg-surface-2 rounded-2xl border border-border-subtle">
               <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
-              <p className="text-[8px] text-white/30 uppercase font-black mt-0.5">{item.label}</p>
+              <p className="text-[8px] text-text-low uppercase font-black mt-0.5">{item.label}</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-center text-[10px] text-white/25 font-black uppercase tracking-widest py-1">
+        <p className="text-center text-[10px] text-text-low font-black uppercase tracking-widest py-1">
           faltam {minRequired - confirmedCount} confirmação{minRequired - confirmedCount !== 1 ? 'ões' : ''} para o sorteio
         </p>
       )}
