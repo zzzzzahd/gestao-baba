@@ -14,18 +14,18 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
     onClick={onClose}
   >
     <div
-      className="w-full max-w-xl bg-[#0a0a0a] border border-white/10 rounded-t-[2.5rem] p-6 max-h-[80vh] flex flex-col shadow-2xl"
+      className="w-full max-w-xl bg-[#0a0a0a] border border-border-mid rounded-t-[2.5rem] p-6 max-h-[80vh] flex flex-col shadow-2xl"
       onClick={e => e.stopPropagation()}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-black uppercase tracking-widest text-white">Atletas</h2>
-          <p className="text-[10px] text-white/40 font-bold uppercase">{players.length} membros</p>
+          <p className="text-[10px] text-text-low font-bold uppercase">{players.length} membros</p>
         </div>
         <button
           onClick={onClose}
-          className="p-2 rounded-2xl bg-white/5 text-white/40 hover:text-white transition-colors"
+          className="p-2 rounded-2xl bg-surface-2 text-text-low hover:text-white transition-colors"
         >
           <X size={20} />
         </button>
@@ -36,10 +36,10 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
         {players.map((p, i) => (
           <div
             key={p.id || i}
-            className="flex items-center gap-4 p-3 bg-white/5 rounded-2xl border border-white/5"
+            className="flex items-center gap-4 p-3 bg-surface-2 rounded-2xl border border-border-subtle"
           >
             {/* Avatar */}
-            <div className="w-12 h-12 rounded-2xl bg-gray-800 border border-white/10 overflow-hidden flex items-center justify-center text-white font-black text-lg flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gray-800 border border-border-mid overflow-hidden flex items-center justify-center text-white font-black text-lg flex-shrink-0">
               {p.avatar_url
                 ? <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.display_name} />
                 : (p.display_name || '?').charAt(0).toUpperCase()}
@@ -64,7 +64,7 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId }) => (
             {p.user_id !== currentUserId && (
               <button
                 onClick={() => onOpenRate(p)}
-                className="p-3 bg-white/5 text-white/20 rounded-xl hover:bg-cyan-electric hover:text-black transition-all flex-shrink-0"
+                className="p-3 bg-surface-2 text-text-muted rounded-xl hover:bg-cyan-electric hover:text-black transition-all flex-shrink-0"
               >
                 <Star size={16} />
               </button>
