@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronUp, Clock,
 } from 'lucide-react';
 import { MatchCardSkeleton } from '../components/SkeletonLoader';
-import { toastErrorWithRetry } from '../utils/toastUtils';
+import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
