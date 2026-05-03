@@ -62,7 +62,7 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
         {/* Voltar */}
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 text-white/40 hover:text-white transition-colors z-10"
+          className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-low hover:text-white transition-colors z-10"
         >
           <ArrowLeft size={18} />
         </button>
@@ -72,7 +72,7 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
           onClick={() => onTabChange(isEditing ? 'stats' : 'edit')}
           className={`absolute top-6 right-6 flex items-center gap-2 px-4 py-2.5 backdrop-blur-md rounded-2xl border transition-all z-10 text-[10px] font-black uppercase tracking-widest ${
             isEditing
-              ? 'bg-white/5 border-white/10 text-white/40 hover:text-white'   // cancelar: neutro
+              ? 'bg-surface-2 border-border-mid text-text-low hover:text-white'   // cancelar: neutro
               : 'bg-transparent border-cyan-electric/50 text-cyan-electric hover:bg-cyan-electric/10' // editar: outline cyan
           }`}
         >
@@ -123,8 +123,8 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
           )}
           {profile?.favorite_team && (
             <>
-              <span className="text-white/20">·</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+              <span className="text-text-muted">·</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-text-low">
                 {profile.favorite_team}
               </span>
             </>
@@ -137,7 +137,7 @@ const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefre
             <span className="text-xl font-black font-mono text-white">
               {Number(globalRating).toFixed(2)}
             </span>
-            <span className="text-[10px] text-white/30 font-bold uppercase">rating global</span>
+            <span className="text-[10px] text-text-low font-bold uppercase">rating global</span>
           </div>
         )}
       </div>
