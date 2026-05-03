@@ -59,7 +59,7 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
       <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white">
         Bem-vindo ao Draft!
       </h2>
-      <p className="text-white/40 text-sm max-w-xs leading-relaxed">
+      <p className="text-text-low text-sm max-w-xs leading-relaxed">
         Você ainda não faz parte de nenhum baba. Crie o seu ou entre em um pelo código de convite.
       </p>
     </div>
@@ -76,16 +76,16 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
 
       <button
         onClick={onJoinFocus}
-        className="w-full py-4 rounded-2xl font-black bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center justify-center gap-3"
+        className="w-full py-4 rounded-2xl font-black bg-surface-2 border border-border-mid text-text-mid hover:text-white hover:bg-surface-3 transition-all active:scale-95 uppercase text-xs tracking-widest flex items-center justify-center gap-3"
       >
         <LogIn size={18} />
         Entrar com código de convite
       </button>
     </div>
 
-    <div className="flex items-start gap-3 p-4 bg-white/[0.03] border border-white/5 rounded-2xl text-left max-w-xs">
+    <div className="flex items-start gap-3 p-4 bg-surface-1 border border-border-subtle rounded-2xl text-left max-w-xs">
       <Zap size={16} className="text-cyan-electric shrink-0 mt-0.5" />
-      <p className="text-[11px] text-white/30 leading-relaxed">
+      <p className="text-[11px] text-text-low leading-relaxed">
         O presidente do baba gera um código de 6 letras. Peça a ele e entre instantaneamente.
       </p>
     </div>
@@ -116,7 +116,7 @@ const HeroBabaCard = ({ baba, onClick }) => {
       {/* Nome + logo */}
       <div className="flex items-center gap-3 mb-4">
         {baba.logo_url ? (
-          <img src={baba.logo_url} className="w-12 h-12 rounded-2xl object-cover border border-white/10" alt="" />
+          <img src={baba.logo_url} className="w-12 h-12 rounded-2xl object-cover border border-border-mid" alt="" />
         ) : (
           <div className="w-12 h-12 rounded-2xl bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 text-cyan-electric font-black text-lg">
             {baba.name.charAt(0)}
@@ -127,7 +127,7 @@ const HeroBabaCard = ({ baba, onClick }) => {
             {baba.name}
           </h2>
           {(dayLabel || gameTime) && (
-            <p className="text-[11px] text-white/40 mt-0.5">
+            <p className="text-[11px] text-text-low mt-0.5">
               {dayLabel && <span>{dayLabel}</span>}
               {dayLabel && gameTime && <span className="mx-1">·</span>}
               {gameTime && <span>{gameTime}</span>}
@@ -169,7 +169,7 @@ const BabaListItem = ({ baba, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="w-full p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 flex justify-between items-center transition-all active:scale-95"
+      className="w-full p-4 rounded-2xl bg-surface-2 border border-border-subtle hover:border-border-mid flex justify-between items-center transition-all active:scale-95"
     >
       <div className="flex items-center gap-3">
         {baba.logo_url ? (
@@ -181,7 +181,7 @@ const BabaListItem = ({ baba, onClick }) => {
         )}
         <div className="text-left">
           <p className="font-black text-sm">{baba.name}</p>
-          <p className="text-[10px] text-white/40">
+          <p className="text-[10px] text-text-low">
             {dayLabel && <span>{dayLabel}</span>}
             {dayLabel && gameTime && <span className="mx-1">·</span>}
             {gameTime && <span>{gameTime}</span>}
@@ -194,7 +194,7 @@ const BabaListItem = ({ baba, onClick }) => {
         {confirmed && (
           <CheckCircle2 size={14} className="text-cyan-electric" />
         )}
-        <ArrowRight className="text-white/30" size={16} />
+        <ArrowRight className="text-text-low" size={16} />
       </div>
     </button>
   );
@@ -226,18 +226,18 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
     {/* Opções */}
     <div className="fixed bottom-44 right-5 z-[60] flex flex-col items-end gap-3">
       <div className="flex items-center gap-3">
-        <span className="text-[11px] text-white/60 font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-white/10">
+        <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
           Entrar com código
         </span>
         <button
           onClick={onJoin}
-          className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center active:scale-90 transition-transform"
+          className="w-12 h-12 rounded-full bg-surface-3 border border-border-strong flex items-center justify-center active:scale-90 transition-transform"
         >
           <LogIn size={18} className="text-white" />
         </button>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-[11px] text-white/60 font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-white/10">
+        <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
           Criar baba
         </span>
         <button
@@ -337,7 +337,7 @@ const HomePage = () => {
           {/* ── Demais babas (a partir do 2º) ── */}
           {restBabas.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-[10px] text-white/30 font-black uppercase tracking-widest px-1">
+              <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1">
                 Meus Babas ({myBabas.length})
               </h3>
               {myBabas.map((baba) => (
@@ -353,8 +353,8 @@ const HomePage = () => {
       )}
 
       {/* ── Join Box — sempre no final ── */}
-      <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-white/5">
-        <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+      <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-border-subtle">
+        <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
           Entrar com código
         </p>
         <input
@@ -362,7 +362,7 @@ const HomePage = () => {
           onChange={e => setInvite(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
           placeholder="AB12CD"
           maxLength={6}
-          className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl text-center tracking-widest font-black text-lg focus:border-cyan-electric/50 outline-none transition-colors"
+          className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl text-center tracking-widest font-black text-lg focus:border-cyan-electric/50 outline-none transition-colors"
         />
         <button
           onClick={handleJoin}
