@@ -46,10 +46,10 @@ const LandingPage = () => {
             {/* Divisor */}
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-white/10" />
+                <span className="w-full border-t border-border-mid" />
               </div>
               <div className="relative flex justify-center text-[9px] uppercase font-black tracking-[0.3em]">
-                <span className="bg-black px-4 text-white/20">
+                <span className="bg-black px-4 text-text-muted">
                   ou
                 </span>
               </div>
@@ -58,7 +58,7 @@ const LandingPage = () => {
             {/* Botão: Modo Visitante */}
             <button
               onClick={() => navigate('/visitor')}
-              className="w-full py-4 rounded-2xl font-black bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+              className="w-full py-4 rounded-2xl font-black bg-surface-2 border border-border-mid text-text-mid hover:text-white hover:bg-surface-3 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
             >
               <Zap size={18} />
               Modo Visitante (Sem Conta)
