@@ -97,7 +97,7 @@ const TeamsBlock = ({ currentMatch, navigate, isPresident }) => {
           <Swords size={13} className="text-cyan-electric" />
           <span className="text-[10px] font-black text-text-low uppercase tracking-widest">Times sorteados</span>
         </div>
-        <button onClick={() => navigate('/teams')} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
+        <button onClick={() => navigate('/draw')} className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors">
           Ver completo <ChevronRight size={10} />
         </button>
       </div>
@@ -129,11 +129,11 @@ const TeamsBlock = ({ currentMatch, navigate, isPresident }) => {
         </div>
       )}
       {isPresident ? (
-        <button onClick={() => navigate('/match')} className="w-full py-5 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all flex items-center justify-center gap-2 text-black" style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
+        <button onClick={() => navigate('/draw')} className="w-full py-5 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all flex items-center justify-center gap-2 text-black" style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
           <Play size={18} /> Iniciar Partida
         </button>
       ) : (
-        <button onClick={() => navigate('/teams')} className="w-full py-4 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all flex items-center justify-center gap-2 text-black" style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
+        <button onClick={() => navigate('/draw')} className="w-full py-4 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all flex items-center justify-center gap-2 text-black" style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
           <Play size={16} /> Ver Times
         </button>
       )}
