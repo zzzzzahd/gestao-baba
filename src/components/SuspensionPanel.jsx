@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 const POSITION_LABEL = {
   goleiro: 'Goleiro', linha: 'Linha', zagueiro: 'Zagueiro',
   lateral: 'Lateral', meia: 'Meia', atacante: 'Atacante',
+  fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
+};
+  lateral: 'Lateral', meia: 'Meia', atacante: 'Atacante',
 };
 
 // Retorna quantos dias até voltar (ou null se não suspenso)
