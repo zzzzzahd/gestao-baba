@@ -50,7 +50,7 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl"
+        className="w-full max-w-sm bg-[#0a0a0a] border border-border-mid rounded-[2.5rem] p-8 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Avatar + nome */}
@@ -63,7 +63,7 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           <h3 className="text-xl font-black uppercase italic text-white tracking-tighter">
             {player.display_name}
           </h3>
-          <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1">
+          <p className="text-[10px] text-text-low font-bold uppercase tracking-[0.2em] mt-1">
             Avaliação Técnica
           </p>
         </div>
@@ -87,7 +87,7 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
                 value={ratings[cat.id]}
                 onChange={e => setRatings(prev => ({ ...prev, [cat.id]: parseInt(e.target.value) }))}
               />
-              <div className="flex justify-between text-[8px] text-white/20 font-bold px-0.5">
+              <div className="flex justify-between text-[8px] text-text-muted font-bold px-0.5">
                 <span>Fraco</span><span>Médio</span><span>Elite</span>
               </div>
             </div>
@@ -99,7 +99,7 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           <button
             onClick={onClose}
             disabled={submitting}
-            className="py-4 rounded-2xl bg-white/5 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-colors disabled:opacity-50"
+            className="py-4 rounded-2xl bg-surface-2 text-text-low font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
