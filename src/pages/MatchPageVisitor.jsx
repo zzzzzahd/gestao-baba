@@ -13,10 +13,10 @@ const MatchPageVisitor = () => {
   // Tarefa 1.2 — substitui window.confirm()
   const [confirmExit, setConfirmExit] = useState(false);
   
-  // NOVA STATE: Para jogadores que ficaram na reserva individual.
+  // NOVA STATE: Para jogadores que ficaram na reserva individual
   const [reserves, setReserves] = useState([]);
 
-  // 1. Carregar times e reservas do localStorage.
+  // 1. Carregar times e reservas do localStorage
   useEffect(() => {
     const savedTeams = localStorage.getItem('temp_teams');
     const savedReserves = localStorage.getItem('temp_reserves');
@@ -132,7 +132,7 @@ const MatchPageVisitor = () => {
 
   if (!currentMatch) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white/20 uppercase font-black italic">
+      <div className="min-h-screen bg-black flex items-center justify-center text-text-muted uppercase font-black italic">
         Carregando Partida...
       </div>
     );
@@ -154,8 +154,8 @@ const MatchPageVisitor = () => {
         </div>
 
         {/* Placar Principal */}
-        <div className="card-glass p-8 border border-white/10 text-center relative overflow-hidden rounded-[2.5rem]">
-          <div className={`text-7xl font-black mb-6 font-mono tracking-tighter transition-colors ${
+        <div className="card-glass p-8 border border-border-mid text-center relative overflow-hidden rounded-[2.5rem]">
+          <div className={`text-7xl font-black mb-6 font-mono tabular-nums tracking-tighter transition-colors ${
             timer < 60 ? 'text-red-500' : 'text-white'
           }`}>
             {formatTime(timer)}
@@ -168,7 +168,7 @@ const MatchPageVisitor = () => {
               </p>
               <button 
                 onClick={() => setCurrentMatch({...currentMatch, scoreA: currentMatch.scoreA + 1})}
-                className="text-6xl font-black w-full py-6 bg-white/5 rounded-3xl border border-white/10 hover:bg-white/10 active:scale-90 transition-all shadow-inner"
+                className="text-6xl font-black w-full py-6 bg-surface-2 rounded-3xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all shadow-inner"
               >
                 {currentMatch.scoreA}
               </button>
@@ -182,7 +182,7 @@ const MatchPageVisitor = () => {
               </p>
               <button 
                 onClick={() => setCurrentMatch({...currentMatch, scoreB: currentMatch.scoreB + 1})}
-                className="text-6xl font-black w-full py-6 bg-white/5 rounded-3xl border border-white/10 hover:bg-white/10 active:scale-90 transition-all shadow-inner"
+                className="text-6xl font-black w-full py-6 bg-surface-2 rounded-3xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all shadow-inner"
               >
                 {currentMatch.scoreB}
               </button>
@@ -202,7 +202,7 @@ const MatchPageVisitor = () => {
 
           <button
             onClick={handleMatchEnd}
-            className="mt-3 w-full py-3 bg-white/5 border border-white/10 rounded-xl font-black text-xs uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all"
+            className="mt-3 w-full py-3 bg-surface-2 border border-border-mid rounded-xl font-black text-xs uppercase tracking-widest text-text-mid hover:text-white hover:bg-surface-3 transition-all"
           >
             Finalizar Partida
           </button>
@@ -214,7 +214,7 @@ const MatchPageVisitor = () => {
             <p className="text-[10px] font-black text-yellow-500 mb-2 uppercase tracking-widest">Reserva Individual (Sobras):</p>
             <div className="flex flex-wrap gap-2">
               {reserves.map((player, i) => (
-                <span key={i} className="text-[9px] font-bold bg-white/10 px-2 py-1 rounded border border-white/5 opacity-70">
+                <span key={i} className="text-[9px] font-bold bg-surface-3 px-2 py-1 rounded border border-border-subtle opacity-70">
                   {player.name}
                 </span>
               ))}
@@ -223,7 +223,7 @@ const MatchPageVisitor = () => {
         )}
 
         {/* Times Jogando Agora */}
-        <div className="card-glass p-4 border border-white/5 rounded-2xl">
+        <div className="card-glass p-4 border border-border-subtle rounded-2xl">
           <p className="text-[10px] font-black opacity-40 mb-3 uppercase tracking-widest">Jogando Agora:</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -258,7 +258,7 @@ const MatchPageVisitor = () => {
             Próximo na Fila:
           </h3>
           {allTeams.length > 2 ? (
-            <div className="bg-white/5 p-5 rounded-[1.5rem] border border-white/5 flex justify-between items-center">
+            <div className="bg-surface-2 p-5 rounded-[1.5rem] border border-border-subtle flex justify-between items-center">
               <span className="font-black text-sm text-cyan-electric italic uppercase">
                 {allTeams[2].name}
               </span>
@@ -270,22 +270,22 @@ const MatchPageVisitor = () => {
               )}
             </div>
           ) : (
-            <p className="text-[10px] opacity-20 text-center uppercase font-black py-4 border border-dashed border-white/10 rounded-2xl">
+            <p className="text-[10px] opacity-20 text-center uppercase font-black py-4 border border-dashed border-border-mid rounded-2xl">
               Apenas dois times em campo
             </p>
           )}
         </div>
 
         {/* Escalações de todos os times */}
-        <div className="space-y-4 pt-4 border-t border-white/5">
+        <div className="space-y-4 pt-4 border-t border-border-subtle">
           <h3 className="text-[10px] font-black opacity-30 italic px-2 uppercase tracking-[0.2em]">
             Escalações Gerais:
           </h3>
           <div className="grid grid-cols-1 gap-4">
             {allTeams.map((team, idx) => (
-              <div key={idx} className="card-glass p-5 rounded-[2rem] border border-white/5">
+              <div key={idx} className="card-glass p-5 rounded-[2rem] border border-border-subtle">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-black uppercase text-white/80 italic">{team.name}</span>
+                  <span className="text-xs font-black uppercase text-text-high italic">{team.name}</span>
                   {/* SEÇÃO DE STATUS DO TIME (Suplentes/Reserva) */}
                   <div className="flex gap-2">
                     {team.players.length < 5 && (
@@ -298,8 +298,8 @@ const MatchPageVisitor = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {team.players.map((p, i) => (
-                    <div key={i} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                      <div className={`w-1 h-1 rounded-full ${p.position === 'goleiro' ? 'bg-green-500' : 'bg-white/20'}`}></div>
+                    <div key={i} className="flex items-center gap-1 bg-surface-2 px-2 py-1 rounded-lg border border-border-subtle">
+                      <div className={`w-1 h-1 rounded-full ${p.position === 'goleiro' ? 'bg-green-500' : 'bg-surface-3'}`}></div>
                       <span className="text-[9px] font-bold uppercase opacity-60 tracking-tighter">{p.name}</span>
                     </div>
                   ))}
