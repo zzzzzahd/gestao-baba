@@ -18,10 +18,10 @@ const POSITION_OPTIONS = [
 ];
 
 const INPUT_CLASS =
-  'w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-bold text-white placeholder:text-white/20 focus:outline-none focus:border-cyan-electric/50 focus:bg-white/[0.07] transition-all disabled:opacity-50';
+  'w-full bg-surface-2 border border-border-mid rounded-2xl px-4 py-3.5 text-sm font-bold text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 focus:bg-white/[0.07] transition-all disabled:opacity-50';
 
 const FieldLabel = ({ icon, children }) => (
-  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">
+  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-low mb-2">
     {icon} {children}
   </label>
 );
@@ -86,10 +86,10 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
       {/* Email (readonly) */}
       <div>
         <FieldLabel icon={<Mail size={12} />}>Email</FieldLabel>
-        <div className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3.5 text-sm font-bold text-white/30 cursor-not-allowed">
+        <div className="w-full bg-surface-1 border border-border-subtle rounded-2xl px-4 py-3.5 text-sm font-bold text-text-low cursor-not-allowed">
           {profile?.email || '—'}
         </div>
-        <p className="text-[9px] text-white/20 mt-1 ml-1">Não pode ser alterado</p>
+        <p className="text-[9px] text-text-muted mt-1 ml-1">Não pode ser alterado</p>
       </div>
 
       {/* Idade */}
@@ -133,7 +133,7 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
       <div className="grid grid-cols-2 gap-3 pt-2">
         <button
           onClick={onCancel} disabled={saving}
-          className="py-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className="py-4 rounded-2xl bg-surface-2 border border-border-mid text-text-low font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <X size={14} /> Cancelar
         </button>
@@ -152,4 +152,3 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
 };
 
 export default ProfileEdit;
-
