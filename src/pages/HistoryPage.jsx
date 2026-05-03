@@ -28,7 +28,7 @@ const formatTime = (dateStr) => {
 const statusLabel = {
   finished:    { text: 'Finalizada',   color: 'text-green-400 bg-green-400/10 border-green-400/20'            },
   in_progress: { text: 'Em andamento', color: 'text-cyan-electric bg-cyan-electric/10 border-cyan-electric/20' },
-  scheduled:   { text: 'Agendada',     color: 'text-white/40 bg-white/5 border-white/10'                       },
+  scheduled:   { text: 'Agendada',     color: 'text-text-low bg-surface-2 border-border-mid'                       },
 };
 
 // ─── Card de partida ──────────────────────────────────────────────────────────
@@ -62,15 +62,15 @@ const MatchCard = ({ match }) => {
   const scorers = players.filter(p => p.goals > 0 || p.assists > 0);
 
   return (
-    <div className="rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden">
+    <div className="rounded-[2rem] border border-border-subtle bg-surface-1 overflow-hidden">
 
       {/* Header */}
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-[9px] text-white/30 font-black uppercase">
+          <div className="flex items-center gap-2 text-[9px] text-text-low font-black uppercase">
             <Calendar size={10} />
             <span>{formatDate(match.match_date)}</span>
-            <span className="text-white/10">·</span>
+            <span className="text-text-muted">·</span>
             <Clock size={10} />
             <span>{formatTime(match.match_date)}</span>
           </div>
@@ -82,25 +82,25 @@ const MatchCard = ({ match }) => {
         {/* Placar */}
         <div className="flex items-center justify-between gap-4">
           <div className={`flex-1 text-center p-3 rounded-2xl transition-all ${
-            winnerA ? 'bg-cyan-electric/10 border border-cyan-electric/20' : 'bg-white/5'
+            winnerA ? 'bg-cyan-electric/10 border border-cyan-electric/20' : 'bg-surface-2'
           }`}>
-            <p className={`text-[10px] font-black uppercase tracking-wide mb-1 ${winnerA ? 'text-cyan-electric' : 'text-white/50'}`}>
+            <p className={`text-[10px] font-black uppercase tracking-wide mb-1 ${winnerA ? 'text-cyan-electric' : 'text-text-mid'}`}>
               {match.team_a_name}{winnerA && <span className="ml-1">👑</span>}
             </p>
-            <p className={`text-4xl font-black font-mono ${winnerA ? 'text-cyan-electric' : 'text-white/60'}`}>
+            <p className={`text-4xl font-black font-mono ${winnerA ? 'text-cyan-electric' : 'text-text-mid'}`}>
               {scoreA}
             </p>
           </div>
 
-          <div className="text-white/20 font-black text-sm italic">VS</div>
+          <div className="text-text-muted font-black text-sm italic">VS</div>
 
           <div className={`flex-1 text-center p-3 rounded-2xl transition-all ${
-            winnerB ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/5'
+            winnerB ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-surface-2'
           }`}>
-            <p className={`text-[10px] font-black uppercase tracking-wide mb-1 ${winnerB ? 'text-yellow-500' : 'text-white/50'}`}>
+            <p className={`text-[10px] font-black uppercase tracking-wide mb-1 ${winnerB ? 'text-yellow-500' : 'text-text-mid'}`}>
               {match.team_b_name}{winnerB && <span className="ml-1">👑</span>}
             </p>
-            <p className={`text-4xl font-black font-mono ${winnerB ? 'text-yellow-500' : 'text-white/60'}`}>
+            <p className={`text-4xl font-black font-mono ${winnerB ? 'text-yellow-500' : 'text-text-mid'}`}>
               {scoreB}
             </p>
           </div>
@@ -112,7 +112,7 @@ const MatchCard = ({ match }) => {
             <img
               src={match.winner_photo_url}
               alt="Time vencedor"
-              className="w-full rounded-2xl object-cover max-h-48 border border-white/10"
+              className="w-full rounded-2xl object-cover max-h-48 border border-border-mid"
             />
           </div>
         )}
@@ -120,7 +120,7 @@ const MatchCard = ({ match }) => {
         {/* Expandir */}
         <button
           onClick={loadPlayers}
-          className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-[9px] font-black uppercase text-white/30 hover:text-cyan-electric transition-colors"
+          className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-[9px] font-black uppercase text-text-low hover:text-cyan-electric transition-colors"
         >
           {loadingPlayers
             ? <div className="w-3 h-3 border-2 border-cyan-electric border-t-transparent rounded-full animate-spin" />
@@ -133,12 +133,12 @@ const MatchCard = ({ match }) => {
 
       {/* Detalhes expandidos */}
       {open && players.length > 0 && (
-        <div className="border-t border-white/5 p-5 space-y-5 bg-black/20">
+        <div className="border-t border-border-subtle p-5 space-y-5 bg-black/20">
 
           {/* Gols & Assistências */}
           {scorers.length > 0 && (
             <div>
-              <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-3">
+              <p className="text-[9px] font-black text-text-low uppercase tracking-widest mb-3">
                 ⚽ Gols & Assistências
               </p>
               <div className="space-y-2">
@@ -178,9 +178,9 @@ const MatchCard = ({ match }) => {
                   {list.map((p, i) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                        p.player?.position === 'goleiro' ? 'bg-green-500' : 'bg-white/20'
+                        p.player?.position === 'goleiro' ? 'bg-green-500' : 'bg-surface-3'
                       }`} />
-                      <span className="text-[10px] text-white/60 truncate">{p.player?.name}</span>
+                      <span className="text-[10px] text-text-mid truncate">{p.player?.name}</span>
                     </div>
                   ))}
                 </div>
@@ -260,13 +260,13 @@ const HistoryPage = () => {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-surface-2 border border-border-mid flex items-center justify-center"
           >
             <ArrowLeft size={18} />
           </button>
           <div>
             <h1 className="text-2xl font-black uppercase italic tracking-tighter">Histórico</h1>
-            <p className="text-[10px] text-white/30 uppercase font-black">{currentBaba?.name}</p>
+            <p className="text-[10px] text-text-low uppercase font-black">{currentBaba?.name}</p>
           </div>
         </div>
 
@@ -277,16 +277,16 @@ const HistoryPage = () => {
             { label: 'Finalizadas', value: stats.finished, icon: <Trophy size={14} />   },
             { label: 'Gols',        value: stats.goals,    icon: <Target size={14} />   },
           ].map(s => (
-            <div key={s.label} className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
+            <div key={s.label} className="p-4 rounded-2xl bg-surface-2 border border-border-subtle text-center">
               <div className="flex justify-center text-cyan-electric/60 mb-2">{s.icon}</div>
               <p className="text-2xl font-black text-white">{s.value}</p>
-              <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mt-1">{s.label}</p>
+              <p className="text-[8px] font-black text-text-low uppercase tracking-widest mt-1">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Filtros */}
-        <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid">
           {[
             { id: 'all',      label: 'Todas'       },
             { id: 'finished', label: 'Finalizadas' },
@@ -298,7 +298,7 @@ const HistoryPage = () => {
               className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
                 filter === f.id
                   ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
-                  : 'text-white/40 hover:text-white'
+                  : 'text-text-low hover:text-white'
               }`}
             >
               {f.label}
@@ -317,7 +317,7 @@ const HistoryPage = () => {
                 <button
                   onClick={() => setPage(p => p + 1)}
                   disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
+                  className="w-full py-4 rounded-2xl bg-surface-2 border border-border-mid text-text-low font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 transition-all disabled:opacity-50"
                 >
                   {loading ? 'Carregando...' : 'Carregar mais'}
                 </button>
@@ -325,10 +325,10 @@ const HistoryPage = () => {
             </>
           ) : (
             // Estado vazio com CTA contextual
-            <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl">
-              <Calendar size={32} className="text-white/10 mx-auto mb-3" />
-              <p className="text-white/20 font-black uppercase text-sm">Nenhuma partida encontrada</p>
-              <p className="text-white/10 text-[10px] mt-1">
+            <div className="text-center py-20 border-2 border-dashed border-border-subtle rounded-3xl">
+              <Calendar size={32} className="text-text-muted mx-auto mb-3" />
+              <p className="text-text-muted font-black uppercase text-sm">Nenhuma partida encontrada</p>
+              <p className="text-text-muted text-[10px] mt-1">
                 {filter === 'month'
                   ? 'Nenhuma partida este mês ainda'
                   : filter === 'finished'
