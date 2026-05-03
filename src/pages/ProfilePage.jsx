@@ -97,7 +97,7 @@ const ProfilePage = () => {
       <div className="max-w-xl mx-auto px-6 space-y-6 mt-4">
 
         {/* Tabs */}
-        <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid">
           {[
             { id: 'stats', label: 'Estatísticas'  },
             { id: 'edit',  label: 'Editar Perfil' },
@@ -108,7 +108,7 @@ const ProfilePage = () => {
               className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
                 tab === t.id
                   ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
-                  : 'text-white/40 hover:text-white'
+                  : 'text-text-low hover:text-white'
               }`}
             >
               {t.label}
