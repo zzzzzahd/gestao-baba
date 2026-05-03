@@ -4,12 +4,17 @@ import { User, Mail, Calendar, Target, Heart, Save, X, RefreshCw } from 'lucide-
 import toast from 'react-hot-toast';
 
 const POSITION_OPTIONS = [
+  // Society / Futebol de campo
   { value: 'goleiro',  label: 'Goleiro'  },
   { value: 'zagueiro', label: 'Zagueiro' },
   { value: 'lateral',  label: 'Lateral'  },
   { value: 'meia',     label: 'Meia'     },
   { value: 'atacante', label: 'Atacante' },
   { value: 'linha',    label: 'Linha'    },
+  // Futsal
+  { value: 'fixo',     label: 'Fixo'     },
+  { value: 'ala',      label: 'Ala'      },
+  { value: 'pivo',     label: 'Pivô'     },
 ];
 
 const INPUT_CLASS =
