@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HelpCircle, X } from 'lucide-react';
 
-const Tooltip = ({ title, text, iconSize = 13, iconClassName = 'text-white/20 hover:text-cyan-electric' }) => {
+const Tooltip = ({ title, text, iconSize = 13, iconClassName = 'text-text-muted hover:text-cyan-electric' }) => {
   const [open, setOpen]   = useState(false);
   const ref               = useRef(null);
 
@@ -50,7 +50,7 @@ const Tooltip = ({ title, text, iconSize = 13, iconClassName = 'text-white/20 ho
             {/* Botão fechar */}
             <button
               onClick={() => setOpen(false)}
-              className="absolute top-2.5 right-2.5 text-white/20 hover:text-white/60 transition-colors"
+              className="absolute top-2.5 right-2.5 text-text-muted hover:text-text-mid transition-colors"
             >
               <X size={11} />
             </button>
@@ -60,7 +60,7 @@ const Tooltip = ({ title, text, iconSize = 13, iconClassName = 'text-white/20 ho
                 {title}
               </p>
             )}
-            <p className="text-[11px] text-white/50 font-medium leading-relaxed">
+            <p className="text-[11px] text-text-mid font-medium leading-relaxed">
               {text}
             </p>
           </div>
