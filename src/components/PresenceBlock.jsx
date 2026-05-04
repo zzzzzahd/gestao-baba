@@ -83,14 +83,28 @@ const PresenceBlock = ({
               </button>
             </div>
           ) : (
-            /* Ainda não confirmou → botão principal */
+            /* Ainda não confirmou → botão principal com microinteração */
             <button
-              onClick={confirmPresence}
+              onClick={() => {
+                if (navigator.vibrate) navigator.vibrate(40);
+                confirmPresence();
+              }}
               disabled={loading}
-              className="w-full py-5 rounded-2xl text-black font-black uppercase italic tracking-tighter shadow-lg active:scale-95 transition-all disabled:opacity-50"
+              className="w-full py-5 rounded-2xl text-black font-black uppercase italic tracking-tighter shadow-lg active:scale-95 transition-all duration-150 disabled:opacity-50 relative overflow-hidden"
               style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
             >
-              {loading ? 'Confirmando...' : '✓ Confirmar Presença'}
+              <span className={`flex items-center justify-center gap-2 transition-all duration-200 ${loading ? 'opacity-0' : 'opacity-100'}`}>
+                ✓ Confirmar Presença
+              </span>
+              {loading && (
+                <span className="absolute inset-0 flex items-center justify-center gap-2 animate-check-pop">
+                  <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Confirmando...
+                </span>
+              )}
             </button>
           )}
         </div>
