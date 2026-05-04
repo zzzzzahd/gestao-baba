@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Copy, Share2, RefreshCw } from 'lucide-react';
+import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { DAY_FULL } from '../../utils/constants';
 import PresenceBlock   from '../../components/PresenceBlock';
 import DrawConfigBlock from '../../components/DrawConfigBlock';
@@ -58,6 +58,7 @@ const TabOverview = ({
   loading,
   inviteExpiry,
   handleCopyCode,
+  copied,
   generateInviteCode,
   onShowQR,
 }) => {
@@ -133,8 +134,12 @@ const TabOverview = ({
               <span className="flex-1 text-sm font-black tracking-[0.3em] text-white text-center">
                 {currentBaba.invite_code}
               </span>
-              <button onClick={handleCopyCode} className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric hover:text-black transition-all">
-                <Copy size={13} />
+              <button onClick={handleCopyCode} className={`p-2 rounded-xl border transition-all duration-300 ${
+                copied
+                  ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                  : 'bg-cyan-electric/10 border-cyan-electric/20 text-cyan-electric hover:bg-cyan-electric hover:text-black'
+              }`}>
+                {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
               </button>
               <button onClick={onShowQR} className="p-2 bg-surface-2 border border-border-subtle rounded-xl text-text-low hover:text-white transition-all">
                 <Share2 size={13} />
