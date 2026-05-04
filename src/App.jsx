@@ -21,6 +21,7 @@ import DrawPage         from './pages/DrawPage';
 // Componentes globais
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
+import PageWrapper   from './components/PageWrapper';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
@@ -58,16 +59,16 @@ const AppInner = () => {
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
 
         {/* Protegidas */}
-        <Route path="/home"      element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/create"    element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
-        <Route path="/profile"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/rankings"  element={<ProtectedRoute><RankingsPage /></ProtectedRoute>} />
-        <Route path="/financial" element={<ProtectedRoute><FinancialPage /></ProtectedRoute>} />
-        <Route path="/history"   element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+        <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><PageWrapper><DashboardPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/create"    element={<ProtectedRoute><PageWrapper><CreatePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/profile"   element={<ProtectedRoute><PageWrapper><ProfilePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/rankings"  element={<ProtectedRoute><PageWrapper><RankingsPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/financial" element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/history"   element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
 
-        {/* Wizard de sorteio — rota unificada (Fase 2) */}
-        <Route path="/draw" element={<ProtectedRoute><DrawPage /></ProtectedRoute>} />
+        {/* Wizard de sorteio */}
+        <Route path="/draw" element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
 
         {/* Redirects de rotas legadas */}
         <Route path="/teams" element={<Navigate to="/draw" replace />} />
