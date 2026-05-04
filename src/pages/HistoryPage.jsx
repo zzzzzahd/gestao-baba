@@ -6,8 +6,10 @@ import {
   ArrowLeft, Calendar, Trophy, Target,
   ChevronDown, ChevronUp, Clock,
 } from 'lucide-react';
-import { MatchCardSkeleton } from '../components/SkeletonLoader';
-import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
+import { MatchCardSkeleton }      from '../components/SkeletonLoader';
+import { toastErrorWithRetry }    from '../utils/toastUtils.jsx';
+import { usePullToRefresh }       from '../hooks/usePullToRefresh';
+import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,7 +212,6 @@ const HistoryPage = () => {
   const loadMatches = useCallback(async (reset = false) => {
     if (!currentBaba?.id) return;
     setLoading(true);
-
     const currentPage = reset ? 0 : page;
     if (reset) setPage(0);
 
@@ -246,6 +247,12 @@ const HistoryPage = () => {
 
   useEffect(() => { if (page > 0) loadMatches(false); }, [page]);
 
+  // Tarefa 4.2 — Pull-to-refresh
+  const { pulling, pullY, refreshing, progress } = usePullToRefresh(
+    async () => { setMatches([]); await loadMatches(true); },
+    { disabled: loading },
+  );
+
   const stats = {
     total:    matches.length,
     finished: matches.filter(m => m.status === 'finished').length,
@@ -254,6 +261,7 @@ const HistoryPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-28">
+      <PullToRefreshIndicator pulling={pulling} pullY={pullY} refreshing={refreshing} progress={progress} />
       <div className="max-w-xl mx-auto space-y-6">
 
         {/* Header */}
