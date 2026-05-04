@@ -110,10 +110,15 @@ const DashboardPage = () => {
   }, [currentBaba?.invite_expires_at]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
+  const [copied, setCopied] = useState(false);
+
   const handleCopyCode = () => {
     if (!currentBaba?.invite_code) return;
     navigator.clipboard.writeText(currentBaba.invite_code);
+    if (navigator.vibrate) navigator.vibrate(30);
+    setCopied(true);
     toast.success('Código copiado!');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleUpload = async (e, type) => {
@@ -301,6 +306,7 @@ const DashboardPage = () => {
                 loading={loading}
                 inviteExpiry={inviteExpiry}
                 handleCopyCode={handleCopyCode}
+                copied={copied}
                 generateInviteCode={generateInviteCode}
                 onShowQR={() => setShowQRCode(true)}
               />
