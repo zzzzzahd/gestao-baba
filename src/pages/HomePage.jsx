@@ -10,6 +10,8 @@ import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 // Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
+import { usePullToRefresh }       from '../hooks/usePullToRefresh';
+import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 
 // ─── Countdown hook inline ─────────────────────────────────────────────────────
 // Recebe índice do dia da semana (0=Dom) + horário "HH:MM" e retorna string
@@ -256,11 +258,10 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
 const HomePage = () => {
   const navigate  = useNavigate();
   const { profile } = useAuth();
-  const { myBabas, setCurrentBaba, joinBaba, loading } = useBaba();
+  const { myBabas, setCurrentBaba, joinBaba, loading, syncData } = useBaba();
 
   const [invite, setInvite]     = useState('');
   const [fabOpen, setFabOpen]   = useState(false);
-  // Tarefa 1.4 — feedback visual no botão de join
   const [joining, setJoining]   = useState(false);
 
   const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
@@ -269,6 +270,12 @@ const HomePage = () => {
   const hasBabas  = myBabas?.length > 0;
 
   const joinBoxRef = useRef(null);
+
+  // Tarefa 4.2 — Pull-to-refresh
+  const { pulling, pullY, refreshing, progress } = usePullToRefresh(
+    async () => { await syncData?.(); },
+    { disabled: loading },
+  );
 
   const handleJoin = async () => {
     const code = invite.trim().toUpperCase();
@@ -308,7 +315,7 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white px-5 pt-6 pb-32 space-y-5">
-
+      <PullToRefreshIndicator pulling={pulling} pullY={pullY} refreshing={refreshing} progress={progress} />
       {/* ── Topo compacto ── */}
       <div className="flex items-center justify-between">
         <Logo size="small" />
