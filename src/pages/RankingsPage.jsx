@@ -391,10 +391,10 @@ const RankingsPage = () => {
             )}
           </>
         ) : (
-          <div className="text-center py-20 border-2 border-dashed border-border-subtle rounded-3xl">
-            <Trophy size={32} className="text-text-muted mx-auto mb-4" />
-            <p className="text-text-muted font-black uppercase text-sm">Nenhum dado ainda</p>
-            <p className="text-text-muted text-[10px] mt-2 uppercase">
+          <div className="text-center py-14 border border-dashed border-border-mid rounded-3xl space-y-4 px-6">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center mx-auto"><Trophy size={28} className="text-cyan-electric/50" /></div>
+            <p className="text-text-low font-black uppercase text-sm">Sem dados de ranking</p>
+            <p className="text-text-muted text-[10px] mt-1 font-bold leading-relaxed">
               Joga o primeiro baba pra começar a contagem!
             </p>
           </div>
