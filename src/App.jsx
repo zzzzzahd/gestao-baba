@@ -17,6 +17,7 @@ import DashboardPage    from './pages/DashboardPage';
 import CreatePage       from './pages/CreatePage';
 import HistoryPage      from './pages/HistoryPage';
 import DrawPage         from './pages/DrawPage';
+import PrivacyPage      from './pages/PrivacyPage';
 
 // Componentes globais
 import BottomNav     from './components/BottomNav';
@@ -57,6 +58,7 @@ const AppInner = () => {
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
+        <Route path="/privacidade"   element={<PrivacyPage />} />
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
