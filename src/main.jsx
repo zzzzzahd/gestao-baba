@@ -2,12 +2,26 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/global.css';
+import * as Sentry from '@sentry/react';
 
-// ─── MON-001: Sentry — Error Tracking em Produção ─────────────────────────
-// Instalar: npm install @sentry/react
-// Configurar VITE_SENTRY_DSN no .env e no painel da Vercel
-// Documentação: https://docs.sentry.io/platforms/javascript/guides/react/
-
+// ─── Sentry — Monitoramento de erros em produção (Sprint 10.5 Fase B) ────────
+// Configurar VITE_SENTRY_DSN nas env vars do Vercel antes de ativar.
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn:         import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.MODE,
+    // Não enviar dados pessoais (LGPD)
+    beforeSend(event) {
+      if (event.user) {
+        delete event.user.email;
+        delete event.user.ip_address;
+      }
+      return event;
+    },
+    // Capturar apenas erros, não performance em dev
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 0,
+  });
+}
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
 if (SENTRY_DSN && import.meta.env.PROD) {
