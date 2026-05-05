@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { CYAN_GRADIENT } from '../utils/constants';
+import { maskPix } from '../utils/securityUtils';
 
 const FinancialPage = () => {
   const navigate = useNavigate();
@@ -269,7 +270,7 @@ const FinancialPage = () => {
                       </span>
                       {/* Chave PIX: neutro (era green-500/50) */}
                       <span className="text-[9px] font-black text-text-low uppercase italic tracking-widest font-mono">
-                        PIX: {f.pix_key}
+                        PIX: {maskPix(f.pix_key)}
                       </span>
                     </div>
                   </div>
