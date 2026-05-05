@@ -6,6 +6,141 @@ import Logo from '../components/Logo';
 const LoginPage = () => {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
+  const [isLogin, setIsLogin]   = useState(true);
+  const [loading, setLoading]   = useState(false);
+  const [consent, setConsent]   = useState(false); // LGPD
+  const [formData, setFormData] = useState({ email: '', password: '', name: '' });
+
+  useEffect(() => {
+    if (user) navigate('/home');
+  }, [user, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isLogin && !consent) return; // bloquear sem consentimento
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const { error } = await signIn(formData.email, formData.password);
+        if (error) setLoading(false);
+      } else {
+        const { error } = await signUp(formData.email, formData.password, {
+          name:           formData.name,
+          consent_at:     new Date().toISOString(),
+          consent_version:'1.0',
+        });
+        if (!error) {
+          setIsLogin(true);
+          setFormData({ email: '', password: '', name: '' });
+          setConsent(false);
+        }
+        setLoading(false);
+      }
+    } catch {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-5 bg-black">
+      <div className="w-full max-w-md">
+        <div className="mb-16">
+          <Logo size="large" />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <input
+              type="text" name="name" placeholder="Nome completo"
+              value={formData.name} onChange={handleChange} required
+              className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
+            />
+          )}
+
+          <input
+            type="email" name="email" placeholder="Email"
+            value={formData.email} onChange={handleChange} required
+            className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
+          />
+
+          <input
+            type="password" name="password" placeholder="Senha (mínimo 8 caracteres)"
+            value={formData.password} onChange={handleChange} required minLength={8}
+            className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
+          />
+
+          {/* Consentimento LGPD — só no cadastro */}
+          {!isLogin && (
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={e => setConsent(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${
+                  consent
+                    ? 'bg-cyan-electric border-cyan-electric'
+                    : 'bg-transparent border-border-strong group-hover:border-cyan-electric/50'
+                }`}>
+                  {consent && (
+                    <svg className="w-3 h-3 text-black" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-[11px] text-text-low leading-relaxed">
+                Li e aceito a{' '}
+                <button
+                  type="button"
+                  onClick={() => navigate('/privacidade')}
+                  className="text-cyan-electric underline hover:text-white transition-colors"
+                >
+                  Política de Privacidade
+                </button>
+                {' '}e autorizo o uso dos meus dados para funcionamento do Draft Play.
+              </span>
+            </label>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || (!isLogin && !consent)}
+            className="w-full p-4 bg-cyan-electric text-black font-bold rounded-xl hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {loading ? 'Aguarde...' : isLogin ? 'ENTRAR' : 'CRIAR CONTA'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setIsLogin(!isLogin); setConsent(false); }}
+            className="w-full p-2 text-cyan-electric text-sm hover:text-cyan-300 transition-colors"
+          >
+            {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="w-full p-2 text-text-mid text-sm hover:text-white transition-colors"
+          >
+            ← Voltar
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default LoginPage;
+
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const { signIn, signUp, user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
