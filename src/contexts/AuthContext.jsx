@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import { touchSession, isSessionExpired, clearSessionData } from '../utils/securityUtils';
 
 // BUG-003 FIX: O schema original criava a tabela como "users",
 // mas todo o código de aplicação usa "profiles".
@@ -55,8 +56,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const currentUser = session?.user ?? null;
+
+      // Session timeout: logout por inatividade após 7 dias
+      if (currentUser && isSessionExpired()) {
+        await supabase.auth.signOut();
+        clearSessionData();
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        toast.error('Sessão expirada. Faça login novamente.');
+        return;
+      }
+
+      if (currentUser) touchSession();
       setUser(currentUser);
       if (currentUser) loadProfile(currentUser.id);
       setLoading(false);
@@ -64,12 +78,22 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
+      if (currentUser) touchSession();
       setUser(currentUser);
       if (currentUser) loadProfile(currentUser.id);
       else setProfile(null);
     });
 
-    return () => subscription.unsubscribe();
+    // Atualizar última atividade em interações do usuário
+    const handleActivity = () => touchSession();
+    window.addEventListener('click',     handleActivity, { passive: true });
+    window.addEventListener('touchstart', handleActivity, { passive: true });
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('click',     handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+    };
   }, [loadProfile]);
 
   const signUp = async (email, password, metadata = {}) => {
@@ -83,12 +107,14 @@ export const AuthProvider = ({ children }) => {
 
       if (data.user) {
         const { error: profileError } = await supabase
-          .from(PROFILE_TABLE)  // BUG-003 FIX
+          .from(PROFILE_TABLE)
           .insert([{
-            id:         data.user.id,
-            email:      email,
-            name:       metadata.name || email.split('@')[0],
-            created_at: new Date().toISOString(),
+            id:              data.user.id,
+            email:           email,
+            name:            metadata.name || email.split('@')[0],
+            created_at:      new Date().toISOString(),
+            consent_at:      metadata.consent_at || new Date().toISOString(),
+            consent_version: metadata.consent_version || '1.0',
           }]);
         if (profileError) console.error('[AuthContext] criar perfil:', profileError);
       }
