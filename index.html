@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Draft Play - Gestão de Baba</title>
 
+    <!-- ── Segurança (Sprint 10.5 Fase B) ── -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' https://plausible.io;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://o*.ingest.sentry.io;
+      frame-ancestors 'none';
+      base-uri 'self';
+      form-action 'self';
+    ">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
     <!-- PWA Essencial -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#00f2ff" />
