@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Trophy, Target, Award, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2 } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
+import ShareableCardModal from '../components/ShareableCardModal';
 
 // ─── Pódio ────────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,7 @@ const RankingsPage = () => {
   const [rankings,     setRankings]     = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [showSelector, setShowSelector] = useState(false);
+  const [showShare,    setShowShare]    = useState(false);
 
   // Player do usuário logado dentro do baba atual
   const myPlayer = useMemo(
@@ -232,6 +234,18 @@ const RankingsPage = () => {
   const myRankData = myRankIndex >= 0 ? rankings[myRankIndex] : null;
   const showFooter = myRankData !== null && rankings.length > 0;
 
+  // Dados normalizados para o ShareableCardModal
+  const shareRankingData = rankings.map(p => ({
+    id:        p.id,
+    name:      p.name,
+    avatar_url: p.avatar_url,
+    count:     activeTab === 'artilheiros' ? p.goals : activeTab === 'garcons' ? p.assists : p.total,
+  }));
+
+  const shareRankingType =
+    activeTab === 'artilheiros' ? 'gols' :
+    activeTab === 'garcons'     ? 'assistencias' : 'mvp';
+
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-40">
       <div className="max-w-4xl mx-auto space-y-5">
@@ -277,7 +291,16 @@ const RankingsPage = () => {
               </p>
             ) : null}
           </div>
-          <div className="w-10" />
+
+          {/* Botão compartilhar */}
+          <button
+            onClick={() => setShowShare(true)}
+            disabled={!rankings.length}
+            className="p-2 hover:bg-surface-3 rounded-full transition-colors disabled:opacity-30"
+            title="Compartilhar ranking"
+          >
+            <Share2 size={20} className="text-cyan-electric" />
+          </button>
         </div>
 
         {/* Filtro de período */}
@@ -413,6 +436,16 @@ const RankingsPage = () => {
           />
         );
       })()}
+
+      {/* Modal de compartilhamento */}
+      <ShareableCardModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        rankingType={shareRankingType}
+        rankingData={shareRankingData}
+        babaName={currentBaba?.name || 'Baba'}
+        babaLogo={currentBaba?.logo_url}
+      />
     </div>
   );
 };
