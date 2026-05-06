@@ -2,6 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Hub central do baba. Fase 3: 3 abas com lazy loading + query param.
 // Aba 1 — Visão Geral | Aba 2 — Gestão | Aba 3 — Pós-jogo
+// Sprint 9: passa reloadConfirmations para TabOverview
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
@@ -67,7 +68,7 @@ const DashboardPage = () => {
     generateInviteCode, nextGameDay, uploadBabaImage,
     countdown, ratePlayer, getAllRatings,
     gameConfirmations, myConfirmation, canConfirm,
-    confirmPresence, cancelConfirmation,
+    confirmPresence, cancelConfirmation, reloadConfirmations, // ← Sprint 9
     drawConfig, setDrawConfig, isDrawing, currentMatch,
   } = useBaba();
 
@@ -300,6 +301,7 @@ const DashboardPage = () => {
                 canConfirm={canConfirm}
                 confirmPresence={confirmPresence}
                 cancelConfirmation={cancelConfirmation}
+                reloadConfirmations={reloadConfirmations} // ← Sprint 9
                 drawConfig={drawConfig}
                 setDrawConfig={setDrawConfig}
                 isDrawing={isDrawing}
