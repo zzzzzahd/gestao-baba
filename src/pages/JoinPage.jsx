@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase } from '../services/supabase';
 
 export default function JoinPage() {
   const { code } = useParams();
