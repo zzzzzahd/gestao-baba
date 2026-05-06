@@ -154,7 +154,6 @@ export const BabaProvider = ({ children }) => {
   const hasAutoDrawnRef = useRef(false);
 
   // BUG-007 FIX: ref estável para o último resultado de ratings
-  // evita re-renders em cascata quando DashboardPage usa getAllRatings em useEffect
   const lastRatingsResultRef = useRef([]);
 
   // ─────────────────────────────────────────────
@@ -181,7 +180,6 @@ export const BabaProvider = ({ children }) => {
         position: r.player?.position || 'linha',
       }));
 
-      // BUG-007 FIX: só atualiza ref se o conteúdo mudou (comparação por JSON)
       const serialized = JSON.stringify(result);
       if (serialized !== JSON.stringify(lastRatingsResultRef.current)) {
         lastRatingsResultRef.current = result;
@@ -192,7 +190,7 @@ export const BabaProvider = ({ children }) => {
       console.error('[getAllRatings]', e);
       return [];
     }
-  }, [currentBaba?.id]); // BUG-007 FIX: dep é só o ID, não o objeto inteiro
+  }, [currentBaba?.id]);
 
   const ratePlayer = useCallback(async (ratedId, ratings) => {
     if (!user || !currentBaba) return;
@@ -317,7 +315,8 @@ export const BabaProvider = ({ children }) => {
   };
 
   // ─────────────────────────────────────────────
-  // CONFIRMAÇÃO DE PRESENÇA
+  // CONFIRMAÇÃO DE PRESENÇA — Sprint 9
+  // Suporta status 'confirmed' e 'waitlist' com base no max_players do baba
   // ─────────────────────────────────────────────
 
   const confirmPresence = async () => {
@@ -326,31 +325,94 @@ export const BabaProvider = ({ children }) => {
     try {
       const myPlayer = players.find(p => p.user_id === user.id);
       if (!myPlayer) throw new Error('Jogador não encontrado');
+
+      // Conta confirmados (status = 'confirmed') para determinar se vai para waitlist
+      const confirmedCount = gameConfirmations.filter(c => c.status === 'confirmed').length;
+      const maxPlayers     = currentBaba.max_players ?? 999;
+      const isWaitlist     = confirmedCount >= maxPlayers;
+
+      // Posição na fila (só relevante se for waitlist)
+      const waitlistCount = isWaitlist
+        ? gameConfirmations.filter(c => c.status === 'waitlist').length
+        : null;
+
       const { data, error } = await supabase
         .from('game_confirmations')
-        .insert([{ baba_id: currentBaba.id, player_id: myPlayer.id, game_date: nextGameDay.dateStr }])
+        .insert([{
+          baba_id:   currentBaba.id,
+          player_id: myPlayer.id,
+          game_date: nextGameDay.dateStr,
+          status:    isWaitlist ? 'waitlist' : 'confirmed',
+          position:  isWaitlist ? waitlistCount + 1 : null,
+        }])
         .select('*, player:players(*)')
         .single();
+
       if (error) throw error;
+
       setGameConfirmations(prev => [...prev, data]);
       setMyConfirmation(data);
-      toast.success('Presença confirmada!');
-    } catch (error) { toast.error('Erro ao confirmar'); }
-    finally { setLoading(false); }
+
+      if (isWaitlist) {
+        toast(`Você entrou na lista de espera (${waitlistCount + 1}º)`, { icon: '⏳' });
+      } else {
+        toast.success('Presença confirmada! ✅');
+      }
+    } catch (error) {
+      console.error('[confirmPresence]', error);
+      toast.error('Erro ao confirmar');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const cancelConfirmation = async () => {
     if (!myConfirmation) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from('game_confirmations').delete().eq('id', myConfirmation.id);
+      // Atualiza status para 'cancelled' em vez de deletar
+      // → trigger promote_waitlist no banco promove o próximo da fila automaticamente
+      const { error } = await supabase
+        .from('game_confirmations')
+        .update({ status: 'cancelled' })
+        .eq('id', myConfirmation.id);
+
       if (error) throw error;
-      setGameConfirmations(prev => prev.filter(c => c.id !== myConfirmation.id));
+
+      // Recarrega confirmações para refletir a promoção automática do banco
+      const { data: fresh } = await supabase
+        .from('game_confirmations')
+        .select('*, player:players(*)')
+        .eq('baba_id', currentBaba.id)
+        .eq('game_date', nextGameDay.dateStr)
+        .neq('status', 'cancelled');
+
+      setGameConfirmations(fresh || []);
       setMyConfirmation(null);
       toast.success('Presença cancelada');
-    } catch (error) { toast.error('Erro ao cancelar'); }
-    finally { setLoading(false); }
+    } catch (error) {
+      console.error('[cancelConfirmation]', error);
+      toast.error('Erro ao cancelar');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Recarregar confirmações (chamado pelo WaitlistPanel após promoção manual)
+  const reloadConfirmations = useCallback(async () => {
+    if (!currentBaba || !nextGameDay) return;
+    const { data } = await supabase
+      .from('game_confirmations')
+      .select('*, player:players(*)')
+      .eq('baba_id', currentBaba.id)
+      .eq('game_date', nextGameDay.dateStr)
+      .neq('status', 'cancelled');
+
+    const fresh = data || [];
+    setGameConfirmations(fresh);
+    const myP = players.find(p => p.user_id === user?.id);
+    setMyConfirmation(myP ? fresh.find(c => c.player_id === myP.id) || null : null);
+  }, [currentBaba?.id, nextGameDay?.dateStr, players, user?.id]);
 
   // ─────────────────────────────────────────────
   // CRUD
@@ -587,7 +649,11 @@ export const BabaProvider = ({ children }) => {
     setIsDrawing(true);
     try {
       const dateStr   = nextGameDay.dateStr;
-      const confirmed = gameConfirmations.map(c => c?.player).filter(p => p && p.id);
+      // Sprint 9: usa apenas confirmados (não waitlist) para o sorteio
+      const confirmed = gameConfirmations
+        .filter(c => c.status === 'confirmed')
+        .map(c => c?.player)
+        .filter(p => p && p.id);
 
       if (confirmed.length < drawConfig.playersPerTeam * 2) {
         setDrawStatus('insufficient');
@@ -622,7 +688,6 @@ export const BabaProvider = ({ children }) => {
         .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
 
       if (!existingMatch) {
-        // BUG-001 FIX: match_date como TIMESTAMP, não DATE
         const gameTimeStr = nextGameDay.time?.substring(0, 5) || '20:00';
         const matchDatetime = `${dateStr}T${gameTimeStr}:00`;
 
@@ -635,12 +700,11 @@ export const BabaProvider = ({ children }) => {
           status:         'scheduled',
         }]).select().single();
 
-        // BUG-002 FIX: team como 'A' ou 'B', não 'Team A' / 'Team B'
         const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
           t.players.map(p => ({
             match_id:  match.id,
             player_id: p.id,
-            team:      i === 0 ? 'A' : 'B',   // ← CORRIGIDO
+            team:      i === 0 ? 'A' : 'B',
             position:  p.position || 'linha',
           }))
         );
@@ -664,7 +728,8 @@ export const BabaProvider = ({ children }) => {
       .from('draw_results').select('id')
       .eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
     if (existing) { hasAutoDrawnRef.current = true; return; }
-    if (gameConfirmations.length >= drawConfig.playersPerTeam * 2) {
+    const confirmedCount = gameConfirmations.filter(c => c.status === 'confirmed').length;
+    if (confirmedCount >= drawConfig.playersPerTeam * 2) {
       hasAutoDrawnRef.current = true;
       const res = await drawTeamsIntelligent();
       if (res) toast.success('Sorteio automático realizado!');
@@ -700,7 +765,6 @@ export const BabaProvider = ({ children }) => {
       const next        = getNextGameDay(currentBaba);
       setNextGameDay(next);
 
-      // BUG-004 FIX: guarda sempre com optional chaining antes de usar
       if (next) {
         setConfirmationDeadline(next.deadline);
         setCanConfirm(new Date() < next.deadline);
@@ -708,7 +772,8 @@ export const BabaProvider = ({ children }) => {
           .from('game_confirmations')
           .select('*, player:players(*)')
           .eq('baba_id', currentBaba.id)
-          .eq('game_date', next.dateStr);
+          .eq('game_date', next.dateStr)
+          .neq('status', 'cancelled'); // Sprint 9: exclui cancelados
         const confirmations = c || [];
         setGameConfirmations(confirmations);
         const myP = playersData.find(p => p.user_id === user.id);
@@ -718,7 +783,7 @@ export const BabaProvider = ({ children }) => {
         setGameConfirmations([]);
         setMyConfirmation(null);
         setConfirmationDeadline(null);
-        setCanConfirm(false); // BUG-004 FIX: resetar canConfirm também
+        setCanConfirm(false);
       }
     };
     syncData();
@@ -727,7 +792,6 @@ export const BabaProvider = ({ children }) => {
   useEffect(() => {
     let timeoutId;
     const update = () => {
-      // BUG-004 FIX: acesso seguro com optional chaining
       if (!nextGameDay?.date) {
         setCountdown({ d: 0, h: 0, m: 0, s: 0, active: false });
         return;
@@ -772,7 +836,7 @@ export const BabaProvider = ({ children }) => {
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline, nextGameDay,
       countdown, currentMatch, matchPlayers, isDrawing, drawStatus,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
-      confirmPresence, cancelConfirmation,
+      confirmPresence, cancelConfirmation, reloadConfirmations, // Sprint 9: + reloadConfirmations
       ratePlayer, getAllRatings, setManualWeight,
       generateBalancedTeams,
     }}>
