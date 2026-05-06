@@ -18,6 +18,7 @@ import CreatePage       from './pages/CreatePage';
 import HistoryPage      from './pages/HistoryPage';
 import DrawPage         from './pages/DrawPage';
 import PrivacyPage      from './pages/PrivacyPage';
+import JoinPage         from './pages/JoinPage'; // ← NOVO Sprint 8.2
 
 // Componentes globais
 import BottomNav     from './components/BottomNav';
@@ -59,6 +60,7 @@ const AppInner = () => {
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
+        <Route path="/join/:code"    element={<JoinPage />} /> {/* ← NOVO Sprint 8.2 */}
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
