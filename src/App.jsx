@@ -18,12 +18,13 @@ import CreatePage       from './pages/CreatePage';
 import HistoryPage      from './pages/HistoryPage';
 import DrawPage         from './pages/DrawPage';
 import PrivacyPage      from './pages/PrivacyPage';
-import JoinPage         from './pages/JoinPage'; // ← NOVO Sprint 8.2
+import JoinPage         from './pages/JoinPage';
 
 // Componentes globais
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
 import PageWrapper   from './components/PageWrapper';
+import PushPrompt    from './components/PushPrompt'; // ← Sprint 9.1a
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
@@ -41,12 +42,20 @@ const ProtectedRoute = ({ children }) => {
 const AppInner = () => {
   const { user } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // Sprint 9.1a: delay de 3s após login para não disputar atenção com onboarding
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
 
   useEffect(() => {
     if (user && shouldShowOnboarding()) {
       const id = setTimeout(() => setShowOnboarding(true), 800);
       return () => clearTimeout(id);
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setShowPushPrompt(false); return; }
+    const id = setTimeout(() => setShowPushPrompt(true), 3000);
+    return () => clearTimeout(id);
   }, [user]);
 
   return (
@@ -60,7 +69,7 @@ const AppInner = () => {
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
-        <Route path="/join/:code"    element={<JoinPage />} /> {/* ← NOVO Sprint 8.2 */}
+        <Route path="/join/:code"    element={<JoinPage />} />
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
@@ -80,6 +89,9 @@ const AppInner = () => {
       </Routes>
 
       <BottomNav />
+
+      {/* Sprint 9.1a: solicitar push 3s após login, acima do BottomNav */}
+      {showPushPrompt && <PushPrompt />}
 
       {showOnboarding && (
         <OnboardingModal onClose={() => setShowOnboarding(false)} />
