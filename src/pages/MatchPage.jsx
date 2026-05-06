@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { X, Target, UserPlus } from 'lucide-react';
+import { X, Target, UserPlus, Share2 } from 'lucide-react';
 import WinnerPhotoModal from '../components/WinnerPhotoModal';
+import ShareableCardModal from '../components/ShareableCardModal';
 import toast from 'react-hot-toast';
 
 const MatchPage = () => {
@@ -23,6 +24,8 @@ const MatchPage = () => {
   const [showWinnerPhoto, setShowWinnerPhoto] = useState(false);
   const [winnerInfo,      setWinnerInfo]      = useState({ name: '', matchId: null });
   const [pendingQueue,    setPendingQueue]    = useState([]);
+  const [showShare,       setShowShare]       = useState(false);
+  const [matchScorers,    setMatchScorers]    = useState([]);
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -134,6 +137,25 @@ const MatchPage = () => {
         team_a_score: scoreA, team_b_score: scoreB,
         finished_at: new Date().toISOString(),
       }).eq('id', matchId);
+    }
+
+    // Buscar artilheiros da partida para o card de compartilhamento
+    if (matchId) {
+      const { data: scorers } = await supabase
+        .from('match_players')
+        .select('player_id, goals, players(id, name, avatar_url)')
+        .eq('match_id', matchId)
+        .gt('goals', 0)
+        .order('goals', { ascending: false });
+
+      setMatchScorers(
+        (scorers || []).map(s => ({
+          id:         s.players.id,
+          name:       s.players.name,
+          avatar_url: s.players.avatar_url,
+          count:      s.goals,
+        }))
+      );
     }
 
     // FEAT-005: guardar fila pendente e abrir modal de foto
@@ -276,6 +298,28 @@ const MatchPage = () => {
         babaId={currentBaba?.id}
         winnerName={winnerInfo.name}
         onSaved={handleWinnerPhotoClose}
+      />
+
+      {/* Botão flutuante de compartilhar resultado (aparece após o jogo terminar) */}
+      {winnerInfo.name && !showWinnerPhoto && (
+        <button
+          onClick={() => setShowShare(true)}
+          className="fixed bottom-24 right-6 z-40 bg-cyan-electric text-black p-4 rounded-full shadow-2xl shadow-cyan-500/40 active:scale-95 transition-all"
+          title="Compartilhar resultado"
+        >
+          <Share2 size={22} />
+        </button>
+      )}
+
+      {/* Modal de compartilhamento de resultado */}
+      <ShareableCardModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        rankingType="gols"
+        rankingData={matchScorers}
+        babaName={currentBaba?.name || 'Baba'}
+        babaLogo={currentBaba?.logo_url}
+        matchData={{ winner: winnerInfo.name }}
       />
     </div>
   );
