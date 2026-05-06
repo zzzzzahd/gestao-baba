@@ -1,20 +1,19 @@
+// src/components/QRCodeModal.jsx
+// Sprint 9: URL do QR aponta para /join/:code (rota pública) em vez de /home?code=
+
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Copy, RefreshCw, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// QRCodeModal — gera QR Code do link de convite do baba
-// O QR aponta para a URL do app com ?code=XXXXXX
-// Ao abrir, o HomePage detecta o param e pré-preenche o campo
 
 const QRCodeModal = ({ isOpen, onClose, inviteCode, babaName, onRefresh }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   if (!isOpen) return null;
 
-  // URL que o QR vai codificar
+  // Sprint 9: aponta para /join/:code (JoinPage pública) em vez de /home?code=
   const inviteUrl = inviteCode
-    ? `${window.location.origin}/home?code=${inviteCode}`
+    ? `${window.location.origin}/join/${inviteCode}`
     : null;
 
   const handleCopyLink = () => {
@@ -35,12 +34,13 @@ const QRCodeModal = ({ isOpen, onClose, inviteCode, babaName, onRefresh }) => {
       try {
         await navigator.share({
           title: `Entra no meu baba: ${babaName}`,
-          text:  `Usa o código ${inviteCode} ou o link abaixo para entrar no Draft Play!`,
+          text:  `Clica no link para entrar no Draft Play!`,
           url:   inviteUrl,
         });
       } catch { /* usuário cancelou */ }
     } else {
-      handleCopyLink();
+      const wa = `https://wa.me/?text=${encodeURIComponent(`Entra no nosso baba "${babaName}"! 🏟️ ${inviteUrl}`)}`;
+      window.open(wa, '_blank');
     }
   };
 
@@ -94,7 +94,7 @@ const QRCodeModal = ({ isOpen, onClose, inviteCode, babaName, onRefresh }) => {
             </div>
 
             <p className="text-[9px] text-white/20 text-center leading-relaxed px-2">
-              Mostre o QR Code ou compartilhe o código. Válido por tempo limitado.
+              Escaneie o QR Code ou compartilhe o link. Ao clicar, o jogador verá a página de entrada do baba.
             </p>
           </div>
         ) : (
