@@ -1,8 +1,6 @@
 // src/pages/draw/StepMatch.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Wizard /draw — Step 3: Partida ao vivo.
-// Placar, timer, registro de gols, fila de times, encerramento.
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 9.3: Realtime via supabase.channel para sincronizar placar e gols
+// entre múltiplos dispositivos (presidente + jogadores assistindo).
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Target, UserPlus, ChevronLeft } from 'lucide-react';
@@ -31,7 +29,49 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [winnerInfo,      setWinnerInfo]      = useState({ name: '', matchId: null });
   const [pendingQueue,    setPendingQueue]    = useState([]);
 
-  // ── Carregar times ao montar (se ainda não há matchState) ─────────────────
+  // ── Sprint 9.3: Refresh do estado via banco ───────────────────────────────
+  const refreshMatchState = useCallback(async () => {
+    if (!matchId) return;
+    try {
+      const { data: mp } = await supabase
+        .from('match_players')
+        .select('player_id, team, goals, assists')
+        .eq('match_id', matchId);
+
+      if (!mp) return;
+
+      // Recalcula placar a partir dos dados reais do banco
+      const scoreA = mp.filter(p => p.team === 'A').reduce((sum, p) => sum + (p.goals || 0), 0);
+      const scoreB = mp.filter(p => p.team === 'B').reduce((sum, p) => sum + (p.goals || 0), 0);
+
+      setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
+    } catch (err) {
+      console.error('[StepMatch] refreshMatchState:', err);
+    }
+  }, [matchId]);
+
+  // ── Sprint 9.3: Canal Realtime ────────────────────────────────────────────
+  useEffect(() => {
+    if (!matchId) return;
+
+    const channel = supabase
+      .channel(`match:${matchId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  '*',
+          schema: 'public',
+          table:  'match_players',
+          filter: `match_id=eq.${matchId}`,
+        },
+        () => refreshMatchState()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [matchId, refreshMatchState]);
+
+  // ── Carregar times ao montar ──────────────────────────────────────────────
   useEffect(() => {
     if (matchState?.allTeams) {
       setAllTeams(matchState.allTeams);
@@ -135,6 +175,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         await supabase.from('match_players').update({ assists: (ad?.assists || 0) + 1 })
           .eq('match_id', matchId).eq('player_id', selectedAssist);
       }
+      // Sprint 9.3: o Realtime vai disparar refreshMatchState automaticamente,
+      // mas atualizamos localmente também para resposta imediata no dispositivo do presidente
       setCurrentMatch(prev => ({
         ...prev,
         scoreA: goalTeam === 'A' ? prev.scoreA + 1 : prev.scoreA,
@@ -220,8 +262,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           {formatTime(timer)}
         </div>
 
+        {/* Sprint 9.3: badge Realtime */}
+        {matchId && (
+          <div className="flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-green-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            Ao vivo
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
-          {/* Time A */}
           <div className="flex-1 space-y-2">
             <p className="text-[10px] font-black text-cyan-electric uppercase truncate">
               {currentMatch.teamA.name}
@@ -236,7 +285,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
           <span className="text-lg font-black text-text-muted italic">VS</span>
 
-          {/* Time B */}
           <div className="flex-1 space-y-2">
             <p className="text-[10px] font-black text-yellow-500 uppercase truncate">
               {currentMatch.teamB.name}
@@ -271,9 +319,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
       {/* Jogadores em campo */}
       <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle">
-        <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-3">
-          Em campo
-        </p>
+        <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-3">Em campo</p>
         <div className="grid grid-cols-2 gap-4">
           {[
             { team: currentMatch.teamA, color: 'text-cyan-electric', dot: 'bg-cyan-electric' },
