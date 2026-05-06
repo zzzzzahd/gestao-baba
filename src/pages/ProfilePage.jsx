@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useReducer, useCallback } from 'react';
+import { Share2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
@@ -6,6 +7,7 @@ import { supabase } from '../services/supabase';
 import ProfileHeader from '../components/ProfileHeader';
 import ProfileStats  from '../components/ProfileStats';
 import ProfileEdit   from '../components/ProfileEdit';
+import ShareableCardModal from '../components/ShareableCardModal';
 
 // ─────────────────────────────────────────────
 // ESTADO — useReducer no lugar de 5x useState
@@ -35,10 +37,11 @@ const reducer = (state, action) => {
 
 const ProfilePage = () => {
   const { profile, user, refreshProfile } = useAuth();
-  const { myBabas }                        = useBaba();
+  const { myBabas, currentBaba }          = useBaba();
 
-  const [tab,   setTab]   = useState('stats');
-  const [state, dispatch] = useReducer(reducer, INITIAL);
+  const [tab,       setTab]       = useState('stats');
+  const [showShare, setShowShare] = useState(false);
+  const [state, dispatch]         = useReducer(reducer, INITIAL);
 
   // ── LOAD — 1 round-trip via RPC ──────────────
 
@@ -83,6 +86,14 @@ const ProfilePage = () => {
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   })();
 
+  // Dados do próprio jogador para o card compartilhável
+  const profileShareData = profile ? [{
+    id:         user?.id,
+    name:       profile.name || profile.username || 'Jogador',
+    avatar_url: profile.avatar_url || null,
+    count:      state.matchStats.reduce((acc, m) => acc + (m.goals || 0), 0),
+  }] : [];
+
   return (
     <div className="min-h-screen bg-black text-white pb-28 font-sans selection:bg-cyan-electric selection:text-black">
 
@@ -96,24 +107,38 @@ const ProfilePage = () => {
 
       <div className="max-w-xl mx-auto px-6 space-y-6 mt-4">
 
-        {/* Tabs */}
-        <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid">
-          {[
-            { id: 'stats', label: 'Estatísticas'  },
-            { id: 'edit',  label: 'Editar Perfil' },
-          ].map(t => (
+        {/* Tabs + botão de compartilhar */}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1">
+            {[
+              { id: 'stats', label: 'Estatísticas'  },
+              { id: 'edit',  label: 'Editar Perfil' },
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
+                  tab === t.id
+                    ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
+                    : 'text-text-low hover:text-white'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Botão compartilhar stats */}
+          {tab === 'stats' && (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
-                tab === t.id
-                  ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
-                  : 'text-text-low hover:text-white'
-              }`}
+              onClick={() => setShowShare(true)}
+              disabled={!profileShareData.length || state.loading}
+              className="p-2.5 bg-surface-2 border border-border-mid rounded-xl hover:bg-surface-3 transition-colors disabled:opacity-30"
+              title="Compartilhar suas stats"
             >
-              {t.label}
+              <Share2 size={18} className="text-cyan-electric" />
             </button>
-          ))}
+          )}
         </div>
 
         {/* Erro */}
@@ -142,6 +167,16 @@ const ProfilePage = () => {
           />
         )}
       </div>
+
+      {/* Modal de compartilhamento de perfil */}
+      <ShareableCardModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        rankingType="gols"
+        rankingData={profileShareData}
+        babaName={currentBaba?.name || 'Baba'}
+        babaLogo={currentBaba?.logo_url}
+      />
     </div>
   );
 };
