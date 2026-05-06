@@ -29,7 +29,7 @@ const LandingPage = () => {
                 Bem-vindo ao DRAFT
               </h1>
               <p className="text-xs font-medium opacity-50 px-4 leading-relaxed uppercase tracking-wide">
-                Sistema profissional de gestão de peladas e babas
+                Plataforma de gestão de jogos e times
               </p>
             </div>
 
