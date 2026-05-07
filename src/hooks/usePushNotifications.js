@@ -1,10 +1,10 @@
 // src/hooks/usePushNotifications.js
-// Sprint 9.1a — Gerencia permissão de push e registro de subscription no Supabase.
+// Sprint 9 — Gerencia permissão de push e registro de subscription no Supabase.
+// Usa RPCs upsert_push_subscription / deactivate_push_subscription + get_push_status
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 
-// Chave pública VAPID — preencher após gerar com `npx web-push generate-vapid-keys`
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? '';
 
 function urlBase64ToUint8Array(base64String) {
@@ -15,75 +15,74 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export function usePushNotifications() {
-  const [permission, setPermission]   = useState(Notification?.permission ?? 'default');
-  const [subscribed, setSubscribed]   = useState(false);
-  const [loading,    setLoading]      = useState(false);
-  const [supported,  setSupported]    = useState(false);
+  const [permission, setPermission] = useState(Notification?.permission ?? 'default');
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [supported,  setSupported]  = useState(false);
 
+  // Detectar suporte
   useEffect(() => {
     const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setSupported(ok);
     if (ok) setPermission(Notification.permission);
   }, []);
 
-  // Verifica se já tem subscription ativa no banco
+  // Verificar status via RPC ao montar
   useEffect(() => {
     if (!supported) return;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (!sub) return;
-
-      const { data } = await supabase
-        .from('push_subscriptions')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .eq('endpoint', sub.endpoint)
-        .maybeSingle();
-
-      setSubscribed(!!data);
+      const { data } = await supabase.rpc('get_push_status');
+      if (data?.[0]?.has_subscription) {
+        // Confirmar que o browser também tem a subscription
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          setSubscribed(!!sub && data[0].has_subscription);
+        } catch {
+          setSubscribed(data[0].has_subscription);
+        }
+      }
     })();
   }, [supported]);
 
   const subscribe = useCallback(async () => {
-    if (!supported || !VAPID_PUBLIC_KEY) return false;
+    if (!supported || !VAPID_PUBLIC_KEY) {
+      console.warn('[usePushNotifications] Push não suportado ou VAPID_PUBLIC_KEY ausente');
+      return false;
+    }
     setLoading(true);
     try {
-      // Solicitar permissão
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== 'granted') return false;
 
-      // Registrar service worker (se ainda não estiver)
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      // Registrar / obter service worker
+      let reg;
+      try {
+        reg = await navigator.serviceWorker.register('/sw.js');
+      } catch {
+        reg = await navigator.serviceWorker.ready;
+      }
       await navigator.serviceWorker.ready;
 
-      // Criar subscription
+      // Criar subscription no browser
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
       const subJson = sub.toJSON();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return false;
 
-      // Salvar no Supabase
-      const { error } = await supabase
-        .from('push_subscriptions')
-        .upsert(
-          {
-            user_id:    session.user.id,
-            endpoint:   subJson.endpoint,
-            p256dh:     subJson.keys?.p256dh,
-            auth:       subJson.keys?.auth,
-            user_agent: navigator.userAgent.substring(0, 200),
-          },
-          { onConflict: 'user_id,endpoint' }
-        );
+      // Salvar via RPC (faz upsert correto por endpoint)
+      const { error } = await supabase.rpc('upsert_push_subscription', {
+        p_endpoint: subJson.endpoint,
+        p_p256dh:   subJson.keys?.p256dh,
+        p_auth:     subJson.keys?.auth,
+        p_ua:       navigator.userAgent.substring(0, 200),
+      });
 
       if (error) throw error;
 
@@ -102,18 +101,16 @@ export function usePushNotifications() {
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (!sub) return;
+      if (!sub) {
+        setSubscribed(false);
+        return;
+      }
 
+      const endpoint = sub.endpoint;
       await sub.unsubscribe();
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase
-          .from('push_subscriptions')
-          .delete()
-          .eq('user_id', session.user.id)
-          .eq('endpoint', sub.endpoint);
-      }
+      // Desativar no banco via RPC (soft delete — mantém histórico)
+      await supabase.rpc('deactivate_push_subscription', { p_endpoint: endpoint });
 
       setSubscribed(false);
     } catch (err) {
