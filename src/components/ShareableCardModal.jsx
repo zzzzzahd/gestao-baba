@@ -126,15 +126,17 @@ const ProfileCardContent = ({ profileData, babaName, babaLogo, today }) => {
         MEU PERFIL
       </p>
 
-      {/* Baba */}
-      <div className="flex items-center gap-2">
-        {babaLogo && (
-          <img src={babaLogo} alt={babaName} className="w-8 h-8 rounded-xl object-cover border border-cyan-electric/30" />
-        )}
-        <h2 className="text-xl font-black italic text-white uppercase tracking-tighter leading-none">
-          {babaName}
-        </h2>
-      </div>
+      {/* Baba — só exibe se vier do ranking (babaName passado) */}
+      {babaName && (
+        <div className="flex items-center gap-2">
+          {babaLogo && (
+            <img src={babaLogo} alt={babaName} className="w-8 h-8 rounded-xl object-cover border border-cyan-electric/30" />
+          )}
+          <h2 className="text-xl font-black italic text-white uppercase tracking-tighter leading-none">
+            {babaName}
+          </h2>
+        </div>
+      )}
 
       {/* Avatar + nome */}
       <div className="flex flex-col items-center gap-3 flex-1 justify-center">
