@@ -1,54 +1,53 @@
+// src/pages/RankingsPage.jsx
+// Sprint 12: botão de perfil público na lista de ranking + animação de badges
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2, ExternalLink } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 import ShareableCardModal from '../components/ShareableCardModal';
 
 // ─── Pódio ────────────────────────────────────────────────────────────────────
 
-const PodiumStep = ({ player, position, statValue, statUnit, isMe }) => {
+const PodiumStep = ({ player, position, statValue, statUnit, isMe, onPlayerClick }) => {
   const configs = {
-    1: { height: 'h-24', label: '🥇', labelColor: 'text-yellow-400', ring: 'ring-yellow-400/60', size: 'w-16 h-16', fontSize: 'text-4xl' },
-    2: { height: 'h-16', label: '🥈', labelColor: 'text-gray-300',   ring: 'ring-gray-300/40',   size: 'w-13 h-13', fontSize: 'text-3xl' },
-    3: { height: 'h-10', label: '🥉', labelColor: 'text-orange-500', ring: 'ring-orange-500/40', size: 'w-12 h-12', fontSize: 'text-2xl' },
+    1: { height: 'h-24', label: '🥇', labelColor: 'text-yellow-400', ring: 'ring-yellow-400/60', fontSize: 'text-4xl' },
+    2: { height: 'h-16', label: '🥈', labelColor: 'text-gray-300',   ring: 'ring-gray-300/40',   fontSize: 'text-3xl' },
+    3: { height: 'h-10', label: '🥉', labelColor: 'text-orange-500', ring: 'ring-orange-500/40', fontSize: 'text-2xl' },
   };
-
   const c = configs[position];
 
   return (
     <div className="flex flex-col items-center gap-2 flex-1">
-      {/* Avatar */}
-      <div className={`relative ${position === 1 ? 'w-16 h-16' : position === 2 ? 'w-14 h-14' : 'w-12 h-12'}`}>
-        <div className={`w-full h-full rounded-full ring-2 ${c.ring} overflow-hidden bg-surface-3 flex items-center justify-center ${isMe ? 'ring-cyan-electric' : ''}`}>
-          {player.avatar_url ? (
-            <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
-          ) : (
-            <span className={`font-black text-white ${position === 1 ? 'text-xl' : 'text-base'}`}>
-              {(player.name || '?').charAt(0).toUpperCase()}
-            </span>
-          )}
+      <button
+        onClick={() => onPlayerClick?.(player)}
+        className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
+      >
+        <div className={`relative ${position === 1 ? 'w-16 h-16' : position === 2 ? 'w-14 h-14' : 'w-12 h-12'}`}>
+          <div className={`w-full h-full rounded-full ring-2 ${c.ring} overflow-hidden bg-surface-3 flex items-center justify-center ${isMe ? 'ring-cyan-electric' : ''}`}>
+            {player.avatar_url ? (
+              <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
+            ) : (
+              <span className={`font-black text-white ${position === 1 ? 'text-xl' : 'text-base'}`}>
+                {(player.name || '?').charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <span className="absolute -bottom-1 -right-1 text-sm leading-none">{c.label}</span>
         </div>
-        {/* Medalha */}
-        <span className="absolute -bottom-1 -right-1 text-sm leading-none">{c.label}</span>
-      </div>
-
-      {/* Nome */}
-      <div className="text-center max-w-[80px]">
-        <p className={`text-[10px] font-black uppercase truncate ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
-          {player.name}
-        </p>
-        {isMe && <p className="text-[8px] text-cyan-electric/60 font-black uppercase">Você</p>}
-      </div>
-
-      {/* Valor */}
-      <p className={`font-black ${c.fontSize} ${c.labelColor} leading-none`}>{statValue}</p>
-      <p className="text-[8px] text-text-low font-black uppercase">{statUnit}</p>
-
-      {/* Degrau */}
+        <div className="text-center max-w-[80px]">
+          <p className={`text-[10px] font-black uppercase truncate ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
+            {player.name}
+          </p>
+          {isMe && <p className="text-[8px] text-cyan-electric/60 font-black uppercase">Você</p>}
+        </div>
+        <p className={`font-black ${c.fontSize} ${c.labelColor} leading-none`}>{statValue}</p>
+        <p className="text-[8px] text-text-low font-black uppercase">{statUnit}</p>
+      </button>
       <div className={`w-full ${c.height} rounded-t-xl flex items-end justify-center pb-2 border-t border-border-mid ${
         position === 1 ? 'bg-yellow-400/10' : position === 2 ? 'bg-surface-2' : 'bg-surface-1'
       }`}>
@@ -58,10 +57,8 @@ const PodiumStep = ({ player, position, statValue, statUnit, isMe }) => {
   );
 };
 
-const Podium = ({ top3, getStatValue, myPlayerId }) => {
+const Podium = ({ top3, getStatValue, myPlayerId, onPlayerClick }) => {
   if (top3.length < 1) return null;
-
-  // Ordem visual do pódio: 2º | 1º | 3º
   const order = [
     top3[1] ? { player: top3[1], position: 2 } : null,
     top3[0] ? { player: top3[0], position: 1 } : null,
@@ -80,6 +77,7 @@ const Podium = ({ top3, getStatValue, myPlayerId }) => {
             statValue={value}
             statUnit={unit}
             isMe={player.id === myPlayerId}
+            onPlayerClick={onPlayerClick}
           />
         );
       })}
@@ -87,7 +85,7 @@ const Podium = ({ top3, getStatValue, myPlayerId }) => {
   );
 };
 
-// ─── Footer fixo com posição do usuário ──────────────────────────────────────
+// ─── Footer fixo ──────────────────────────────────────────────────────────────
 
 const MyPositionFooter = ({ position, total, statValue, statUnit }) => (
   <div className="fixed bottom-[96px] left-0 right-0 z-40 flex justify-center pointer-events-none">
@@ -119,9 +117,9 @@ const RankingsPage = () => {
   const [rankings,     setRankings]     = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [showSelector, setShowSelector] = useState(false);
+  // Sprint 12: share card
   const [showShare,    setShowShare]    = useState(false);
 
-  // Player do usuário logado dentro do baba atual
   const myPlayer = useMemo(
     () => (players || []).find(p => p.user_id === user?.id) || null,
     [players, user?.id]
@@ -141,7 +139,6 @@ const RankingsPage = () => {
         dateFilter = d.toISOString().split('T')[0];
       }
 
-      // BUG-005 FIX: !inner garante que o filtro de baba_id funcione
       let query = supabase
         .from('match_players')
         .select(`
@@ -158,20 +155,17 @@ const RankingsPage = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Agrega por jogador
       const statsMap = {};
       (data || []).forEach(mp => {
         const id = mp.player_id;
         if (!statsMap[id]) {
           statsMap[id] = {
             id,
-            name:       mp.player.name                   || 'Jogador',
-            position:   mp.player.position               || 'linha',
-            avatar_url: mp.player.profile?.avatar_url    || null,
-            user_id:    mp.player.user_id                || null,
-            goals:   0,
-            assists: 0,
-            matches: 0,
+            name:       mp.player.name                || 'Jogador',
+            position:   mp.player.position            || 'linha',
+            avatar_url: mp.player.profile?.avatar_url || null,
+            user_id:    mp.player.user_id             || null,
+            goals: 0, assists: 0, matches: 0,
           };
         }
         statsMap[id].goals   += mp.goals   || 0;
@@ -186,10 +180,8 @@ const RankingsPage = () => {
       } else if (activeTab === 'garcons') {
         arr = arr.filter(p => p.assists > 0).sort((a, b) => b.assists - a.assists);
       } else if (activeTab === 'mvps') {
-        arr = arr
-          .map(p => ({ ...p, total: p.goals + p.assists }))
-          .filter(p => p.total > 0)
-          .sort((a, b) => b.total - a.total);
+        arr = arr.map(p => ({ ...p, total: p.goals + p.assists }))
+          .filter(p => p.total > 0).sort((a, b) => b.total - a.total);
       }
 
       setRankings(arr.slice(0, 10));
@@ -210,9 +202,9 @@ const RankingsPage = () => {
   ];
 
   const getStatValue = useCallback((player) => {
-    if (activeTab === 'artilheiros') return { value: player.goals,   unit: 'gols'    };
-    if (activeTab === 'garcons')     return { value: player.assists, unit: 'assists'  };
-    return                                  { value: player.total,   unit: 'G+A'     };
+    if (activeTab === 'artilheiros') return { value: player.goals,   unit: 'gols'   };
+    if (activeTab === 'garcons')     return { value: player.assists, unit: 'assists' };
+    return                                  { value: player.total,   unit: 'G+A'    };
   }, [activeTab]);
 
   const getMedalColor = (i) => {
@@ -222,29 +214,27 @@ const RankingsPage = () => {
     return 'text-text-low';
   };
 
-  // Pódio — top 3
-  const top3    = rankings.slice(0, 3);
-  // Lista — a partir do 4º
+  // Sprint 12: navegar para perfil público do jogador
+  const handlePlayerClick = (player) => {
+    if (player?.user_id) navigate(`/player/${player.user_id}`);
+  };
+
+  const top3      = rankings.slice(0, 3);
   const listFrom4 = rankings.slice(3);
 
-  // Posição do usuário logado
-  const myRankIndex = myPlayer
-    ? rankings.findIndex(p => p.id === myPlayer.id)
-    : -1;
-  const myRankData = myRankIndex >= 0 ? rankings[myRankIndex] : null;
-  const showFooter = myRankData !== null && rankings.length > 0;
+  const myRankIndex = myPlayer ? rankings.findIndex(p => p.id === myPlayer.id) : -1;
+  const myRankData  = myRankIndex >= 0 ? rankings[myRankIndex] : null;
+  const showFooter  = myRankData !== null && rankings.length > 0;
 
-  // Dados normalizados para o ShareableCardModal
-  const shareRankingData = rankings.map(p => ({
-    id:        p.id,
-    name:      p.name,
+  // Dados para o ShareableCardModal
+  const shareData = rankings.map(p => ({
+    id:         p.id,
+    name:       p.name,
     avatar_url: p.avatar_url,
-    count:     activeTab === 'artilheiros' ? p.goals : activeTab === 'garcons' ? p.assists : p.total,
+    count: activeTab === 'artilheiros' ? p.goals
+         : activeTab === 'garcons'     ? p.assists
+         : p.total,
   }));
-
-  const shareRankingType =
-    activeTab === 'artilheiros' ? 'gols' :
-    activeTab === 'garcons'     ? 'assistencias' : 'mvp';
 
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-40">
@@ -257,7 +247,6 @@ const RankingsPage = () => {
           </button>
           <div className="text-center flex-1">
             <h1 className="text-xl font-black uppercase italic tracking-tighter">Rankings</h1>
-            {/* Seletor de baba — Tarefa 4.3 */}
             {myBabas?.length > 1 ? (
               <div className="relative inline-block mt-0.5">
                 <button
@@ -291,8 +280,7 @@ const RankingsPage = () => {
               </p>
             ) : null}
           </div>
-
-          {/* Botão compartilhar */}
+          {/* Sprint 12: botão compartilhar */}
           <button
             onClick={() => setShowShare(true)}
             disabled={!rankings.length}
@@ -354,20 +342,19 @@ const RankingsPage = () => {
           </>
         ) : rankings.length > 0 ? (
           <>
-            {/* ── Pódio (top 3) ── */}
             <Podium
               top3={top3}
               getStatValue={getStatValue}
               myPlayerId={myPlayer?.id}
+              onPlayerClick={handlePlayerClick}
             />
 
-            {/* ── Lista (4º em diante) ── */}
             {listFrom4.length > 0 && (
               <div className="space-y-2 pt-2">
                 <div className="h-px bg-surface-2 mb-3" />
                 {listFrom4.map((player, i) => {
                   const { value, unit } = getStatValue(player);
-                  const absIndex        = i + 3; // posição real no ranking
+                  const absIndex        = i + 3;
                   const isMe            = player.id === myPlayer?.id;
 
                   return (
@@ -383,7 +370,6 @@ const RankingsPage = () => {
                         {absIndex + 1}º
                       </span>
 
-                      {/* Avatar */}
                       <div className="w-9 h-9 rounded-full bg-surface-3 overflow-hidden flex items-center justify-center shrink-0">
                         {player.avatar_url ? (
                           <img src={player.avatar_url} className="w-full h-full object-cover" alt={player.name} />
@@ -401,11 +387,22 @@ const RankingsPage = () => {
                         <p className="text-[9px] text-text-low font-bold uppercase">{player.position}</p>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <p className={`text-2xl font-black ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
-                          {value}
-                        </p>
-                        <p className="text-[9px] text-text-low font-bold uppercase">{unit}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <p className={`text-2xl font-black ${isMe ? 'text-cyan-electric' : 'text-white'}`}>
+                            {value}
+                          </p>
+                          <p className="text-[9px] text-text-low font-bold uppercase">{unit}</p>
+                        </div>
+                        {/* Sprint 12: link perfil público */}
+                        {player.user_id && (
+                          <button
+                            onClick={() => handlePlayerClick(player)}
+                            className="p-2 bg-surface-2 rounded-xl text-text-muted hover:text-cyan-electric hover:bg-cyan-electric/10 transition-all"
+                          >
+                            <ExternalLink size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -415,7 +412,9 @@ const RankingsPage = () => {
           </>
         ) : (
           <div className="text-center py-14 border border-dashed border-border-mid rounded-3xl space-y-4 px-6">
-            <div className="w-16 h-16 rounded-[1.5rem] bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center mx-auto"><Trophy size={28} className="text-cyan-electric/50" /></div>
+            <div className="w-16 h-16 rounded-[1.5rem] bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center mx-auto">
+              <Trophy size={28} className="text-cyan-electric/50" />
+            </div>
             <p className="text-text-low font-black uppercase text-sm">Sem dados de ranking</p>
             <p className="text-text-muted text-[10px] mt-1 font-bold leading-relaxed">
               Joga o primeiro baba pra começar a contagem!
@@ -424,7 +423,6 @@ const RankingsPage = () => {
         )}
       </div>
 
-      {/* Footer fixo — posição do usuário */}
       {showFooter && (() => {
         const { value, unit } = getStatValue(myRankData);
         return (
@@ -437,12 +435,12 @@ const RankingsPage = () => {
         );
       })()}
 
-      {/* Modal de compartilhamento */}
+      {/* Sprint 12: ShareableCardModal */}
       <ShareableCardModal
         isOpen={showShare}
         onClose={() => setShowShare(false)}
-        rankingType={shareRankingType}
-        rankingData={shareRankingData}
+        rankingType={activeTab === 'artilheiros' ? 'gols' : activeTab === 'garcons' ? 'assistencias' : 'mvp'}
+        rankingData={shareData}
         babaName={currentBaba?.name || 'Baba'}
         babaLogo={currentBaba?.logo_url}
       />
