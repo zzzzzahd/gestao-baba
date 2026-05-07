@@ -27,7 +27,7 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 if (SENTRY_DSN && import.meta.env.PROD) {
   import('@sentry/react').then(Sentry => {
     Sentry.init({
-      dsn:         SENTRY_DNS,
+      dsn:         SENTRY_DSN, // ← CORRIGIDO: era SENTRY_DNS (typo)
       environment:  'production',
       // Captura apenas 20% das sessões para não estourar o free tier
       tracesSampleRate: 0.2,
