@@ -235,14 +235,12 @@ const ProfilePage = () => {
         )}
       </div>
 
-      {/* Card de perfil — template 'profile' com dados reais */}
+      {/* Card de perfil — template 'profile' — sem nome de baba (é card pessoal) */}
       <ShareableCardModal
         isOpen={showShare}
         onClose={() => setShowShare(false)}
         rankingType="profile"
         profileData={profileShareData}
-        babaName={currentBaba?.name || 'Baba'}
-        babaLogo={currentBaba?.logo_url}
       />
     </div>
   );
