@@ -5,26 +5,27 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 
 // Páginas
-import LandingPage      from './pages/LandingPage';
-import LoginPage        from './pages/LoginPage';
-import HomePage         from './pages/HomePage';
-import ProfilePage      from './pages/ProfilePage';
-import MatchPageVisitor from './pages/MatchPageVisitor';
-import RankingsPage     from './pages/RankingsPage';
-import FinancialPage    from './pages/FinancialPage';
-import VisitorMode      from './pages/VisitorMode';
-import DashboardPage    from './pages/DashboardPage';
-import CreatePage       from './pages/CreatePage';
-import HistoryPage      from './pages/HistoryPage';
-import DrawPage         from './pages/DrawPage';
-import PrivacyPage      from './pages/PrivacyPage';
-import JoinPage         from './pages/JoinPage';
+import LandingPage        from './pages/LandingPage';
+import LoginPage          from './pages/LoginPage';
+import HomePage           from './pages/HomePage';
+import ProfilePage        from './pages/ProfilePage';
+import PublicProfilePage  from './pages/PublicProfilePage'; // ← Sprint 12
+import MatchPageVisitor   from './pages/MatchPageVisitor';
+import RankingsPage       from './pages/RankingsPage';
+import FinancialPage      from './pages/FinancialPage';
+import VisitorMode        from './pages/VisitorMode';
+import DashboardPage      from './pages/DashboardPage';
+import CreatePage         from './pages/CreatePage';
+import HistoryPage        from './pages/HistoryPage';
+import DrawPage           from './pages/DrawPage';
+import PrivacyPage        from './pages/PrivacyPage';
+import JoinPage           from './pages/JoinPage';
 
 // Componentes globais
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
 import PageWrapper   from './components/PageWrapper';
-import PushPrompt    from './components/PushPrompt'; // ← Sprint 9.1a
+import PushPrompt    from './components/PushPrompt';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
@@ -38,11 +39,10 @@ const ProtectedRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
-// ─── AppInner (dentro dos providers) ─────────────────────────────────────────
+// ─── AppInner ─────────────────────────────────────────────────────────────────
 const AppInner = () => {
   const { user } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  // Sprint 9.1a: delay de 3s após login para não disputar atenção com onboarding
   const [showPushPrompt, setShowPushPrompt] = useState(false);
 
   useEffect(() => {
@@ -70,6 +70,7 @@ const AppInner = () => {
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
         <Route path="/join/:code"    element={<JoinPage />} />
+        <Route path="/player/:userId" element={<PublicProfilePage />} /> {/* ← Sprint 12 */}
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
@@ -79,18 +80,15 @@ const AppInner = () => {
         <Route path="/rankings"  element={<ProtectedRoute><PageWrapper><RankingsPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/financial" element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/history"   element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/draw"      element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
 
-        {/* Wizard de sorteio */}
-        <Route path="/draw" element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
-
-        {/* Redirects de rotas legadas */}
+        {/* Redirects */}
         <Route path="/teams" element={<Navigate to="/draw" replace />} />
         <Route path="/match" element={<Navigate to="/draw" replace />} />
       </Routes>
 
       <BottomNav />
 
-      {/* Sprint 9.1a: solicitar push 3s após login, acima do BottomNav */}
       {showPushPrompt && <PushPrompt />}
 
       {showOnboarding && (
