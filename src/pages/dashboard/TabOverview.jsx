@@ -1,16 +1,15 @@
 // src/pages/dashboard/TabOverview.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Aba "Visão Geral" do Dashboard.
-// Sprint 9: integração do WaitlistPanel + share via /join/:code
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 10 — PresenceBlock usa RPCs confirm_presence/cancel_presence
+// Sprint 13 — InvitesPanel integrado
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2, Link2 } from 'lucide-react';
 import { DAY_FULL } from '../../utils/constants';
 import PresenceBlock  from '../../components/PresenceBlock';
 import DrawConfigBlock from '../../components/DrawConfigBlock';
-import WaitlistPanel  from '../../components/WaitlistPanel'; // ← Sprint 9
+import WaitlistPanel  from '../../components/WaitlistPanel';
+import InvitesPanel   from '../../components/InvitesPanel';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,9 +40,7 @@ const TabOverview = ({
   gameConfirmations,
   myConfirmation,
   canConfirm,
-  confirmPresence,
-  cancelConfirmation,
-  reloadConfirmations, // ← Sprint 9
+  reloadConfirmations,
   drawConfig,
   setDrawConfig,
   isDrawing,
@@ -58,8 +55,8 @@ const TabOverview = ({
   const navigate        = useNavigate();
   const gameDaysDisplay = formatGameDays(currentBaba);
   const cdStr           = formatCountdown(countdown);
+  const [showInvites,  setShowInvites]  = useState(false);
 
-  // Sprint 9: share via /join/:code em vez de ?code=
   const handleShareJoinLink = () => {
     if (!currentBaba?.invite_code) return;
     const url  = `${window.location.origin}/join/${currentBaba.invite_code}`;
@@ -118,22 +115,23 @@ const TabOverview = ({
         </div>
       )}
 
-      {/* Presença + Config + Waitlist */}
+      {/* Presença + Waitlist + Sorteio */}
       {nextGameDay ? (
         <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle space-y-4">
+          {/* Sprint 10 — PresenceBlock com RPCs atômicas */}
           <PresenceBlock
             nextGameDay={nextGameDay}
             gameConfirmations={gameConfirmations}
             myConfirmation={myConfirmation}
             canConfirm={canConfirm}
-            confirmPresence={confirmPresence}
-            cancelConfirmation={cancelConfirmation}
             countdown={countdown}
             loading={loading}
             drawConfig={drawConfig}
+            currentBaba={currentBaba}
+            onReload={reloadConfirmations}
           />
 
-          {/* ── Sprint 9: Lista de Espera ── */}
+          {/* Waitlist */}
           {gameConfirmations.some(c => c.status === 'waitlist') && (
             <div className="pt-3 border-t border-border-subtle">
               <WaitlistPanel
@@ -144,7 +142,7 @@ const TabOverview = ({
             </div>
           )}
 
-          {/* Convite com share via /join/:code */}
+          {/* Convite rápido */}
           {isPresident && canConfirm && currentBaba?.invite_code && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-surface-2 border border-border-subtle">
               <span className="text-[9px] text-text-muted font-black uppercase tracking-widest shrink-0">Convite</span>
@@ -158,11 +156,9 @@ const TabOverview = ({
               }`}>
                 {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
               </button>
-              {/* Sprint 9: share via /join/:code */}
               <button
                 onClick={handleShareJoinLink}
                 className="p-2 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 hover:bg-green-500/20 transition-all"
-                title="Compartilhar link de entrada"
               >
                 <Share2 size={13} />
               </button>
@@ -232,7 +228,6 @@ const TabOverview = ({
                   <Copy size={14} /> Copiar
                 </button>
               </div>
-              {/* Sprint 9: botão share WhatsApp com /join/:code */}
               <button
                 onClick={handleShareJoinLink}
                 className="w-full py-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-400 font-black uppercase text-[10px] flex items-center justify-center gap-2 hover:bg-green-500/20 transition-all"
@@ -252,6 +247,31 @@ const TabOverview = ({
             <button onClick={generateInviteCode} className="w-full py-5 bg-surface-2 border border-dashed border-border-strong rounded-2xl text-[10px] font-black uppercase hover:border-cyan-electric/50 transition-all flex items-center justify-center gap-2">
               <RefreshCw size={14} className="animate-pulse" /> Gerar Código de Convite
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Sprint 13 — Painel de Convites (presidente) */}
+      {isPresident && (
+        <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+          <button
+            onClick={() => setShowInvites(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Link2 size={14} className="text-cyan-electric" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">Gerenciar Convites</span>
+            </div>
+            <span className="text-[9px] font-black text-text-low uppercase">
+              {showInvites ? 'Fechar' : 'Abrir'}
+            </span>
+          </button>
+          {showInvites && (
+            <div className="px-5 pb-5 border-t border-border-subtle">
+              <div className="pt-4">
+                <InvitesPanel babaId={currentBaba?.id} isPresident={isPresident} />
+              </div>
+            </div>
           )}
         </div>
       )}
