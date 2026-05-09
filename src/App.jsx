@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -9,7 +10,7 @@ import LandingPage        from './pages/LandingPage';
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
 import ProfilePage        from './pages/ProfilePage';
-import PublicProfilePage  from './pages/PublicProfilePage'; // ← Sprint 12
+import PublicProfilePage  from './pages/PublicProfilePage';
 import MatchPageVisitor   from './pages/MatchPageVisitor';
 import RankingsPage       from './pages/RankingsPage';
 import FinancialPage      from './pages/FinancialPage';
@@ -26,6 +27,7 @@ import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
 import PageWrapper   from './components/PageWrapper';
 import PushPrompt    from './components/PushPrompt';
+import ConsentModal  from './components/ConsentModal';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
@@ -41,10 +43,12 @@ const ProtectedRoute = ({ children }) => {
 
 // ─── AppInner ─────────────────────────────────────────────────────────────────
 const AppInner = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [needsConsent,   setNeedsConsent]   = useState(false);
 
+  // Onboarding (apenas uma vez)
   useEffect(() => {
     if (user && shouldShowOnboarding()) {
       const id = setTimeout(() => setShowOnboarding(true), 800);
@@ -52,11 +56,21 @@ const AppInner = () => {
     }
   }, [user]);
 
+  // Push prompt (3s após login)
   useEffect(() => {
     if (!user) { setShowPushPrompt(false); return; }
     const id = setTimeout(() => setShowPushPrompt(true), 3000);
     return () => clearTimeout(id);
   }, [user]);
+
+  // Sprint 10.5 — verificar consentimento LGPD
+  useEffect(() => {
+    if (user && profile && !profile.consent_at) {
+      setNeedsConsent(true);
+    } else {
+      setNeedsConsent(false);
+    }
+  }, [user, profile]);
 
   return (
     <>
@@ -69,8 +83,9 @@ const AppInner = () => {
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
+        <Route path="/termos"        element={<PrivacyPage />} />
         <Route path="/join/:code"    element={<JoinPage />} />
-        <Route path="/player/:userId" element={<PublicProfilePage />} /> {/* ← Sprint 12 */}
+        <Route path="/player/:userId" element={<PublicProfilePage />} />
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
@@ -89,9 +104,16 @@ const AppInner = () => {
 
       <BottomNav />
 
-      {showPushPrompt && <PushPrompt />}
+      {/* Sprint 10.5 — Consentimento LGPD (bloqueia tudo até aceitar) */}
+      {needsConsent && (
+        <ConsentModal onAccepted={() => setNeedsConsent(false)} />
+      )}
 
-      {showOnboarding && (
+      {/* Push prompt — só exibe se já deu consent */}
+      {showPushPrompt && !needsConsent && <PushPrompt />}
+
+      {/* Onboarding — só exibe se já deu consent */}
+      {showOnboarding && !needsConsent && (
         <OnboardingModal onClose={() => setShowOnboarding(false)} />
       )}
     </>
