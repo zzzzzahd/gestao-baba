@@ -1,16 +1,16 @@
 // src/pages/dashboard/TabManage.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Aba "Gestão" do Dashboard. Fase 3.
-// Conteúdo: times sorteados, acesso rápido a financeiro, suspensões, config.
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 15 — BabaSettings via RPC update_baba_settings
+// Sprint 17 — PresidentDashboard com KPIs
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Swords, Play, ChevronRight, DollarSign,
-  Settings, Shield, RefreshCw,
+  Settings, Shield, RefreshCw, BarChart2, ChevronDown, ChevronUp,
 } from 'lucide-react';
-import SuspensionPanel from '../../components/SuspensionPanel';
+import SuspensionPanel    from '../../components/SuspensionPanel';
+import BabaSettings       from '../../components/BabaSettings';
+import PresidentDashboard from '../../components/PresidentDashboard';
 
 // ─── Bloco de times ───────────────────────────────────────────────────────────
 
@@ -103,7 +103,9 @@ const TabManage = ({
   setShowSuspensions,
   onShowSettings,
 }) => {
-  const navigate = useNavigate();
+  const navigate          = useNavigate();
+  const [showSettings,    setShowSettings]    = useState(false);
+  const [showDashboard,   setShowDashboard]   = useState(false);
 
   return (
     <div className="space-y-5">
@@ -153,6 +155,33 @@ const TabManage = ({
             Administração
           </p>
 
+          {/* Sprint 17 — Dashboard do Presidente */}
+          <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+            <button
+              onClick={() => setShowDashboard(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                  <BarChart2 size={15} className="text-purple-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase text-white">Relatórios & KPIs</p>
+                  <p className="text-[9px] text-text-muted font-black">Dashboard do presidente</p>
+                </div>
+              </div>
+              {showDashboard
+                ? <ChevronUp size={14} className="text-text-low" />
+                : <ChevronDown size={14} className="text-text-low" />}
+            </button>
+            {showDashboard && (
+              <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+                <PresidentDashboard babaId={currentBaba?.id} />
+              </div>
+            )}
+          </div>
+
+          {/* Suspensões */}
           <button
             onClick={() => setShowSuspensions(s => !s)}
             className="w-full py-4 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-red-400 font-black uppercase text-[10px] tracking-widest hover:bg-red-500/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
@@ -173,12 +202,31 @@ const TabManage = ({
             </div>
           )}
 
-          <button
-            onClick={onShowSettings}
-            className="w-full py-5 bg-surface-2 border border-border-mid rounded-[2.5rem] text-text-low font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 flex items-center justify-center gap-3 transition-colors active:scale-95"
-          >
-            <Settings size={18} /> Configurações do Grupo
-          </button>
+          {/* Sprint 15 — Configurações avançadas inline */}
+          <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+            <button
+              onClick={() => setShowSettings(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-surface-2 border border-border-mid flex items-center justify-center">
+                  <Settings size={15} className="text-text-low" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase text-white">Configurações do Grupo</p>
+                  <p className="text-[9px] text-text-muted font-black">Jogo, sorteio, avaliações</p>
+                </div>
+              </div>
+              {showSettings
+                ? <ChevronUp size={14} className="text-text-low" />
+                : <ChevronDown size={14} className="text-text-low" />}
+            </button>
+            {showSettings && (
+              <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+                <BabaSettings />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
