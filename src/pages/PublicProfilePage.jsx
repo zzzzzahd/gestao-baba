@@ -1,260 +1,264 @@
 // src/pages/PublicProfilePage.jsx
-// Sprint 12 fix:
-// - Avatar não corta mais (removido -mt-14, layout ajustado)
-// - Query de stats corrigida: busca player_ids primeiro, depois agrega
-// - Rota: /player/:userId
+// Sprint 19 — Perfil público via RPC get_public_profile (single round-trip).
+// Inclui badges, stats, babas, follow/unfollow e compartilhamento.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Share2, UserPlus, UserMinus, Star, Trophy, Target, Zap, Users } from 'lucide-react';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Star } from 'lucide-react';
-import StreakBadge from '../components/StreakBadge';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
-const BADGE_DEFINITIONS = [
-  { id: 'estreante',    icon: '🌱', label: 'Estreante',      condition: ({ matches })   => matches   >= 1  },
-  { id: 'veterano',     icon: '🛡️', label: 'Veterano',       condition: ({ matches })   => matches   >= 10 },
-  { id: 'lenda',        icon: '👑', label: 'Lenda',          condition: ({ matches })   => matches   >= 30 },
-  { id: 'artilheiro',   icon: '⚡', label: 'Artilheiro',     condition: ({ goals })     => goals     >= 10 },
-  { id: 'maquina',      icon: '🔥', label: 'Máquina de Gol', condition: ({ goals })     => goals     >= 30 },
-  { id: 'garcom',       icon: '🎯', label: 'Garçom',         condition: ({ assists })   => assists   >= 10 },
-  { id: 'bem_avaliado', icon: '⭐', label: 'Bem Avaliado',   condition: ({ rating })    => rating    >= 4.0 },
-  { id: 'elite',        icon: '💎', label: 'Elite',          condition: ({ rating })    => rating    >= 4.5 },
-  { id: 'multi_baba',   icon: '🏟️', label: 'Multi-Baba',    condition: ({ babaCount }) => babaCount >= 2  },
-];
-
-const POSITION_LABEL = {
-  goleiro: 'Goleiro', zagueiro: 'Zagueiro', lateral: 'Lateral',
-  meia: 'Meia', atacante: 'Atacante', linha: 'Linha',
-  fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
+const RARITY_COLOR = {
+  legendary: 'text-yellow-400',
+  epic:      'text-purple-400',
+  rare:      'text-blue-400',
+  common:    'text-text-low',
 };
 
+const StatItem = ({ icon: Icon, label, value, color = 'text-cyan-electric' }) => (
+  <div className="flex flex-col items-center gap-1 p-3 rounded-2xl bg-surface-1 border border-border-mid">
+    <Icon size={16} className={color} />
+    <span className="text-lg font-black text-white leading-none">{value ?? 0}</span>
+    <span className="text-[8px] font-black uppercase tracking-widest text-text-low">{label}</span>
+  </div>
+);
+
 export default function PublicProfilePage() {
-  const { userId } = useParams();
-  const navigate   = useNavigate();
+  const { userId }  = useParams();
+  const navigate    = useNavigate();
+  const { user }    = useAuth();
 
-  const [profile,  setProfile]  = useState(null);
-  const [stats,    setStats]    = useState(null);
-  const [streak,   setStreak]   = useState(0);
-  const [loading,  setLoading]  = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [data,      setData]      = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [notFound,  setNotFound]  = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [toggling,  setToggling]  = useState(false);
 
-  useEffect(() => {
+  const isOwnProfile = user?.id === userId;
+
+  const load = useCallback(async () => {
     if (!userId) return;
-    loadPublicProfile();
-  }, [userId]);
-
-  const loadPublicProfile = async () => {
     setLoading(true);
     try {
-      // 1. Perfil público
-      const { data: prof, error: profErr } = await supabase
-        .from('profiles')
-        .select('id, name, avatar_url, position, favorite_team')
-        .eq('id', userId)
-        .single();
-
-      if (profErr || !prof) { setNotFound(true); return; }
-      setProfile(prof);
-
-      // 2. Buscar todos os player_ids do usuário (pode estar em vários babas)
-      const { data: playerRows } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', userId);
-
-      const playerIds = (playerRows || []).map(p => p.id);
-
-      if (playerIds.length === 0) {
-        // Usuário existe mas nunca entrou em um baba
-        setStats({ goals: 0, assists: 0, matches: 0, rating: 0, babaCount: 0 });
-        setStreak(0);
+      const { data: result, error } = await supabase.rpc('get_public_profile', { p_user_id: userId });
+      if (error || result?.error) {
+        setNotFound(true);
         return;
       }
+      setData(result);
 
-      // 3. Contar babas distintos que o jogador participa (para badge Multi-Baba)
-      const babaCount = playerRows.length; // cada row é um baba diferente
-
-      // 4. Estatísticas agregadas de partidas
-      const { data: mp } = await supabase
-        .from('match_players')
-        .select('goals, assists')
-        .in('player_id', playerIds);
-
-      const goals   = (mp || []).reduce((s, r) => s + (r.goals   || 0), 0);
-      const assists = (mp || []).reduce((s, r) => s + (r.assists || 0), 0);
-      const matches = (mp || []).length;
-
-      // 4. Rating médio de todos os babas
-      const { data: ratings } = await supabase
-        .from('player_rating_summary')
-        .select('final_rating')
-        .in('player_id', playerIds);
-
-      const ratingVals = (ratings || []).map(r => r.final_rating).filter(v => v > 0);
-      const avgRating  = ratingVals.length
-        ? ratingVals.reduce((a, b) => a + b, 0) / ratingVals.length
-        : 0;
-
-      // 5. Streak — confirmações ordenadas por data desc
-      const { data: confs } = await supabase
-        .from('game_confirmations')
-        .select('game_date')
-        .in('player_id', playerIds)
-        .eq('status', 'confirmed')
-        .order('game_date', { ascending: false })
-        .limit(30);
-
-      let s = (confs || []).length > 0 ? 1 : 0;
-      for (let i = 1; i < (confs || []).length; i++) {
-        const prev = new Date(confs[i - 1].game_date);
-        const curr = new Date(confs[i].game_date);
-        const diffDays = (prev - curr) / (1000 * 60 * 60 * 24);
-        if (diffDays <= 14) s++;
-        else break;
+      // Verificar se o usuário logado segue este perfil
+      if (user && user.id !== userId) {
+        const { data: follow } = await supabase
+          .from('player_follows')
+          .select('follower_id')
+          .eq('follower_id', user.id)
+          .eq('followed_id', userId)
+          .maybeSingle();
+        setFollowing(!!follow);
       }
-      setStreak(s);
-      setStats({ goals, assists, matches, rating: avgRating, babaCount });
-
     } catch (err) {
       console.error('[PublicProfilePage]', err);
       setNotFound(true);
     } finally {
       setLoading(false);
     }
+  }, [userId, user?.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleFollow = async () => {
+    if (!user) { navigate('/login'); return; }
+    setToggling(true);
+    try {
+      const { data: result, error } = await supabase.rpc('toggle_follow', { p_target_id: userId });
+      if (error) throw error;
+      setFollowing(result.following);
+      toast.success(result.following ? 'Seguindo!' : 'Deixou de seguir');
+      setData(prev => prev ? {
+        ...prev,
+        followers: prev.followers + (result.following ? 1 : -1),
+      } : prev);
+    } catch (err) {
+      toast.error('Erro');
+    } finally {
+      setToggling(false);
+    }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  const handleShare = () => {
+    const url = `${window.location.origin}/player/${userId}`;
+    if (navigator.share) {
+      navigator.share({ title: data?.name, url });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('Link copiado!');
+    }
+  };
 
-  if (notFound) return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-center px-6">
-      <p className="text-5xl">🔍</p>
-      <h1 className="text-xl font-black text-white uppercase">Jogador não encontrado</h1>
-      <button onClick={() => navigate(-1)} className="text-cyan-electric font-black uppercase text-sm">
-        ← Voltar
-      </button>
-    </div>
-  );
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <span className="w-8 h-8 border-3 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  const unlockedBadges = stats
-    ? BADGE_DEFINITIONS.filter(b => b.condition(stats))
-    : [];
-
-  return (
-    <div className="min-h-screen bg-black text-white pb-12">
-
-      {/* Header */}
-      <div className="relative px-6 pt-14 pb-6 flex flex-col items-center bg-black">
-        {/* Glow fundo */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,243,255,0.08)_0%,_transparent_70%)] pointer-events-none" />
-
+  if (notFound || !data) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-center px-8">
+        <span className="text-5xl">🔍</span>
+        <p className="text-[10px] font-black uppercase tracking-widest text-text-low">
+          Perfil não encontrado
+        </p>
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-6 left-6 p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-low hover:text-white transition-colors"
+          className="px-4 py-2 rounded-xl border border-border-mid text-[10px] font-black uppercase text-text-low hover:text-white transition-colors"
         >
-          <ArrowLeft size={18} />
+          Voltar
         </button>
+      </div>
+    );
+  }
 
-        <p className="absolute top-6 right-6 text-[9px] font-black uppercase tracking-widest text-text-muted">
-          Perfil Público
-        </p>
+  const stats = data.stats || {};
+  const badges = data.badges || [];
+  const babas  = data.babas  || [];
 
-        {/* Avatar — sem margem negativa, dentro do flow normal */}
-        <div className="w-28 h-28 rounded-[2rem] border-4 border-cyan-electric/40 bg-gray-900 overflow-hidden shadow-2xl flex items-center justify-center mt-2 mb-4">
-          {profile.avatar_url ? (
-            <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-4xl font-black text-cyan-electric">
-              {(profile.name || '?').charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
+  return (
+    <div className="min-h-screen bg-black text-white pb-28">
 
-        {/* Nome + posição + time */}
-        <h1 className="text-2xl font-black italic uppercase tracking-tighter text-center leading-tight">
-          {profile.name}
-        </h1>
-        <div className="flex items-center justify-center gap-3 mt-2 flex-wrap">
-          {profile.position && (
-            <span className="text-[10px] font-black uppercase text-cyan-electric">
-              {POSITION_LABEL[profile.position] || profile.position}
-            </span>
-          )}
-          {profile.favorite_team && (
-            <>
-              <span className="text-text-muted">·</span>
-              <span className="text-[10px] font-black uppercase text-text-low">
-                {profile.favorite_team}
-              </span>
-            </>
-          )}
+      {/* Header com cover fictício */}
+      <div className="relative h-36 bg-gradient-to-br from-cyan-electric/20 via-surface-2 to-black">
+        {/* Gradiente decorativo */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-electric/10 to-transparent" />
+
+        {/* Botões de navegação */}
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-xl bg-black/50 border border-white/10 backdrop-blur-sm text-white hover:bg-black/70 transition-all"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleShare}
+              className="p-2 rounded-xl bg-black/50 border border-white/10 backdrop-blur-sm text-white hover:bg-black/70 transition-all"
+            >
+              <Share2 size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Conteúdo */}
-      <div className="px-6 space-y-5 max-w-md mx-auto">
-
-        {/* Streak */}
-        {streak > 0 && (
-          <div className="flex justify-center">
-            <StreakBadge streak={streak} animate />
+      {/* Avatar + info */}
+      <div className="relative px-6 -mt-12">
+        <div className="flex items-end justify-between mb-4">
+          {/* Avatar */}
+          <div className="w-20 h-20 rounded-2xl ring-4 ring-black overflow-hidden bg-surface-2 flex items-center justify-center border border-border-mid">
+            {data.avatar_url
+              ? <img src={data.avatar_url} alt={data.name} className="w-full h-full object-cover" />
+              : <span className="text-3xl font-black text-white">{(data.name || '?')[0].toUpperCase()}</span>
+            }
           </div>
-        )}
 
-        {/* Rating */}
-        {stats?.rating > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-surface-1 border border-cyan-electric/20">
-            <Star size={18} className="text-cyan-electric" fill="currentColor" />
-            <span className="text-3xl font-black font-mono text-white">
-              {Number(stats.rating).toFixed(2)}
-            </span>
-            <span className="text-[10px] text-text-low font-black uppercase">rating global</span>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { emoji: '⚽', label: 'Gols',    value: stats?.goals   ?? 0, color: 'text-orange-400'    },
-            { emoji: '🎯', label: 'Assists', value: stats?.assists ?? 0, color: 'text-cyan-electric' },
-            { emoji: '🏟️', label: 'Jogos',   value: stats?.matches ?? 0, color: 'text-purple-400'    },
-          ].map(s => (
-            <div key={s.label} className="p-4 rounded-2xl bg-surface-1 border border-border-subtle text-center">
-              <p className="text-lg mb-1">{s.emoji}</p>
-              <p className={`text-2xl font-black font-mono ${s.color}`}>{s.value}</p>
-              <p className="text-[8px] text-text-low font-black uppercase mt-0.5">{s.label}</p>
-            </div>
-          ))}
+          {/* Botão follow */}
+          {!isOwnProfile && (
+            <button
+              onClick={handleFollow}
+              disabled={toggling}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                following
+                  ? 'bg-surface-2 border border-border-mid text-text-low hover:text-red-400 hover:border-red-500/30'
+                  : 'bg-cyan-electric text-black hover:bg-cyan-400'
+              }`}
+            >
+              {toggling
+                ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                : following ? <UserMinus size={12} /> : <UserPlus size={12} />}
+              {following ? 'Seguindo' : 'Seguir'}
+            </button>
+          )}
         </div>
 
-        {/* Conquistas */}
-        {unlockedBadges.length > 0 && (
-          <div>
-            <p className="text-[9px] font-black text-text-low uppercase tracking-widest mb-3">
-              Conquistas ({unlockedBadges.length})
+        {/* Nome e bio */}
+        <div className="mb-4">
+          <h1 className="text-xl font-black text-white leading-tight">{data.name}</h1>
+          {data.instagram_handle && (
+            <p className="text-[10px] font-black text-text-low mt-0.5">@{data.instagram_handle}</p>
+          )}
+          {data.bio && (
+            <p className="text-xs text-text-mid mt-2 leading-relaxed">{data.bio}</p>
+          )}
+          <div className="flex items-center gap-4 mt-3">
+            <span className="text-[10px] font-black text-text-low">
+              <span className="text-white">{data.followers}</span> seguidores
+            </span>
+            <span className="text-[10px] font-black text-text-low">
+              <span className="text-white">{data.following}</span> seguindo
+            </span>
+            <span className="text-[10px] font-black text-text-low">
+              <span className="text-white">{data.profile_views}</span> visualizações
+            </span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-2 mb-6">
+          <StatItem icon={Zap}    label="Jogos"    value={stats.matches}  color="text-cyan-electric" />
+          <StatItem icon={Trophy} label="Vitórias"  value={stats.wins}     color="text-yellow-400" />
+          <StatItem icon={Target} label="Gols"      value={stats.goals}    color="text-green-400" />
+          <StatItem icon={Users}  label="Assists"   value={stats.assists}  color="text-purple-400" />
+        </div>
+
+        {/* Badges */}
+        {badges.length > 0 && (
+          <div className="mb-6">
+            <p className="text-[10px] font-black uppercase tracking-widest text-text-low mb-3">
+              Conquistas ({badges.length})
             </p>
             <div className="flex flex-wrap gap-2">
-              {unlockedBadges.map(b => (
+              {badges.map(b => (
                 <div
-                  key={b.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-1 border border-border-subtle rounded-xl"
+                  key={b.badge_id}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-1 border border-border-mid"
+                  title={b.name}
                 >
-                  <span>{b.icon}</span>
-                  <span className="text-[10px] font-black text-white uppercase">{b.label}</span>
+                  <span className="text-base leading-none">{b.icon}</span>
+                  <span className={`text-[9px] font-black uppercase ${RARITY_COLOR[b.rarity] || 'text-text-low'}`}>
+                    {b.name}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Sem dados ainda */}
-        {stats && stats.matches === 0 && !stats.rating && (
-          <div className="text-center py-10 border border-dashed border-border-subtle rounded-2xl">
-            <p className="text-3xl mb-2">⚽</p>
-            <p className="text-[11px] font-black text-text-muted uppercase">Nenhuma partida ainda</p>
+        {/* Babas */}
+        {babas.length > 0 && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-text-low mb-3">Babas</p>
+            <div className="space-y-2">
+              {babas.map(b => (
+                <div
+                  key={b.baba_id}
+                  className="flex items-center justify-between px-4 py-3 rounded-2xl bg-surface-1 border border-border-mid"
+                >
+                  <div>
+                    <p className="text-xs font-black text-white">{b.baba_name}</p>
+                    <p className="text-[9px] font-black text-text-low uppercase">{b.modality}</p>
+                  </div>
+                  {b.is_owner && (
+                    <span className="px-2 py-0.5 rounded-lg bg-cyan-electric/10 border border-cyan-electric/20 text-[8px] font-black text-cyan-electric uppercase">
+                      Presidente
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
