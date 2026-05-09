@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+// src/pages/JoinPage.jsx
+// Sprint 13 — usa RPC join_baba_by_invite (tabela invites dedicada)
+// Mantém fallback para invite_code legado da tabela babas
+
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
 export default function JoinPage() {
-  const { code } = useParams();
-  const navigate = useNavigate();
-  const [baba, setBaba] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState(null);
-  const [session, setSession] = useState(null);
+  const { code }   = useParams();
+  const navigate   = useNavigate();
+  const [baba,        setBaba]        = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [joining,     setJoining]     = useState(false);
+  const [error,       setError]       = useState(null);
+  const [session,     setSession]     = useState(null);
   const [memberCount, setMemberCount] = useState(null);
+  const [inviteInfo,  setInviteInfo]  = useState(null); // dados extras do convite
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -19,59 +24,114 @@ export default function JoinPage() {
   useEffect(() => {
     if (!code) return;
     setLoading(true);
-    supabase
-      .from("babas")
-      .select("id, name, description, logo_url, cover_url, modality, location, max_players, game_days, game_time, invite_expires_at")
-      .eq("invite_code", code)
-      .single()
-      .then(({ data, error: err }) => {
-        if (err || !data) {
-          setError("Convite inválido ou expirado.");
-        } else if (data.invite_expires_at && new Date(data.invite_expires_at) < new Date()) {
-          setError("Este convite expirou.");
-        } else {
-          setBaba(data);
-        }
-        setLoading(false);
-      });
+    loadBabaByCode();
   }, [code]);
+
+  const loadBabaByCode = async () => {
+    // 1. Tentar primeiro na tabela invites (Sprint 13)
+    const { data: invite } = await supabase
+      .from('invites')
+      .select('id, baba_id, uses, max_uses, expires_at, is_active, note, baba:babas(id, name, description, logo_url, cover_url, modality, location, max_players, game_days, game_time)')
+      .eq('code', code.toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (invite) {
+      // Verificar validade
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+        setError('Este convite expirou.');
+        setLoading(false);
+        return;
+      }
+      if (invite.max_uses && invite.uses >= invite.max_uses) {
+        setError('Este convite atingiu o limite de usos.');
+        setLoading(false);
+        return;
+      }
+      setBaba(invite.baba);
+      setInviteInfo({ type: 'invite', id: invite.id, note: invite.note });
+      setLoading(false);
+      return;
+    }
+
+    // 2. Fallback: invite_code legado na tabela babas
+    const { data: babaLegacy, error: err } = await supabase
+      .from('babas')
+      .select('id, name, description, logo_url, cover_url, modality, location, max_players, game_days, game_time, invite_expires_at')
+      .eq('invite_code', code)
+      .single();
+
+    if (err || !babaLegacy) {
+      setError('Convite inválido ou expirado.');
+      setLoading(false);
+      return;
+    }
+    if (babaLegacy.invite_expires_at && new Date(babaLegacy.invite_expires_at) < new Date()) {
+      setError('Este convite expirou.');
+      setLoading(false);
+      return;
+    }
+    setBaba(babaLegacy);
+    setInviteInfo({ type: 'legacy' });
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (!baba) return;
     supabase
-      .from("players")
-      .select("id", { count: "exact", head: true })
-      .eq("baba_id", baba.id)
+      .from('players')
+      .select('id', { count: 'exact', head: true })
+      .eq('baba_id', baba.id)
       .then(({ count }) => setMemberCount(count));
   }, [baba]);
 
   const handleJoin = async () => {
     if (!session) {
-      sessionStorage.setItem("pendingJoinCode", code);
-      navigate("/login");
+      sessionStorage.setItem('pendingJoinCode', code);
+      navigate('/login');
       return;
     }
     setJoining(true);
-    const { error: err } = await supabase.rpc("join_baba_by_code", { p_code: code });
-    if (err) {
-      setError(err.message);
-    } else {
-      navigate("/dashboard");
+    setError(null);
+
+    try {
+      let result;
+
+      if (inviteInfo?.type === 'invite') {
+        // Sprint 13 — usar RPC nova
+        const { data, error: err } = await supabase.rpc('join_baba_by_invite', { p_code: code });
+        if (err) throw err;
+        result = data;
+      } else {
+        // Fallback legado
+        const { data, error: err } = await supabase.rpc('join_baba_by_code', { p_code: code });
+        if (err) throw err;
+        result = data;
+      }
+
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError(err.message || 'Erro ao entrar no baba.');
+    } finally {
+      setJoining(false);
     }
-    setJoining(false);
   };
 
   const handleShare = () => {
-    const url = window.location.href;
+    const url  = window.location.href;
     const text = `Entra no nosso baba "${baba?.name}"! 🏟️`;
     if (navigator.share) {
       navigator.share({ title: text, url });
     } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, "_blank");
+      window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
     }
   };
 
-  const modalityLabel = { futsal: "Futsal", society: "Society" };
+  const modalityLabel = { futsal: 'Futsal', society: 'Society' };
 
   if (loading) {
     return (
@@ -81,7 +141,7 @@ export default function JoinPage() {
     );
   }
 
-  if (error) {
+  if (error && !baba) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
         <div className="text-center">
@@ -89,7 +149,7 @@ export default function JoinPage() {
           <h1 className="text-xl font-black text-white uppercase tracking-widest mb-2">Convite inválido</h1>
           <p className="text-gray-400 mb-6">{error}</p>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate('/')}
             className="px-6 py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-2xl text-cyan-electric font-black uppercase tracking-widest text-sm hover:bg-cyan-electric/20 transition-all"
           >
             Ir para início
@@ -104,7 +164,7 @@ export default function JoinPage() {
       {/* Cover */}
       <div
         className="h-48 bg-gray-900 relative overflow-hidden"
-        style={baba.cover_url ? { backgroundImage: `url(${baba.cover_url})`, backgroundSize: "cover", backgroundPosition: "center" } : {}}
+        style={baba?.cover_url ? { backgroundImage: `url(${baba.cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
       </div>
@@ -112,28 +172,35 @@ export default function JoinPage() {
       <div className="flex flex-col items-center px-5 -mt-16 pb-10 flex-1">
         {/* Logo */}
         <div className="w-28 h-28 rounded-[2rem] border-4 border-black bg-gray-800 shadow-2xl overflow-hidden flex items-center justify-center mb-4">
-          {baba.logo_url ? (
+          {baba?.logo_url ? (
             <img src={baba.logo_url} alt={baba.name} className="w-full h-full object-cover" />
           ) : (
             <span className="text-4xl font-black italic text-cyan-electric">
-              {baba.name.charAt(0)}
+              {baba?.name?.charAt(0)}
             </span>
           )}
         </div>
 
         {/* Info */}
         <h1 className="text-2xl font-black italic uppercase tracking-tighter text-center mb-1">
-          {baba.name}
+          {baba?.name}
         </h1>
         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-cyan-electric mb-3">
-          <span>⚽ {modalityLabel[baba.modality] || baba.modality}</span>
-          {baba.location && (
+          <span>⚽ {modalityLabel[baba?.modality] || baba?.modality}</span>
+          {baba?.location && (
             <><span className="text-gray-600">•</span><span>📍 {baba.location}</span></>
           )}
         </div>
 
-        {baba.description && (
-          <p className="text-gray-400 text-sm text-center max-w-sm mb-5">{baba.description}</p>
+        {baba?.description && (
+          <p className="text-gray-400 text-sm text-center max-w-sm mb-3">{baba.description}</p>
+        )}
+
+        {/* Nota do convite */}
+        {inviteInfo?.note && (
+          <p className="text-[10px] font-black text-cyan-electric/60 text-center mb-3 italic">
+            "{inviteInfo.note}"
+          </p>
         )}
 
         {/* Stats */}
@@ -144,7 +211,7 @@ export default function JoinPage() {
               <p className="text-[9px] font-black text-text-low uppercase tracking-widest">Membros</p>
             </div>
           )}
-          {baba.max_players && (
+          {baba?.max_players && (
             <div className="bg-surface-2 border border-border-subtle rounded-2xl px-5 py-3 text-center">
               <p className="text-xl font-black text-white">{baba.max_players}</p>
               <p className="text-[9px] font-black text-text-low uppercase tracking-widest">Vagas</p>
@@ -152,13 +219,20 @@ export default function JoinPage() {
           )}
         </div>
 
+        {/* Erro de join */}
+        {error && (
+          <div className="w-full max-w-sm mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+            <p className="text-[10px] font-black text-red-400">{error}</p>
+          </div>
+        )}
+
         {/* CTA Entrar */}
         <button
           onClick={handleJoin}
           disabled={joining}
           className="w-full max-w-sm px-6 py-4 bg-cyan-electric hover:opacity-90 disabled:opacity-50 rounded-2xl text-black font-black uppercase tracking-widest text-sm transition-all active:scale-95 mb-3 shadow-lg shadow-cyan-electric/20"
         >
-          {joining ? "Entrando..." : session ? "Entrar no Baba" : "Entrar / Criar conta"}
+          {joining ? 'Entrando...' : session ? 'Entrar no Baba' : 'Entrar / Criar conta'}
         </button>
 
         {/* Compartilhar WhatsApp */}
