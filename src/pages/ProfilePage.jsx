@@ -1,8 +1,7 @@
 // src/pages/ProfilePage.jsx
-// Sprint 12 fix:
-// 1. Card compartilhável usa template 'profile' com rating, gols, assists, jogos
-// 2. Botão "Ver perfil público" para navegar até /player/:userId
-// 3. Botão de compartilhar no ranking não depende de dados hardcoded
+// Sprint 12 + 14 + 19 — Perfil do usuário logado.
+// Tabs: Estatísticas | Conquistas | Editar Perfil
+// Usa get_player_full_profile + BadgesSection + link para perfil público
 
 import React, { useState, useEffect, useReducer, useCallback } from 'react';
 import { Share2, ExternalLink, Copy, Check } from 'lucide-react';
@@ -16,10 +15,9 @@ import ProfileHeader      from '../components/ProfileHeader';
 import ProfileStats       from '../components/ProfileStats';
 import ProfileEdit        from '../components/ProfileEdit';
 import ShareableCardModal from '../components/ShareableCardModal';
+import BadgesSection      from '../components/BadgesSection';
 
-// ─────────────────────────────────────────────
-// ESTADO
-// ─────────────────────────────────────────────
+// ─── Estado ──────────────────────────────────────────────────────────────────
 
 const INITIAL = {
   ratings:     [],
@@ -39,21 +37,24 @@ const reducer = (state, action) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// PROFILE PAGE
-// ─────────────────────────────────────────────
+// ─── ProfilePage ──────────────────────────────────────────────────────────────
 
 const ProfilePage = () => {
   const navigate                          = useNavigate();
   const { profile, user, refreshProfile } = useAuth();
-  const { myBabas, currentBaba }          = useBaba();
+  const { myBabas, currentBaba, players } = useBaba();
 
   const [tab,       setTab]       = useState('stats');
   const [showShare, setShowShare] = useState(false);
   const [copied,    setCopied]    = useState(false);
   const [state, dispatch]         = useReducer(reducer, INITIAL);
 
-  // ── Load ──────────────────────────────────────
+  // Encontrar o player_id do usuário logado no baba atual
+  const myPlayer = currentBaba
+    ? players.find(p => p.user_id === user?.id)
+    : null;
+
+  // ── Load ──────────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!user || !myBabas?.length) {
       dispatch({ type: 'SUCCESS', payload: { loading: false } });
@@ -88,7 +89,7 @@ const ProfilePage = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Computed ──────────────────────────────────
+  // ── Computed ──────────────────────────────────────────────────────────────
   const globalRating = (() => {
     const vals = state.ratings.map(r => r.final_rating).filter(v => v > 0);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
@@ -98,7 +99,6 @@ const ProfilePage = () => {
   const totalAssists = state.matchStats.reduce((s, m) => s + (m.assists || 0), 0);
   const totalMatches = state.matchStats.reduce((s, m) => s + (m.matches || 0), 0);
 
-  // Dados para o card de perfil — agora com rating, gols, assists, jogos
   const profileShareData = profile ? {
     name:       profile.name || 'Jogador',
     avatar_url: profile.avatar_url || null,
@@ -109,7 +109,6 @@ const ProfilePage = () => {
     matches:    totalMatches,
   } : null;
 
-  // URL do perfil público
   const publicProfileUrl = user ? `${window.location.origin}/player/${user.id}` : null;
 
   const handleCopyPublicLink = () => {
@@ -120,9 +119,11 @@ const ProfilePage = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleViewPublicProfile = () => {
-    if (user) navigate(`/player/${user.id}`);
-  };
+  const TABS = [
+    { id: 'stats',   label: 'Estatísticas'  },
+    { id: 'badges',  label: 'Conquistas'    },
+    { id: 'edit',    label: 'Editar Perfil' },
+  ];
 
   return (
     <div className="min-h-screen bg-black text-white pb-28 font-sans selection:bg-cyan-electric selection:text-black">
@@ -139,15 +140,12 @@ const ProfilePage = () => {
 
         {/* Tabs + botão compartilhar */}
         <div className="flex items-center gap-2">
-          <div className="flex gap-2 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1">
-            {[
-              { id: 'stats', label: 'Estatísticas'  },
-              { id: 'edit',  label: 'Editar Perfil' },
-            ].map(t => (
+          <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1 overflow-x-auto">
+            {TABS.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
+                className={`flex-1 whitespace-nowrap py-2.5 text-[10px] font-black uppercase rounded-lg transition-all px-2 ${
                   tab === t.id
                     ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
                     : 'text-text-low hover:text-white'
@@ -158,7 +156,6 @@ const ProfilePage = () => {
             ))}
           </div>
 
-          {/* Botão compartilhar card de stats */}
           {tab === 'stats' && (
             <button
               onClick={() => setShowShare(true)}
@@ -194,7 +191,7 @@ const ProfilePage = () => {
               {copied ? <Check size={15} /> : <Copy size={15} />}
             </button>
             <button
-              onClick={handleViewPublicProfile}
+              onClick={() => navigate(`/player/${user.id}`)}
               className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
               title="Ver perfil público"
             >
@@ -213,6 +210,7 @@ const ProfilePage = () => {
           </div>
         )}
 
+        {/* Conteúdo das tabs */}
         {tab === 'stats' && (
           <ProfileStats
             statsData={{
@@ -222,6 +220,13 @@ const ProfilePage = () => {
               ranking:     state.ranking,
             }}
             loading={state.loading}
+          />
+        )}
+
+        {tab === 'badges' && (
+          <BadgesSection
+            playerId={myPlayer?.id}
+            babaId={currentBaba?.id}
           />
         )}
 
@@ -235,7 +240,6 @@ const ProfilePage = () => {
         )}
       </div>
 
-      {/* Card de perfil — template 'profile' — sem nome de baba (é card pessoal) */}
       <ShareableCardModal
         isOpen={showShare}
         onClose={() => setShowShare(false)}
