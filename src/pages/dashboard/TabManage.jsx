@@ -1,30 +1,31 @@
 // src/pages/dashboard/TabManage.jsx
-// Sprint 15 — BabaSettings via RPC update_baba_settings
-// Sprint 17 — PresidentDashboard com KPIs
+// Corrigido: sem SuspensionPanel separado (suspensão agora no MembersModal),
+// PresidentDashboard e BabaSettings funcionando inline,
+// canManage para coordenadores também verem gestão.
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate }    from 'react-router-dom';
 import {
   Swords, Play, ChevronRight, DollarSign,
-  Settings, Shield, RefreshCw, BarChart2, ChevronDown, ChevronUp,
+  Settings, BarChart2, ChevronDown, ChevronUp, RefreshCw,
 } from 'lucide-react';
-import SuspensionPanel    from '../../components/SuspensionPanel';
 import BabaSettings       from '../../components/BabaSettings';
 import PresidentDashboard from '../../components/PresidentDashboard';
 
-// ─── Bloco de times ───────────────────────────────────────────────────────────
+// ─── Preview dos times ────────────────────────────────────────────────────────
 
-const TeamsPreview = ({ currentMatch, isPresident }) => {
+const TeamsPreview = ({ currentMatch, canManage }) => {
   const navigate = useNavigate();
   if (!currentMatch) return null;
 
   const teams    = currentMatch.teams    || [];
   const reserves = currentMatch.reserves || [];
-  const COLORS   = [
-    { border: 'border-cyan-electric/30', text: 'text-cyan-electric' },
-    { border: 'border-yellow-500/30',    text: 'text-yellow-500'    },
-    { border: 'border-orange-500/30',    text: 'text-orange-500'    },
-    { border: 'border-purple-500/30',    text: 'text-purple-500'    },
+
+  const COLORS = [
+    { border: 'border-cyan-electric/30', text: 'text-cyan-electric'  },
+    { border: 'border-yellow-500/30',    text: 'text-yellow-500'     },
+    { border: 'border-orange-500/30',    text: 'text-orange-500'     },
+    { border: 'border-purple-500/30',    text: 'text-purple-500'     },
   ];
 
   return (
@@ -32,7 +33,9 @@ const TeamsPreview = ({ currentMatch, isPresident }) => {
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <Swords size={13} className="text-cyan-electric" />
-          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">Times Sorteados</span>
+          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">
+            Times Sorteados
+          </span>
         </div>
         <button
           onClick={() => navigate('/draw')}
@@ -55,7 +58,9 @@ const TeamsPreview = ({ currentMatch, isPresident }) => {
                       {idx + 1}
                     </span>
                     <span className="text-[11px] font-black uppercase truncate flex-1">{p.name}</span>
-                    {p.position === 'goleiro' && <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full shrink-0" />}
+                    {p.position === 'goleiro' && (
+                      <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full shrink-0" />
+                    )}
                   </div>
                 ))}
               </div>
@@ -83,34 +88,66 @@ const TeamsPreview = ({ currentMatch, isPresident }) => {
         style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
       >
         <Play size={18} />
-        {isPresident ? 'Iniciar Partida' : 'Ver Times'}
+        {canManage ? 'Iniciar Partida' : 'Ver Times'}
       </button>
     </div>
   );
 };
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// ─── Bloco expansível ─────────────────────────────────────────────────────────
+
+const ExpandableBlock = ({ id, title, icon: Icon, iconColor = 'text-text-low', sub, expanded, onToggle, children }) => (
+  <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+          iconColor === 'text-cyan-electric' ? 'bg-cyan-electric/10 border-cyan-electric/20'
+          : iconColor === 'text-purple-400'  ? 'bg-purple-400/10  border-purple-400/20'
+          : 'bg-surface-2 border-border-mid'
+        }`}>
+          <Icon size={15} className={iconColor} />
+        </div>
+        <div className="text-left">
+          <p className="text-xs font-black uppercase text-white">{title}</p>
+          {sub && <p className="text-[9px] text-text-muted font-black">{sub}</p>}
+        </div>
+      </div>
+      {expanded
+        ? <ChevronUp   size={14} className="text-text-low" />
+        : <ChevronDown size={14} className="text-text-low" />}
+    </button>
+    {expanded && (
+      <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+        {children}
+      </div>
+    )}
+  </div>
+);
+
+// ─── TabManage ────────────────────────────────────────────────────────────────
 
 const TabManage = ({
   currentBaba,
   currentMatch,
   isDrawing,
   isPresident,
+  canManage,       // presidente OU coordenador
   playersWithRatings,
   getAllRatings,
   setPlayerRatings,
-  showSuspensions,
-  setShowSuspensions,
-  onShowSettings,
 }) => {
-  const navigate          = useNavigate();
-  const [showSettings,    setShowSettings]    = useState(false);
-  const [showDashboard,   setShowDashboard]   = useState(false);
+  const navigate        = useNavigate();
+  const [expanded, setExpanded] = useState({ dashboard: false, settings: false });
+
+  const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   return (
     <div className="space-y-5">
 
-      {/* Times sorteados / estado do sorteio */}
+      {/* Times sorteados / Iniciar sorteio */}
       {isDrawing ? (
         <div className="flex items-center justify-center gap-3 py-10 border border-cyan-electric/20 rounded-2xl bg-cyan-electric/5">
           <RefreshCw size={14} className="text-cyan-electric animate-spin" />
@@ -120,7 +157,7 @@ const TabManage = ({
         </div>
       ) : currentMatch ? (
         <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle">
-          <TeamsPreview currentMatch={currentMatch} isPresident={isPresident} />
+          <TeamsPreview currentMatch={currentMatch} canManage={canManage} />
         </div>
       ) : (
         <div
@@ -133,7 +170,7 @@ const TabManage = ({
         </div>
       )}
 
-      {/* Acesso rápido — Financeiro */}
+      {/* Financeiro */}
       <div
         onClick={() => navigate('/financial')}
         className="flex items-center gap-4 p-5 rounded-3xl bg-surface-1 border border-border-subtle cursor-pointer hover:bg-surface-2 transition-all active:scale-[0.98]"
@@ -148,85 +185,40 @@ const TabManage = ({
         <ChevronRight size={16} className="text-text-muted" />
       </div>
 
-      {/* Administração — apenas presidente */}
-      {isPresident && (
+      {/* Seção de administração — presidente e coordenador */}
+      {canManage && (
         <div className="space-y-3 pt-2 border-t border-border-subtle">
           <p className="text-[9px] font-black text-text-muted uppercase tracking-widest px-1">
-            Administração
+            {isPresident ? 'Administração' : 'Coordenação'}
           </p>
 
-          {/* Sprint 17 — Dashboard do Presidente */}
-          <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
-            <button
-              onClick={() => setShowDashboard(v => !v)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+          {/* Dashboard — apenas presidente vê KPIs completos */}
+          {isPresident && (
+            <ExpandableBlock
+              id="dashboard"
+              title="Relatórios & KPIs"
+              sub="Dashboard do presidente"
+              icon={BarChart2}
+              iconColor="text-purple-400"
+              expanded={expanded.dashboard}
+              onToggle={() => toggle('dashboard')}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <BarChart2 size={15} className="text-purple-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-black uppercase text-white">Relatórios & KPIs</p>
-                  <p className="text-[9px] text-text-muted font-black">Dashboard do presidente</p>
-                </div>
-              </div>
-              {showDashboard
-                ? <ChevronUp size={14} className="text-text-low" />
-                : <ChevronDown size={14} className="text-text-low" />}
-            </button>
-            {showDashboard && (
-              <div className="px-5 pb-5 border-t border-border-subtle pt-4">
-                <PresidentDashboard babaId={currentBaba?.id} />
-              </div>
-            )}
-          </div>
-
-          {/* Suspensões */}
-          <button
-            onClick={() => setShowSuspensions(s => !s)}
-            className="w-full py-4 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-red-400 font-black uppercase text-[10px] tracking-widest hover:bg-red-500/10 flex items-center justify-center gap-3 transition-colors active:scale-95"
-          >
-            <Shield size={16} /> Gestão de Suspensões
-          </button>
-
-          {showSuspensions && (
-            <div className="p-5 bg-surface-1 border border-border-subtle rounded-[2rem]">
-              <SuspensionPanel
-                players={playersWithRatings}
-                babaId={currentBaba?.id}
-                onPlayersUpdated={async () => {
-                  const u = await getAllRatings();
-                  setPlayerRatings(u || []);
-                }}
-              />
-            </div>
+              <PresidentDashboard babaId={currentBaba?.id} />
+            </ExpandableBlock>
           )}
 
-          {/* Sprint 15 — Configurações avançadas inline */}
-          <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
-            <button
-              onClick={() => setShowSettings(v => !v)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-surface-2 border border-border-mid flex items-center justify-center">
-                  <Settings size={15} className="text-text-low" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-black uppercase text-white">Configurações do Grupo</p>
-                  <p className="text-[9px] text-text-muted font-black">Jogo, sorteio, avaliações</p>
-                </div>
-              </div>
-              {showSettings
-                ? <ChevronUp size={14} className="text-text-low" />
-                : <ChevronDown size={14} className="text-text-low" />}
-            </button>
-            {showSettings && (
-              <div className="px-5 pb-5 border-t border-border-subtle pt-4">
-                <BabaSettings />
-              </div>
-            )}
-          </div>
+          {/* Configurações — presidente e coordenador */}
+          <ExpandableBlock
+            id="settings"
+            title="Configurações do Grupo"
+            sub="Jogo, sorteio, avaliações, convites"
+            icon={Settings}
+            iconColor="text-text-low"
+            expanded={expanded.settings}
+            onToggle={() => toggle('settings')}
+          >
+            <BabaSettings />
+          </ExpandableBlock>
         </div>
       )}
     </div>
