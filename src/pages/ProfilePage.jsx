@@ -1,15 +1,14 @@
 // src/pages/ProfilePage.jsx
-// Sprint 12 + 14 + 19 — Perfil do usuário logado.
-// Tabs: Estatísticas | Conquistas | Editar Perfil
-// Usa get_player_full_profile + BadgesSection + link para perfil público
+// Corrigido: tabs limpas (stats | conquistas | editar), sem duplicação,
+// botão perfil público funcionando, BadgesSection integrada corretamente.
 
 import React, { useState, useEffect, useReducer, useCallback } from 'react';
-import { Share2, ExternalLink, Copy, Check } from 'lucide-react';
+import { Share2, ExternalLink, Copy, Check, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useBaba } from '../contexts/BabaContext';
+import { useAuth }  from '../contexts/AuthContext';
+import { useBaba }  from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import toast from 'react-hot-toast';
+import toast        from 'react-hot-toast';
 
 import ProfileHeader      from '../components/ProfileHeader';
 import ProfileStats       from '../components/ProfileStats';
@@ -37,6 +36,14 @@ const reducer = (state, action) => {
   }
 };
 
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'stats',    label: 'Estatísticas'  },
+  { id: 'badges',   label: 'Conquistas'    },
+  { id: 'edit',     label: 'Editar'        },
+];
+
 // ─── ProfilePage ──────────────────────────────────────────────────────────────
 
 const ProfilePage = () => {
@@ -49,9 +56,9 @@ const ProfilePage = () => {
   const [copied,    setCopied]    = useState(false);
   const [state, dispatch]         = useReducer(reducer, INITIAL);
 
-  // Encontrar o player_id do usuário logado no baba atual
+  // player_id do usuário logado no baba atual (para BadgesSection)
   const myPlayer = currentBaba
-    ? players.find(p => p.user_id === user?.id)
+    ? (players || []).find(p => p.user_id === user?.id)
     : null;
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -100,7 +107,7 @@ const ProfilePage = () => {
   const totalMatches = state.matchStats.reduce((s, m) => s + (m.matches || 0), 0);
 
   const profileShareData = profile ? {
-    name:       profile.name || 'Jogador',
+    name:       profile.name       || 'Jogador',
     avatar_url: profile.avatar_url || null,
     position:   profile.position   || null,
     rating:     globalRating,
@@ -119,15 +126,10 @@ const ProfilePage = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const TABS = [
-    { id: 'stats',   label: 'Estatísticas'  },
-    { id: 'badges',  label: 'Conquistas'    },
-    { id: 'edit',    label: 'Editar Perfil' },
-  ];
-
   return (
     <div className="min-h-screen bg-black text-white pb-28 font-sans selection:bg-cyan-electric selection:text-black">
 
+      {/* Header — mantém o original sem alteração */}
       <ProfileHeader
         profile={profile}
         globalRating={globalRating}
@@ -136,26 +138,30 @@ const ProfilePage = () => {
         onProfileRefresh={refreshProfile}
       />
 
-      <div className="max-w-xl mx-auto px-6 space-y-6 mt-4">
+      <div className="max-w-xl mx-auto px-6 space-y-5 mt-4">
 
-        {/* Tabs + botão compartilhar */}
+        {/* ── Tabs ── */}
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1 overflow-x-auto">
+          <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1">
             {TABS.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex-1 whitespace-nowrap py-2.5 text-[10px] font-black uppercase rounded-lg transition-all px-2 ${
+                className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
                   tab === t.id
                     ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
                     : 'text-text-low hover:text-white'
                 }`}
               >
-                {t.label}
+                {t.id === 'badges'
+                  ? <span className="flex items-center justify-center gap-1"><Shield size={10} />{t.label}</span>
+                  : t.label
+                }
               </button>
             ))}
           </div>
 
+          {/* Compartilhar stats — só na aba stats */}
           {tab === 'stats' && (
             <button
               onClick={() => setShowShare(true)}
@@ -168,15 +174,15 @@ const ProfilePage = () => {
           )}
         </div>
 
-        {/* Banner: perfil público */}
-        {user && (
-          <div className="flex items-center gap-3 p-4 rounded-2xl bg-surface-1 border border-border-subtle">
+        {/* ── Banner perfil público ── */}
+        {user && tab !== 'edit' && (
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-1 border border-border-subtle">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase text-text-low tracking-widest mb-0.5">
-                Seu perfil público
+              <p className="text-[9px] font-black uppercase text-text-muted tracking-widest mb-0.5">
+                Perfil público
               </p>
-              <p className="text-[10px] text-text-muted truncate font-mono">
-                /player/{user.id.slice(0, 12)}...
+              <p className="text-[9px] text-text-muted truncate font-mono">
+                /player/{user.id.slice(0, 16)}...
               </p>
             </div>
             <button
@@ -188,29 +194,32 @@ const ProfilePage = () => {
               }`}
               title="Copiar link"
             >
-              {copied ? <Check size={15} /> : <Copy size={15} />}
+              {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
             <button
               onClick={() => navigate(`/player/${user.id}`)}
               className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
               title="Ver perfil público"
             >
-              <ExternalLink size={15} />
+              <ExternalLink size={14} />
             </button>
           </div>
         )}
 
-        {/* Erro */}
+        {/* ── Erro ── */}
         {state.error && (
           <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-center">
             <p className="text-[10px] font-black text-red-400 uppercase">Erro ao carregar dados</p>
-            <button onClick={loadData} className="mt-2 text-[9px] font-black text-red-400/60 hover:text-red-400 uppercase transition-colors">
+            <button
+              onClick={loadData}
+              className="mt-2 text-[9px] font-black text-red-400/60 hover:text-red-400 uppercase transition-colors"
+            >
               Tentar novamente
             </button>
           </div>
         )}
 
-        {/* Conteúdo das tabs */}
+        {/* ── Conteúdo por tab ── */}
         {tab === 'stats' && (
           <ProfileStats
             statsData={{
@@ -234,7 +243,7 @@ const ProfilePage = () => {
           <ProfileEdit
             profile={profile}
             onCancel={() => setTab('stats')}
-            onSaved={() => setTab('stats')}
+            onSaved={() => { setTab('stats'); refreshProfile?.(); }}
             onProfileRefresh={refreshProfile}
           />
         )}
