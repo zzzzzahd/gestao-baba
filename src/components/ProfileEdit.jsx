@@ -1,6 +1,14 @@
+// src/components/ProfileEdit.jsx
+// Sprint 19 — Campos adicionais: bio, instagram_handle, preferred_position, is_public
+// Mantém todos os campos originais (name, age, position, favorite_team)
+
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
-import { User, Mail, Calendar, Target, Heart, Save, X, RefreshCw } from 'lucide-react';
+import {
+  User, Mail, Calendar, Target, Heart,
+  Save, X, RefreshCw, Instagram, FileText,
+  Globe, Lock,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const POSITION_OPTIONS = [
@@ -26,12 +34,38 @@ const FieldLabel = ({ icon, children }) => (
   </label>
 );
 
+const Toggle = ({ label, sub, value, onChange, disabled }) => (
+  <div className="flex items-center justify-between py-3">
+    <div>
+      <p className="text-xs font-black text-white">{label}</p>
+      {sub && <p className="text-[9px] text-text-muted font-black mt-0.5">{sub}</p>}
+    </div>
+    <button
+      onClick={() => onChange(!value)}
+      disabled={disabled}
+      className={`relative w-10 h-5 rounded-full transition-all duration-300 disabled:opacity-50 ${
+        value ? 'bg-cyan-electric' : 'bg-surface-3'
+      }`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${
+        value ? 'translate-x-5' : ''
+      }`} />
+    </button>
+  </div>
+);
+
 const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
   const [formData, setFormData] = useState({
-    name:          profile?.name          || '',
-    age:           profile?.age           || '',
-    position:      profile?.position      || '',
-    favorite_team: profile?.favorite_team || '',
+    // Campos originais
+    name:               profile?.name               || '',
+    age:                profile?.age                || '',
+    position:           profile?.position           || '',
+    favorite_team:      profile?.favorite_team      || '',
+    // Campos Sprint 19
+    bio:                profile?.bio                || '',
+    instagram_handle:   profile?.instagram_handle   || '',
+    preferred_position: profile?.preferred_position || profile?.position || '',
+    is_public:          profile?.is_public          ?? true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -45,21 +79,45 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
       toast.error('O nome é obrigatório');
       return;
     }
+
+    // Validar instagram (sem @, sem espaços)
+    if (formData.instagram_handle) {
+      const clean = formData.instagram_handle.replace(/^@/, '').trim();
+      if (/\s/.test(clean)) {
+        toast.error('Instagram não pode ter espaços');
+        return;
+      }
+      formData.instagram_handle = clean;
+    }
+
+    // Limitar bio a 160 chars
+    if (formData.bio && formData.bio.length > 160) {
+      toast.error('Bio deve ter no máximo 160 caracteres');
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
-          name:          formData.name.trim(),
-          age:           formData.age ? parseInt(formData.age) : null,
-          position:      formData.position || null,
-          favorite_team: formData.favorite_team.trim() || null,
+          // Campos originais
+          name:               formData.name.trim(),
+          age:                formData.age ? parseInt(formData.age) : null,
+          position:           formData.position           || null,
+          favorite_team:      formData.favorite_team.trim() || null,
+          // Campos Sprint 19
+          bio:                formData.bio.trim()              || null,
+          instagram_handle:   formData.instagram_handle.trim() || null,
+          preferred_position: formData.preferred_position      || null,
+          is_public:          formData.is_public,
         })
         .eq('id', profile.id);
+
       if (error) throw error;
 
       if (onProfileRefresh) await onProfileRefresh();
-      toast.success('Perfil atualizado!');
+      toast.success('Perfil atualizado! ✅');
       if (onSaved) onSaved();
     } catch (e) {
       console.error('[ProfileEdit] save:', e);
@@ -69,8 +127,17 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
     }
   };
 
+  const bioLength = formData.bio?.length || 0;
+
   return (
     <div className="space-y-5">
+
+      {/* ── Informações básicas ──────────────────────────────────────── */}
+      <div className="px-1">
+        <p className="text-[9px] font-black uppercase tracking-widest text-text-muted">
+          Informações básicas
+        </p>
+      </div>
 
       {/* Nome */}
       <div>
@@ -103,7 +170,7 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
         />
       </div>
 
-      {/* Posição */}
+      {/* Posição principal */}
       <div>
         <FieldLabel icon={<Target size={12} />}>Posição em Campo</FieldLabel>
         <select
@@ -127,6 +194,93 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
           placeholder="Ex: Flamengo"
           className={INPUT_CLASS}
         />
+      </div>
+
+      {/* ── Perfil público (Sprint 19) ────────────────────────────────── */}
+      <div className="pt-3 border-t border-border-subtle">
+        <p className="text-[9px] font-black uppercase tracking-widest text-text-muted px-1 mb-4">
+          Perfil público
+        </p>
+
+        {/* Bio */}
+        <div className="mb-4">
+          <FieldLabel icon={<FileText size={12} />}>Bio</FieldLabel>
+          <div className="relative">
+            <textarea
+              name="bio"
+              value={formData.bio}
+              onChange={handleChange}
+              disabled={saving}
+              placeholder="Conte um pouco sobre você como jogador..."
+              rows={3}
+              maxLength={160}
+              className={`${INPUT_CLASS} resize-none`}
+            />
+            <span className={`absolute bottom-3 right-4 text-[9px] font-black ${
+              bioLength > 140 ? 'text-yellow-400' : 'text-text-muted'
+            }`}>
+              {bioLength}/160
+            </span>
+          </div>
+        </div>
+
+        {/* Instagram */}
+        <div className="mb-4">
+          <FieldLabel icon={<Instagram size={12} />}>Instagram</FieldLabel>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-black text-sm">@</span>
+            <input
+              type="text"
+              name="instagram_handle"
+              value={formData.instagram_handle}
+              onChange={handleChange}
+              disabled={saving}
+              placeholder="seu_usuario"
+              className={`${INPUT_CLASS} pl-8`}
+            />
+          </div>
+        </div>
+
+        {/* Posição preferida */}
+        <div className="mb-4">
+          <FieldLabel icon={<Target size={12} />}>Posição preferida (exibida no perfil)</FieldLabel>
+          <select
+            name="preferred_position"
+            value={formData.preferred_position}
+            onChange={handleChange}
+            disabled={saving}
+            className={`${INPUT_CLASS} appearance-none`}
+          >
+            <option value="" className="bg-black">Selecione</option>
+            {POSITION_OPTIONS.map(p => (
+              <option key={p.value} value={p.value} className="bg-black">{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Visibilidade do perfil */}
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle">
+          <Toggle
+            label="Perfil público"
+            sub={formData.is_public
+              ? 'Qualquer pessoa com o link pode ver seu perfil'
+              : 'Seu perfil está oculto para outros jogadores'}
+            value={formData.is_public}
+            onChange={(v) => setFormData(prev => ({ ...prev, is_public: v }))}
+            disabled={saving}
+          />
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle">
+            {formData.is_public
+              ? <Globe size={12} className="text-cyan-electric" />
+              : <Lock  size={12} className="text-text-muted"    />
+            }
+            <p className="text-[9px] font-black text-text-muted">
+              {formData.is_public
+                ? 'Stats, badges e babas ficam visíveis publicamente'
+                : 'Apenas membros do mesmo baba podem ver suas informações'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Botões */}
