@@ -1,21 +1,26 @@
 // src/components/BabaSettings.jsx
-// Sprint 15 — Configurações avançadas do baba via RPC update_baba_settings.
+// Corrigido: funciona para presidente E coordenador (canManage),
+// campos organizados por seção, toggle visual limpo, save via RPC.
 
 import React, { useState, useEffect } from 'react';
-import { Save, Settings, ChevronDown, ChevronUp } from 'lucide-react';
-import { supabase } from '../services/supabase';
-import { useBaba } from '../contexts/BabaContext';
-import toast from 'react-hot-toast';
+import { Save, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { supabase }  from '../services/supabase';
+import { useBaba }   from '../contexts/BabaContext';
+import { useAuth }   from '../contexts/AuthContext';
+import toast         from 'react-hot-toast';
 
-const Toggle = ({ label, sub, value, onChange }) => (
+// ── Subcomponentes ────────────────────────────────────────────────────────────
+
+const Toggle = ({ label, sub, value, onChange, disabled }) => (
   <div className="flex items-center justify-between py-3 border-b border-border-subtle last:border-0">
-    <div>
+    <div className="pr-4">
       <p className="text-xs font-black text-white">{label}</p>
       {sub && <p className="text-[9px] text-text-muted font-black mt-0.5">{sub}</p>}
     </div>
     <button
-      onClick={() => onChange(!value)}
-      className={`relative w-10 h-5 rounded-full transition-all duration-300 ${
+      onClick={() => !disabled && onChange(!value)}
+      disabled={disabled}
+      className={`relative w-10 h-5 rounded-full transition-all duration-300 flex-shrink-0 disabled:opacity-40 ${
         value ? 'bg-cyan-electric' : 'bg-surface-3'
       }`}
     >
@@ -26,93 +31,145 @@ const Toggle = ({ label, sub, value, onChange }) => (
   </div>
 );
 
-const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, step }) => (
+const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, disabled }) => (
   <div>
     <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">{label}</label>
     <input
       type={type}
-      value={value}
+      value={value ?? ''}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      min={min} max={max} step={step}
-      className="w-full bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-xs font-black text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 transition-colors"
+      min={min} max={max}
+      disabled={disabled}
+      className="w-full bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-xs font-black text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 transition-colors disabled:opacity-40"
     />
   </div>
 );
 
+const Section = ({ title, expanded, onToggle, children }) => (
+  <div className="rounded-2xl bg-surface-2 border border-border-mid overflow-hidden">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-surface-3/50 transition-colors"
+    >
+      <span className="text-[10px] font-black uppercase tracking-widest text-white">{title}</span>
+      {expanded
+        ? <ChevronUp   size={13} className="text-text-low" />
+        : <ChevronDown size={13} className="text-text-low" />}
+    </button>
+    {expanded && (
+      <div className="px-4 pb-4 border-t border-border-subtle space-y-3 pt-3">
+        {children}
+      </div>
+    )}
+  </div>
+);
+
+// ── BabaSettings ──────────────────────────────────────────────────────────────
+
 export default function BabaSettings() {
   const { currentBaba, updateBaba } = useBaba();
+  const { user }                    = useAuth();
   const [saving,   setSaving]   = useState(false);
-  const [expanded, setExpanded] = useState({ game: true, draw: false, notifications: false, advanced: false });
+  const [sections, setSections] = useState({ game: true, draw: false, rating: false, advanced: false });
 
-  // Form state espelhando os campos do banco
   const [form, setForm] = useState({
-    max_players:           '',
-    allow_reserves:        false,
-    auto_draw_enabled:     false,
-    auto_draw_time:        '20:00',
-    rating_enabled:        true,
-    rating_open_hours:     24,
-    allow_guests:          false,
-    guest_limit:           2,
+    max_players:            '',
+    allow_reserves:         false,
+    auto_draw_enabled:      false,
+    auto_draw_time:         '20:00',
+    rating_enabled:         true,
+    rating_open_hours:      24,
+    allow_guests:           false,
+    guest_limit:            2,
     confirmation_open_days: 3,
-    confirmation_deadline: '20:00',
-    theme_color:           '#06b6d4',
-    pix_key:               '',
+    confirmation_deadline:  '20:00',
+    theme_color:            '#06b6d4',
+    pix_key:                '',
   });
 
+  // Verificar se é coordenador (não presidente)
+  const isPresident   = String(currentBaba?.president_id) === String(user?.id);
+  const [isCoord, setIsCoord] = useState(false);
+
+  useEffect(() => {
+    if (!currentBaba?.id || !user?.id || isPresident) return;
+    (async () => {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('baba_id', currentBaba.id)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsCoord(!!data);
+    })();
+  }, [currentBaba?.id, user?.id, isPresident]);
+
+  const canEditAll = isPresident; // coordenador tem acesso limitado
+
+  // Sync form com currentBaba
   useEffect(() => {
     if (!currentBaba) return;
     setForm({
-      max_players:            currentBaba.max_players           ?? '',
-      allow_reserves:         currentBaba.allow_reserves        ?? false,
-      auto_draw_enabled:      currentBaba.auto_draw_enabled     ?? false,
-      auto_draw_time:         currentBaba.auto_draw_time        ?? '20:00',
-      rating_enabled:         currentBaba.rating_enabled        ?? true,
-      rating_open_hours:      currentBaba.rating_open_hours     ?? 24,
-      allow_guests:           currentBaba.allow_guests          ?? false,
-      guest_limit:            currentBaba.guest_limit           ?? 2,
+      max_players:            currentBaba.max_players            ?? '',
+      allow_reserves:         currentBaba.allow_reserves         ?? false,
+      auto_draw_enabled:      currentBaba.auto_draw_enabled      ?? false,
+      auto_draw_time:         currentBaba.auto_draw_time         ?? '20:00',
+      rating_enabled:         currentBaba.rating_enabled         ?? true,
+      rating_open_hours:      currentBaba.rating_open_hours      ?? 24,
+      allow_guests:           currentBaba.allow_guests           ?? false,
+      guest_limit:            currentBaba.guest_limit            ?? 2,
       confirmation_open_days: currentBaba.confirmation_open_days ?? 3,
       confirmation_deadline:  currentBaba.confirmation_deadline  ?? '20:00',
-      theme_color:            currentBaba.theme_color           ?? '#06b6d4',
-      pix_key:                currentBaba.pix_key               ?? '',
+      theme_color:            currentBaba.theme_color            ?? '#06b6d4',
+      pix_key:                currentBaba.pix_key                ?? '',
     });
   }, [currentBaba?.id]);
 
   const set = (key) => (val) => setForm(prev => ({ ...prev, [key]: val }));
+  const toggle = (id) => setSections(prev => ({ ...prev, [id]: !prev[id] }));
 
   const handleSave = async () => {
     if (!currentBaba) return;
     setSaving(true);
     try {
-      // Usa RPC para campos avançados
+      // Campos disponíveis para coordenadores (gestão operacional)
+      const coordSettings = {
+        max_players:            form.max_players ? Number(form.max_players) : null,
+        auto_draw_enabled:      form.auto_draw_enabled,
+        auto_draw_time:         form.auto_draw_time,
+        confirmation_open_days: Number(form.confirmation_open_days) || 3,
+        confirmation_deadline:  form.confirmation_deadline,
+        allow_guests:           form.allow_guests,
+        guest_limit:            Number(form.guest_limit) || 2,
+      };
+
+      // Campos exclusivos do presidente
+      const presidentSettings = canEditAll ? {
+        ...coordSettings,
+        rating_enabled:    form.rating_enabled,
+        rating_open_hours: Number(form.rating_open_hours) || 24,
+        theme_color:       form.theme_color,
+      } : coordSettings;
+
       const { error: rpcErr } = await supabase.rpc('update_baba_settings', {
         p_baba_id: currentBaba.id,
-        p_settings: {
-          auto_draw_enabled:      form.auto_draw_enabled,
-          auto_draw_time:         form.auto_draw_time,
-          rating_enabled:         form.rating_enabled,
-          rating_open_hours:      Number(form.rating_open_hours) || 24,
-          allow_guests:           form.allow_guests,
-          guest_limit:            Number(form.guest_limit) || 2,
-          confirmation_open_days: Number(form.confirmation_open_days) || 3,
-          confirmation_deadline:  form.confirmation_deadline,
-          theme_color:            form.theme_color,
-          max_players:            form.max_players ? Number(form.max_players) : null,
-        },
+        p_settings: presidentSettings,
       });
       if (rpcErr) throw rpcErr;
 
-      // Campos básicos via updateBaba do contexto
-      await updateBaba(currentBaba.id, {
-        allow_reserves: form.allow_reserves,
-        pix_key:        form.pix_key || null,
-      });
+      if (canEditAll) {
+        await updateBaba?.(currentBaba.id, {
+          allow_reserves: form.allow_reserves,
+          pix_key:        form.pix_key || null,
+        });
+      }
 
       toast.success('Configurações salvas! ✅');
     } catch (err) {
       console.error('[BabaSettings]', err);
-      toast.error('Erro ao salvar');
+      toast.error('Erro ao salvar configurações');
     } finally {
       setSaving(false);
     }
@@ -120,46 +177,24 @@ export default function BabaSettings() {
 
   if (!currentBaba) return null;
 
-  const Section = ({ id, title, icon: Icon, children }) => (
-    <div className="rounded-2xl bg-surface-1 border border-border-mid overflow-hidden">
-      <button
-        onClick={() => setExpanded(p => ({ ...p, [id]: !p[id] }))}
-        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-surface-2/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Icon size={14} className="text-cyan-electric" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white">{title}</span>
-        </div>
-        {expanded[id] ? <ChevronUp size={14} className="text-text-low" /> : <ChevronDown size={14} className="text-text-low" />}
-      </button>
-      {expanded[id] && (
-        <div className="px-4 pb-4 space-y-3 border-t border-border-subtle">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
 
       {/* Jogo */}
-      <Section id="game" title="Jogo" icon={Settings}>
-        <div className="pt-1">
-          <Field
-            label="Máx. jogadores confirmados"
-            type="number"
-            value={form.max_players}
-            onChange={set('max_players')}
-            placeholder="Ilimitado"
-            min="2" max="50"
-          />
-        </div>
+      <Section title="Jogo e Confirmações" expanded={sections.game} onToggle={() => toggle('game')}>
+        <Field
+          label="Máx. jogadores confirmados"
+          type="number" min="2" max="50"
+          value={form.max_players}
+          onChange={set('max_players')}
+          placeholder="Ilimitado"
+        />
         <Toggle
-          label="Permitir reservas"
+          label="Permitir lista de espera"
           sub="Jogadores acima do limite entram na fila"
           value={form.allow_reserves}
           onChange={set('allow_reserves')}
+          disabled={!canEditAll}
         />
         <Toggle
           label="Permitir convidados"
@@ -170,31 +205,27 @@ export default function BabaSettings() {
         {form.allow_guests && (
           <Field
             label="Máx. convidados por membro"
-            type="number"
+            type="number" min="1" max="5"
             value={form.guest_limit}
             onChange={set('guest_limit')}
-            min="1" max="5"
           />
         )}
+        <Field
+          label="Abrir confirmações X dias antes"
+          type="number" min="1" max="7"
+          value={form.confirmation_open_days}
+          onChange={set('confirmation_open_days')}
+        />
+        <Field
+          label="Encerrar confirmações às"
+          type="time"
+          value={form.confirmation_deadline}
+          onChange={set('confirmation_deadline')}
+        />
       </Section>
 
-      {/* Confirmações */}
-      <Section id="draw" title="Confirmações" icon={Settings}>
-        <div className="pt-1 space-y-3">
-          <Field
-            label="Abrir confirmações X dias antes"
-            type="number"
-            value={form.confirmation_open_days}
-            onChange={set('confirmation_open_days')}
-            min="1" max="7"
-          />
-          <Field
-            label="Encerrar confirmações às (HH:MM)"
-            type="time"
-            value={form.confirmation_deadline}
-            onChange={set('confirmation_deadline')}
-          />
-        </div>
+      {/* Sorteio */}
+      <Section title="Sorteio Automático" expanded={sections.draw} onToggle={() => toggle('draw')}>
         <Toggle
           label="Sorteio automático"
           sub="Sortear times automaticamente no horário definido"
@@ -211,9 +242,9 @@ export default function BabaSettings() {
         )}
       </Section>
 
-      {/* Avaliações */}
-      <Section id="notifications" title="Avaliações" icon={Settings}>
-        <div className="pt-1">
+      {/* Avaliações — apenas presidente */}
+      {canEditAll && (
+        <Section title="Avaliações" expanded={sections.rating} onToggle={() => toggle('rating')}>
           <Toggle
             label="Habilitar avaliações"
             sub="Jogadores avaliam uns aos outros após a partida"
@@ -221,22 +252,19 @@ export default function BabaSettings() {
             onChange={set('rating_enabled')}
           />
           {form.rating_enabled && (
-            <div className="mt-3">
-              <Field
-                label="Janela de avaliação (horas após jogo)"
-                type="number"
-                value={form.rating_open_hours}
-                onChange={set('rating_open_hours')}
-                min="1" max="72"
-              />
-            </div>
+            <Field
+              label="Janela de avaliação (horas após jogo)"
+              type="number" min="1" max="72"
+              value={form.rating_open_hours}
+              onChange={set('rating_open_hours')}
+            />
           )}
-        </div>
-      </Section>
+        </Section>
+      )}
 
-      {/* Avançado */}
-      <Section id="advanced" title="Avançado" icon={Settings}>
-        <div className="pt-1 space-y-3">
+      {/* Avançado — apenas presidente */}
+      {canEditAll && (
+        <Section title="Avançado" expanded={sections.advanced} onToggle={() => toggle('advanced')}>
           <div>
             <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
               Cor do tema
@@ -257,19 +285,26 @@ export default function BabaSettings() {
             onChange={set('pix_key')}
             placeholder="CPF, e-mail, telefone ou chave aleatória"
           />
-        </div>
-      </Section>
+        </Section>
+      )}
+
+      {/* Aviso para coordenadores */}
+      {!canEditAll && isCoord && (
+        <p className="text-[9px] font-black text-text-muted text-center uppercase tracking-widest">
+          Avaliações e configurações avançadas são exclusivas do presidente
+        </p>
+      )}
 
       {/* Salvar */}
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full py-3.5 rounded-2xl bg-cyan-electric text-black text-[11px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3.5 rounded-2xl bg-cyan-electric text-black text-[11px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
       >
         {saving
-          ? <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-          : <Save size={14} />}
-        {saving ? 'Salvando...' : 'Salvar configurações'}
+          ? <><RefreshCw size={13} className="animate-spin" /> Salvando...</>
+          : <><Save size={13} /> Salvar configurações</>
+        }
       </button>
     </div>
   );
