@@ -1,6 +1,6 @@
 // src/components/BabaSettings.jsx
-// Corrigido: funciona para presidente E coordenador (canManage),
-// campos organizados por seção, toggle visual limpo, save via RPC.
+// Corrigido: após salvar pela RPC, busca baba atualizado do banco
+// e chama updateBaba para sincronizar o estado local (theme_color etc.)
 
 import React, { useState, useEffect } from 'react';
 import { Save, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
@@ -33,7 +33,9 @@ const Toggle = ({ label, sub, value, onChange, disabled }) => (
 
 const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, disabled }) => (
   <div>
-    <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">{label}</label>
+    <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+      {label}
+    </label>
     <input
       type={type}
       value={value ?? ''}
@@ -72,6 +74,10 @@ export default function BabaSettings() {
   const { user }                    = useAuth();
   const [saving,   setSaving]   = useState(false);
   const [sections, setSections] = useState({ game: true, draw: false, rating: false, advanced: false });
+  const [isCoord,  setIsCoord]  = useState(false);
+
+  const isPresident = String(currentBaba?.president_id) === String(user?.id);
+  const canEditAll  = isPresident;
 
   const [form, setForm] = useState({
     max_players:            '',
@@ -88,25 +94,18 @@ export default function BabaSettings() {
     pix_key:                '',
   });
 
-  // Verificar se é coordenador (não presidente)
-  const isPresident   = String(currentBaba?.president_id) === String(user?.id);
-  const [isCoord, setIsCoord] = useState(false);
-
+  // Verificar se é coordenador
   useEffect(() => {
     if (!currentBaba?.id || !user?.id || isPresident) return;
-    (async () => {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('baba_id', currentBaba.id)
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      setIsCoord(!!data);
-    })();
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('baba_id', currentBaba.id)
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle()
+      .then(({ data }) => setIsCoord(!!data));
   }, [currentBaba?.id, user?.id, isPresident]);
-
-  const canEditAll = isPresident; // coordenador tem acesso limitado
 
   // Sync form com currentBaba
   useEffect(() => {
@@ -127,15 +126,15 @@ export default function BabaSettings() {
     });
   }, [currentBaba?.id]);
 
-  const set = (key) => (val) => setForm(prev => ({ ...prev, [key]: val }));
-  const toggle = (id) => setSections(prev => ({ ...prev, [id]: !prev[id] }));
+  const set    = (key) => (val) => setForm(prev => ({ ...prev, [key]: val }));
+  const toggle = (id)  => setSections(prev => ({ ...prev, [id]: !prev[id] }));
 
   const handleSave = async () => {
     if (!currentBaba) return;
     setSaving(true);
     try {
-      // Campos disponíveis para coordenadores (gestão operacional)
-      const coordSettings = {
+      // 1. Salvar via RPC (campos avançados)
+      const rpcSettings = {
         max_players:            form.max_players ? Number(form.max_players) : null,
         auto_draw_enabled:      form.auto_draw_enabled,
         auto_draw_time:         form.auto_draw_time,
@@ -143,27 +142,53 @@ export default function BabaSettings() {
         confirmation_deadline:  form.confirmation_deadline,
         allow_guests:           form.allow_guests,
         guest_limit:            Number(form.guest_limit) || 2,
+        ...(canEditAll ? {
+          rating_enabled:    form.rating_enabled,
+          rating_open_hours: Number(form.rating_open_hours) || 24,
+          theme_color:       form.theme_color,
+        } : {}),
       };
-
-      // Campos exclusivos do presidente
-      const presidentSettings = canEditAll ? {
-        ...coordSettings,
-        rating_enabled:    form.rating_enabled,
-        rating_open_hours: Number(form.rating_open_hours) || 24,
-        theme_color:       form.theme_color,
-      } : coordSettings;
 
       const { error: rpcErr } = await supabase.rpc('update_baba_settings', {
         p_baba_id: currentBaba.id,
-        p_settings: presidentSettings,
+        p_settings: rpcSettings,
       });
       if (rpcErr) throw rpcErr;
 
-      if (canEditAll) {
-        await updateBaba?.(currentBaba.id, {
-          allow_reserves: form.allow_reserves,
-          pix_key:        form.pix_key || null,
-        });
+      // 2. Campos que a RPC não cobre — update direto
+      const directUpdate = {
+        allow_reserves: form.allow_reserves,
+        ...(canEditAll && form.pix_key !== undefined ? { pix_key: form.pix_key || null } : {}),
+      };
+
+      // 3. ← CORREÇÃO PRINCIPAL: buscar baba atualizado e sincronizar estado local
+      // Isso garante que theme_color e outros campos apareçam sem precisar recarregar
+      const { data: updatedBaba, error: fetchErr } = await supabase
+        .from('babas')
+        .update(directUpdate)
+        .eq('id', currentBaba.id)
+        .select('*')
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      // updateBaba do contexto atualiza setCurrentBaba e setMyBabas
+      // Passamos o baba completo atualizado do banco
+      if (updateBaba && updatedBaba) {
+        // Forçar sync de todos os campos incluindo os da RPC
+        const { data: freshBaba } = await supabase
+          .from('babas')
+          .select('*')
+          .eq('id', currentBaba.id)
+          .single();
+
+        if (freshBaba) {
+          // Atualizar contexto diretamente com dados frescos do banco
+          await updateBaba(currentBaba.id, {
+            ...freshBaba,
+            // não passar game_days_config para não disparar sanitize
+          });
+        }
       }
 
       toast.success('Configurações salvas! ✅');
@@ -180,7 +205,7 @@ export default function BabaSettings() {
   return (
     <div className="space-y-3">
 
-      {/* Jogo */}
+      {/* Jogo e Confirmações */}
       <Section title="Jogo e Confirmações" expanded={sections.game} onToggle={() => toggle('game')}>
         <Field
           label="Máx. jogadores confirmados"
@@ -224,7 +249,7 @@ export default function BabaSettings() {
         />
       </Section>
 
-      {/* Sorteio */}
+      {/* Sorteio Automático */}
       <Section title="Sorteio Automático" expanded={sections.draw} onToggle={() => toggle('draw')}>
         <Toggle
           label="Sorteio automático"
@@ -234,7 +259,7 @@ export default function BabaSettings() {
         />
         {form.auto_draw_enabled && (
           <Field
-            label="Horário do sorteio automático"
+            label="Horário do sorteio"
             type="time"
             value={form.auto_draw_time}
             onChange={set('auto_draw_time')}
@@ -288,14 +313,14 @@ export default function BabaSettings() {
         </Section>
       )}
 
-      {/* Aviso para coordenadores */}
+      {/* Aviso coordenador */}
       {!canEditAll && isCoord && (
         <p className="text-[9px] font-black text-text-muted text-center uppercase tracking-widest">
           Avaliações e configurações avançadas são exclusivas do presidente
         </p>
       )}
 
-      {/* Salvar */}
+      {/* Botão salvar */}
       <button
         onClick={handleSave}
         disabled={saving}
@@ -303,8 +328,7 @@ export default function BabaSettings() {
       >
         {saving
           ? <><RefreshCw size={13} className="animate-spin" /> Salvando...</>
-          : <><Save size={13} /> Salvar configurações</>
-        }
+          : <><Save size={13} /> Salvar configurações</>}
       </button>
     </div>
   );
