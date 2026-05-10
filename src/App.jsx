@@ -20,6 +20,7 @@ import CreatePage         from './pages/CreatePage';
 import HistoryPage        from './pages/HistoryPage';
 import DrawPage           from './pages/DrawPage';
 import PrivacyPage        from './pages/PrivacyPage';
+import TermsPage          from './pages/TermsPage';
 import JoinPage           from './pages/JoinPage';
 
 // Componentes globais
@@ -83,7 +84,7 @@ const AppInner = () => {
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
-        <Route path="/termos"        element={<PrivacyPage />} />
+        <Route path="/termos"        element={<TermsPage />} />
         <Route path="/join/:code"    element={<JoinPage />} />
         <Route path="/player/:userId" element={<PublicProfilePage />} />
 
