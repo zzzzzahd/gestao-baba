@@ -1,43 +1,75 @@
 // src/pages/draw/StepConfig.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Wizard /draw — Step 1: Configuração do sorteio.
-// Mostra: confirmados, config de jogadores/estratégia, botão sortear.
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 16 — Integra DrawConstraintsPanel + aplica constraints no sorteio
 
 import React, { useState } from 'react';
-import { Users, RefreshCw, ChevronRight } from 'lucide-react';
-import { useBaba } from '../../contexts/BabaContext';
-import { supabase } from '../../services/supabase';
-import Tooltip from '../../components/Tooltip';
-import toast from 'react-hot-toast';
+import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useBaba }               from '../../contexts/BabaContext';
+import { supabase }              from '../../services/supabase';
+import Tooltip                   from '../../components/Tooltip';
+import DrawConstraintsPanel      from '../../components/DrawConstraintsPanel';
+import toast                     from 'react-hot-toast';
 
 const STRATEGIES = [
-  {
-    id: 'reserve',
-    label: 'Reserva',
-    tip: 'Jogadores que não cabem nos times ficam de reserva.',
-  },
-  {
-    id: 'substitute',
-    label: 'Incompleto',
-    tip: 'Times são formados mesmo com menos jogadores.',
-  },
+  { id: 'reserve',    label: 'Reserva',    tip: 'Jogadores que não cabem nos times ficam de reserva.'             },
+  { id: 'substitute', label: 'Incompleto', tip: 'Times são formados mesmo com menos jogadores.'                   },
 ];
 
-// Algoritmo de sorteio balanceado por avaliação
-const drawTeams = (players, playersPerTeam, strategy) => {
-  const sorted = [...players].sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+// ─── Algoritmo de sorteio balanceado por avaliação ────────────────────────────
+// Sprint 16: aplica constraints (must_together / must_apart) após snake draft
+
+const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = []) => {
+  const sorted     = [...players].sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
   const totalTeams = Math.floor(sorted.length / playersPerTeam);
-  const teams = Array.from({ length: totalTeams }, (_, i) => ({
-    name: `Time ${String.fromCharCode(65 + i)}`,
+  const teams      = Array.from({ length: totalTeams }, (_, i) => ({
+    name:    `Time ${String.fromCharCode(65 + i)}`,
     players: [],
   }));
 
-  // Distribuição em cobra (snake draft) para balancear
+  // Snake draft inicial
   sorted.forEach((player, idx) => {
     const round = Math.floor(idx / totalTeams);
     const pos   = round % 2 === 0 ? idx % totalTeams : totalTeams - 1 - (idx % totalTeams);
     if (teams[pos]) teams[pos].players.push(player);
+  });
+
+  // Aplicar constraints — tentativa de swap se violação detectada
+  const getTeamOf = (pid) => teams.findIndex(t => t.players.some(p => p.id === pid));
+
+  const swapPlayers = (teamAIdx, playerAId, teamBIdx, playerBId) => {
+    const pA = teams[teamAIdx].players.find(p => p.id === playerAId);
+    const pB = teams[teamBIdx].players.find(p => p.id === playerBId);
+    if (!pA || !pB) return false;
+    teams[teamAIdx].players = teams[teamAIdx].players.filter(p => p.id !== playerAId);
+    teams[teamBIdx].players = teams[teamBIdx].players.filter(p => p.id !== playerBId);
+    teams[teamAIdx].players.push(pB);
+    teams[teamBIdx].players.push(pA);
+    return true;
+  };
+
+  constraints.forEach(({ player_a_id, player_b_id, constraint_type }) => {
+    const tA = getTeamOf(player_a_id);
+    const tB = getTeamOf(player_b_id);
+    if (tA === -1 || tB === -1) return; // um dos jogadores é reserva
+
+    if (constraint_type === 'must_together' && tA !== tB) {
+      // Tentar mover B para o time de A trocando com alguém de rating parecido
+      const playerBObj    = teams[tB].players.find(p => p.id === player_b_id);
+      const ratingTarget  = playerBObj?.final_rating || 0;
+      const candidates    = teams[tA].players
+        .filter(p => p.id !== player_a_id)
+        .sort((a, b) => Math.abs((a.final_rating || 0) - ratingTarget) - Math.abs((b.final_rating || 0) - ratingTarget));
+      if (candidates[0]) swapPlayers(tA, candidates[0].id, tB, player_b_id);
+    }
+
+    if (constraint_type === 'must_apart' && tA === tB) {
+      // Tentar mover B para outro time trocando com alguém de rating parecido
+      const playerBObj    = teams[tA].players.find(p => p.id === player_b_id);
+      const ratingTarget  = playerBObj?.final_rating || 0;
+      const otherTeamIdx  = (tA + 1) % totalTeams;
+      const candidates    = teams[otherTeamIdx].players
+        .sort((a, b) => Math.abs((a.final_rating || 0) - ratingTarget) - Math.abs((b.final_rating || 0) - ratingTarget));
+      if (candidates[0]) swapPlayers(tA, player_b_id, otherTeamIdx, candidates[0].id);
+    }
   });
 
   const reserves = strategy === 'reserve'
@@ -47,9 +79,12 @@ const drawTeams = (players, playersPerTeam, strategy) => {
   return { teams, reserves };
 };
 
+// ─── StepConfig ───────────────────────────────────────────────────────────────
+
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
   const { currentBaba, gameConfirmations, players, isDrawing } = useBaba();
-  const [drawing, setDrawing] = useState(false);
+  const [drawing,          setDrawing]          = useState(false);
+  const [showConstraints,  setShowConstraints]  = useState(false);
 
   const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
   const confirmedCount = gameConfirmations?.length || 0;
@@ -69,8 +104,9 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
     if (!canDraw) return;
     setDrawing(true);
     try {
-      // Buscar sorteio existente de hoje primeiro
       const today = new Date().toISOString().split('T')[0];
+
+      // Verificar sorteio existente
       const { data: existing } = await supabase
         .from('draw_results').select('*')
         .eq('baba_id', currentBaba.id).eq('draw_date', today)
@@ -81,28 +117,46 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         return;
       }
 
+      // Buscar constraints ativos
+      const { data: constraints } = await supabase.rpc('get_draw_constraints', {
+        p_baba_id: currentBaba.id,
+      });
+
       // Buscar jogadores confirmados com ratings
-      const confirmedIds = gameConfirmations.map(c => c.player_id);
+      const confirmedIds     = gameConfirmations.map(c => c.player_id);
       const confirmedPlayers = players
         .filter(p => confirmedIds.includes(p.id))
         .map(p => ({ ...p, final_rating: p.final_rating || 3 }));
 
-      const { teams, reserves } = drawTeams(
+      const { teams, reserves } = drawTeamsWithConstraints(
         confirmedPlayers,
         safeConfig.playersPerTeam,
         safeConfig.strategy,
+        constraints || [],
       );
 
-      // Persistir no banco
+      // Calcular score de balanceamento (diferença de rating médio entre times)
+      const avgRatings     = teams.map(t =>
+        t.players.reduce((s, p) => s + (p.final_rating || 0), 0) / (t.players.length || 1)
+      );
+      const balanceScore   = avgRatings.length > 1
+        ? Math.max(...avgRatings) - Math.min(...avgRatings)
+        : 0;
+
+      // Persistir no banco com campos do Sprint 16
       await supabase.from('draw_results').upsert({
-        baba_id:    currentBaba.id,
-        draw_date:  today,
+        baba_id:          currentBaba.id,
+        draw_date:        today,
         teams,
         reserves,
-        draw_config: safeConfig,
+        draw_config:      safeConfig,
+        algorithm:        'balanced_snake',
+        constraints_used: constraints || [],
+        balance_score:    Math.round(balanceScore * 100) / 100,
+        teams_snapshot:   teams,
       }, { onConflict: 'baba_id,draw_date' });
 
-      toast.success('Times sorteados!');
+      toast.success('Times sorteados! ⚡');
       onNext({ teams, reserves });
     } catch (err) {
       console.error('[StepConfig] draw error:', err);
@@ -192,13 +246,42 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         </div>
       </div>
 
+      {/* Sprint 16 — Restrições de sorteio */}
+      <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+        <button
+          onClick={() => setShowConstraints(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Settings2 size={14} className="text-text-low" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+              Restrições de sorteio
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-black text-text-muted uppercase">
+              Juntos / Separados
+            </span>
+            {showConstraints
+              ? <ChevronUp   size={14} className="text-text-low" />
+              : <ChevronDown size={14} className="text-text-low" />
+            }
+          </div>
+        </button>
+        {showConstraints && (
+          <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+            <DrawConstraintsPanel />
+          </div>
+        )}
+      </div>
+
       {/* Prévia */}
       {confirmedCount >= minRequired && (
         <div className="grid grid-cols-3 gap-2">
           {[
-            { value: totalMatches, label: 'Partidas',   color: 'text-cyan-electric' },
-            { value: totalTeams,   label: 'Times',      color: 'text-white'         },
-            { value: reserveCount, label: 'Reservas',   color: reserveCount > 0 ? 'text-yellow-500' : 'text-text-muted' },
+            { value: totalMatches, label: 'Partidas', color: 'text-cyan-electric'                                      },
+            { value: totalTeams,   label: 'Times',    color: 'text-white'                                               },
+            { value: reserveCount, label: 'Reservas', color: reserveCount > 0 ? 'text-yellow-500' : 'text-text-muted'  },
           ].map(item => (
             <div key={item.label} className="text-center p-3 bg-surface-1 rounded-2xl border border-border-subtle">
               <p className={`text-2xl font-black tabular-nums ${item.color}`}>{item.value}</p>
