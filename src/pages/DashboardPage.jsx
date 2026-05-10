@@ -1,32 +1,28 @@
 // src/pages/DashboardPage.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Hub central do baba. Fase 3: 3 abas com lazy loading + query param.
-// Aba 1 — Visão Geral | Aba 2 — Gestão | Aba 3 — Pós-jogo
-// Sprint 9: passa reloadConfirmations para TabOverview
-// ─────────────────────────────────────────────────────────────────────────────
+// Corrigido: isCoordinator para coordenadores, BabaSettings inline no TabManage,
+// MembersModal com props de suspensão e coordenador, sem duplicação de modais.
 
 import React, {
   useState, useEffect, useCallback, useMemo, Suspense, lazy,
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth }  from '../contexts/AuthContext';
-import { useBaba }  from '../contexts/BabaContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useBaba } from '../contexts/BabaContext';
 import {
   LogOut, Camera, Edit3, ChevronRight, RefreshCw,
-  Trophy, Settings, Users, Calendar,
+  Trophy, Settings, Calendar,
 } from 'lucide-react';
 
-import BabaSettings    from '../components/BabaSettings';
 import QRCodeModal     from '../components/QRCodeModal';
 import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
 import { DAY_SHORT }   from '../utils/constants';
 import toast           from 'react-hot-toast';
 
-// ── Lazy tabs ──────────────────────────────────────────────────────────────────
-const TabOverview  = lazy(() => import('./dashboard/TabOverview'));
-const TabManage    = lazy(() => import('./dashboard/TabManage'));
-const TabPostGame  = lazy(() => import('./dashboard/TabPostGame'));
+// ── Lazy tabs ─────────────────────────────────────────────────────────────────
+const TabOverview = lazy(() => import('./dashboard/TabOverview'));
+const TabManage   = lazy(() => import('./dashboard/TabManage'));
+const TabPostGame = lazy(() => import('./dashboard/TabPostGame'));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,15 +35,11 @@ const computeExpiryLabel = (expiresAt) => {
   return h > 0 ? `Expira em ${h}h ${m}min` : `Expira em ${m}min`;
 };
 
-// ── Tabs config ───────────────────────────────────────────────────────────────
-
 const TABS = [
-  { id: 'overview',  label: 'Visão Geral', icon: <Trophy    size={14} /> },
-  { id: 'manage',    label: 'Gestão',      icon: <Settings  size={14} /> },
-  { id: 'postgame',  label: 'Pós-jogo',    icon: <Calendar  size={14} /> },
+  { id: 'overview', label: 'Visão Geral', icon: <Trophy   size={14} /> },
+  { id: 'manage',   label: 'Gestão',      icon: <Settings size={14} /> },
+  { id: 'postgame', label: 'Pós-jogo',    icon: <Calendar size={14} /> },
 ];
-
-// ── Tab skeleton ──────────────────────────────────────────────────────────────
 
 const TabLoader = () => (
   <div className="space-y-3 pt-2">
@@ -57,34 +49,55 @@ const TabLoader = () => (
   </div>
 );
 
-// ── Dashboard Page ────────────────────────────────────────────────────────────
+// ── DashboardPage ─────────────────────────────────────────────────────────────
 
 const DashboardPage = () => {
-  const navigate                     = useNavigate();
+  const navigate                        = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { profile, signOut, user }   = useAuth();
+  const { profile, signOut, user }      = useAuth();
   const {
     currentBaba, players, loading,
     generateInviteCode, nextGameDay, uploadBabaImage,
     countdown, ratePlayer, getAllRatings,
     gameConfirmations, myConfirmation, canConfirm,
-    confirmPresence, cancelConfirmation, reloadConfirmations, // ← Sprint 9
+    confirmPresence, cancelConfirmation, reloadConfirmations,
     drawConfig, setDrawConfig, isDrawing, currentMatch,
   } = useBaba();
 
-  // ── Aba ativa via query param (?tab=) ─────────────────────────────────────
-  const activeTab = searchParams.get('tab') || 'overview';
+  // ── Aba ativa ────────────────────────────────────────────────────────────
+  const activeTab    = searchParams.get('tab') || 'overview';
   const setActiveTab = (id) => setSearchParams({ tab: id }, { replace: true });
 
+  // ── Papéis do usuário ─────────────────────────────────────────────────────
+  const isPresident   = String(currentBaba?.president_id) === String(user?.id);
+  const [isCoordinator, setIsCoordinator] = useState(false);
+  const canManage     = isPresident || isCoordinator;
+
+  useEffect(() => {
+    if (!currentBaba?.id || !user?.id || isPresident) return;
+    supabase_check();
+
+    async function supabase_check() {
+      const { supabase } = await import('../services/supabase');
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('baba_id', currentBaba.id)
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsCoordinator(!!data);
+    }
+  }, [currentBaba?.id, user?.id, isPresident]);
+
   // ── Estado local ──────────────────────────────────────────────────────────
-  const [showSettings,            setShowSettings]            = useState(false);
   const [showMembers,             setShowMembers]             = useState(false);
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
   const [showQRCode,              setShowQRCode]              = useState(false);
-  const [showSuspensions,         setShowSuspensions]         = useState(false);
   const [isUploading,             setIsUploading]             = useState(false);
   const [inviteExpiry,            setInviteExpiry]            = useState(null);
   const [playerRatings,           setPlayerRatings]           = useState([]);
+  const [copied,                  setCopied]                  = useState(false);
 
   // ── Ratings ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -111,8 +124,6 @@ const DashboardPage = () => {
   }, [currentBaba?.invite_expires_at]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const [copied, setCopied] = useState(false);
-
   const handleCopyCode = () => {
     if (!currentBaba?.invite_code) return;
     navigator.clipboard.writeText(currentBaba.invite_code);
@@ -141,23 +152,19 @@ const DashboardPage = () => {
     getAllRatings().then(updated => setPlayerRatings(updated || []));
   }, [ratePlayer, getAllRatings]);
 
-  // ── Loading state ─────────────────────────────────────────────────────────
+  const handlePlayersUpdated = useCallback(async () => {
+    const data = await getAllRatings();
+    setPlayerRatings(data || []);
+  }, [getAllRatings]);
+
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !currentBaba) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
-
-  // ── Props compartilhadas entre tabs ──────────────────────────────────────
-  const sharedProps = {
-    currentBaba,
-    isPresident,
-    players: playersWithRatings,
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const sharedProps = { currentBaba, isPresident, canManage, players: playersWithRatings };
 
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans selection:bg-cyan-electric selection:text-black">
@@ -182,7 +189,7 @@ const DashboardPage = () => {
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
-          {isPresident && !isUploading && (
+          {canManage && !isUploading && (
             <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-mid hover:text-cyan-electric cursor-pointer transition-colors">
               <Camera size={20} />
               <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'cover')} />
@@ -207,7 +214,7 @@ const DashboardPage = () => {
                 {(currentBaba?.name || '?').charAt(0)}
               </div>
             </div>
-            {isPresident && !isUploading && (
+            {canManage && !isUploading && (
               <label className="absolute bottom-0 right-0 p-2 bg-cyan-electric rounded-xl text-black cursor-pointer hover:scale-110 transition-transform shadow-lg">
                 <Edit3 size={16} />
                 <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'avatar')} />
@@ -218,11 +225,16 @@ const DashboardPage = () => {
             <h1 className="text-3xl font-black italic uppercase tracking-tighter leading-none">
               {currentBaba?.name}
             </h1>
-            <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-widest">
+            <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-widest flex-wrap">
               <span className="text-cyan-electric">@{profile?.name || 'atleta'}</span>
               {isPresident && (
                 <span className="bg-cyan-electric/10 text-cyan-electric px-2 py-0.5 rounded border border-cyan-electric/20">
                   Presidente
+                </span>
+              )}
+              {isCoordinator && !isPresident && (
+                <span className="bg-purple-400/10 text-purple-400 px-2 py-0.5 rounded border border-purple-400/20">
+                  Coordenador
                 </span>
               )}
             </div>
@@ -266,7 +278,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── Tabs (3 abas com query param) ── */}
+        {/* ── Tabs ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
           <div className="flex gap-1">
             {TABS.map(tab => (
@@ -288,7 +300,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── Conteúdo da aba ativa com lazy loading ── */}
+        {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
           <Suspense fallback={<TabLoader />}>
             {activeTab === 'overview' && (
@@ -301,7 +313,7 @@ const DashboardPage = () => {
                 canConfirm={canConfirm}
                 confirmPresence={confirmPresence}
                 cancelConfirmation={cancelConfirmation}
-                reloadConfirmations={reloadConfirmations} // ← Sprint 9
+                reloadConfirmations={reloadConfirmations}
                 drawConfig={drawConfig}
                 setDrawConfig={setDrawConfig}
                 isDrawing={isDrawing}
@@ -321,9 +333,6 @@ const DashboardPage = () => {
                 playersWithRatings={playersWithRatings}
                 getAllRatings={getAllRatings}
                 setPlayerRatings={setPlayerRatings}
-                showSuspensions={showSuspensions}
-                setShowSuspensions={setShowSuspensions}
-                onShowSettings={() => setShowSettings(true)}
               />
             )}
             {activeTab === 'postgame' && (
@@ -342,7 +351,10 @@ const DashboardPage = () => {
           players={playersWithRatings}
           onClose={() => setShowMembers(false)}
           currentUserId={user?.id}
+          babaId={currentBaba?.id}
+          presidentId={currentBaba?.president_id}
           onOpenRate={p => setSelectedPlayerForRating(p)}
+          onPlayersUpdated={handlePlayersUpdated}
         />
       )}
       {selectedPlayerForRating && (
@@ -359,9 +371,6 @@ const DashboardPage = () => {
         babaName={currentBaba?.name}
         onRefresh={generateInviteCode}
       />
-      {showSettings && (
-        <BabaSettings baba={currentBaba} onClose={() => setShowSettings(false)} />
-      )}
     </div>
   );
 };
