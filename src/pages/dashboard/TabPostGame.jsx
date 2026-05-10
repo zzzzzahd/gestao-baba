@@ -1,14 +1,13 @@
 // src/pages/dashboard/TabPostGame.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Aba "Pós-jogo" do Dashboard. Fase 3.
-// Conteúdo: acesso a histórico, rankings, últimos MVPs/destaques.
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 18 — AiInsightsPanel integrado na aba pós-jogo
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, ChevronRight, Star, Target, Zap } from 'lucide-react';
-import { supabase } from '../../services/supabase';
+import { useNavigate }    from 'react-router-dom';
+import { Trophy, Calendar, ChevronRight, Star, Target, Zap, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { supabase }       from '../../services/supabase';
+import { useBaba }        from '../../contexts/BabaContext';
 import { MatchCardSkeleton } from '../../components/SkeletonLoader';
+import AiInsightsPanel    from '../../components/AiInsightsPanel';
 
 // ─── Últimas partidas compactas ───────────────────────────────────────────────
 
@@ -45,168 +44,102 @@ const RecentMatchCard = ({ match }) => {
   );
 };
 
-// ─── Top jogadores compactos ──────────────────────────────────────────────────
+// ─── TabPostGame ──────────────────────────────────────────────────────────────
 
-const TopPlayerCard = ({ player, rank, label, icon }) => (
-  <div className="flex items-center gap-3 p-3 bg-surface-1 rounded-2xl border border-border-subtle">
-    <div className="w-7 h-7 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center shrink-0">
-      <span className="text-[10px] font-black text-cyan-electric tabular-nums">#{rank}</span>
-    </div>
-    <div className="w-8 h-8 rounded-full bg-surface-3 border border-border-mid flex items-center justify-center shrink-0 text-[11px] font-black overflow-hidden">
-      {player.avatar_url
-        ? <img src={player.avatar_url} className="w-full h-full object-cover" alt="" />
-        : (player.display_name || '?').charAt(0).toUpperCase()}
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-[11px] font-black uppercase truncate">{player.display_name || 'Jogador'}</p>
-      <p className="text-[9px] text-text-muted font-bold uppercase">{label}</p>
-    </div>
-    <div className="flex items-center gap-1 shrink-0">
-      {icon}
-      <span className="text-sm font-black tabular-nums text-cyan-electric">{player.value}</span>
-    </div>
-  </div>
-);
-
-// ─── Componente principal ─────────────────────────────────────────────────────
-
-const TabPostGame = ({ currentBaba, players }) => {
-  const navigate = useNavigate();
-  const [matches,    setMatches]    = useState([]);
-  const [topScorers, setTopScorers] = useState([]);
-  const [loading,    setLoading]    = useState(true);
+const TabPostGame = ({ currentBaba, isPresident }) => {
+  const navigate              = useNavigate();
+  const [recentMatches,   setRecentMatches]   = useState([]);
+  const [loadingMatches,  setLoadingMatches]  = useState(true);
+  const [showInsights,    setShowInsights]    = useState(true);
 
   useEffect(() => {
     if (!currentBaba?.id) return;
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        // Últimas 3 partidas
-        const { data: matchData } = await supabase
-          .from('matches').select('*')
-          .eq('baba_id', currentBaba.id)
-          .eq('status', 'finished')
-          .order('match_date', { ascending: false })
-          .limit(3);
-
-        // Top 3 artilheiros (acumulado)
-        const { data: statsData } = await supabase
-          .from('match_players')
-          .select('player_id, goals, assists')
-          .in('match_id',
-            (await supabase.from('matches').select('id').eq('baba_id', currentBaba.id)).data?.map(m => m.id) || []
-          );
-
-        if (!cancelled) {
-          setMatches(matchData || []);
-
-          // Agregar por jogador
-          const agg = {};
-          (statsData || []).forEach(s => {
-            if (!agg[s.player_id]) agg[s.player_id] = { goals: 0, assists: 0 };
-            agg[s.player_id].goals   += s.goals   || 0;
-            agg[s.player_id].assists += s.assists  || 0;
-          });
-
-          const scorers = Object.entries(agg)
-            .map(([id, stats]) => {
-              const p = players?.find(pl => pl.id === id);
-              return p ? { ...p, value: stats.goals, assists: stats.assists } : null;
-            })
-            .filter(Boolean)
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 3);
-
-          setTopScorers(scorers);
-        }
-      } catch (err) {
-        console.error('[TabPostGame]', err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    load();
-    return () => { cancelled = true; };
-  }, [currentBaba?.id, players]);
+    setLoadingMatches(true);
+    supabase
+      .from('matches')
+      .select('id, match_date, status, team_a_name, team_b_name, team_a_score, team_b_score, winner_team')
+      .eq('baba_id', currentBaba.id)
+      .order('match_date', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        setRecentMatches(data || []);
+        setLoadingMatches(false);
+      });
+  }, [currentBaba?.id]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+
+      {/* Sprint 18 — AI Insights */}
+      <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+        <button
+          onClick={() => setShowInsights(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-cyan-electric" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+              Insights da IA
+            </span>
+          </div>
+          {showInsights
+            ? <ChevronUp   size={14} className="text-text-low" />
+            : <ChevronDown size={14} className="text-text-low" />}
+        </button>
+        {showInsights && (
+          <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+            <AiInsightsPanel babaId={currentBaba?.id} isPresident={isPresident} />
+          </div>
+        )}
+      </div>
+
+      {/* Acessos rápidos */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { icon: Trophy,   label: 'Rankings',  sub: 'Ver classificação', path: '/rankings', color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+          { icon: Calendar, label: 'Histórico', sub: 'Partidas passadas',  path: '/history',  color: 'text-cyan-electric', bg: 'bg-cyan-electric/10 border-cyan-electric/20' },
+        ].map(item => (
+          <div
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            className={`p-4 rounded-2xl border cursor-pointer hover:opacity-80 transition-all active:scale-95 ${item.bg}`}
+          >
+            <item.icon size={20} className={`${item.color} mb-2`} />
+            <p className="text-xs font-black text-white uppercase tracking-wide">{item.label}</p>
+            <p className="text-[9px] text-text-low font-black">{item.sub}</p>
+          </div>
+        ))}
+      </div>
 
       {/* Últimas partidas */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Últimas partidas</p>
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <span className="text-[10px] font-black text-text-low uppercase tracking-widest">
+            Últimas partidas
+          </span>
           <button
             onClick={() => navigate('/history')}
             className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
           >
-            Ver tudo <ChevronRight size={10} />
+            Ver todas <ChevronRight size={10} />
           </button>
         </div>
 
-        {loading ? (
-          <MatchCardSkeleton count={2} />
-        ) : matches.length > 0 ? (
-          <div className="space-y-2">
-            {matches.map(m => <RecentMatchCard key={m.id} match={m} />)}
-          </div>
-        ) : (
-          <div
-            onClick={() => navigate('/history')}
-            className="p-8 rounded-3xl bg-surface-1 border border-dashed border-border-mid flex flex-col items-center gap-3 cursor-pointer hover:bg-surface-2 transition-all"
-          >
-            <Calendar size={28} className="text-text-muted" />
-            <p className="text-[11px] font-black text-text-low uppercase tracking-widest">
-              Nenhuma partida ainda
-            </p>
-            <p className="text-[9px] text-text-muted font-bold">Jogue e volte aqui para ver o histórico</p>
-          </div>
-        )}
-      </section>
-
-      {/* Rankings */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Top artilheiros</p>
-          <button
-            onClick={() => navigate('/rankings')}
-            className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
-          >
-            Rankings <ChevronRight size={10} />
-          </button>
+        <div className="space-y-2">
+          {loadingMatches ? (
+            <MatchCardSkeleton count={3} />
+          ) : recentMatches.length > 0 ? (
+            recentMatches.map(m => <RecentMatchCard key={m.id} match={m} />)
+          ) : (
+            <div className="text-center py-10 border-2 border-dashed border-border-subtle rounded-3xl">
+              <Calendar size={28} className="text-text-muted mx-auto mb-2" />
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+                Nenhuma partida ainda
+              </p>
+            </div>
+          )}
         </div>
-
-        {loading ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-14 rounded-2xl bg-surface-1 animate-pulse" />
-            ))}
-          </div>
-        ) : topScorers.length > 0 ? (
-          <div className="space-y-2">
-            {topScorers.map((p, i) => (
-              <TopPlayerCard
-                key={p.id}
-                player={p}
-                rank={i + 1}
-                label={`${p.value} gol${p.value !== 1 ? 's' : ''}`}
-                icon={<Zap size={13} className="text-cyan-electric" />}
-              />
-            ))}
-          </div>
-        ) : (
-          <div
-            onClick={() => navigate('/rankings')}
-            className="p-8 rounded-3xl bg-surface-1 border border-dashed border-border-mid flex flex-col items-center gap-3 cursor-pointer hover:bg-surface-2 transition-all"
-          >
-            <Trophy size={28} className="text-text-muted" />
-            <p className="text-[11px] font-black text-text-low uppercase tracking-widest">Sem dados de ranking</p>
-            <p className="text-[9px] text-text-muted font-bold">Registre gols nas partidas para gerar o ranking</p>
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   );
 };
