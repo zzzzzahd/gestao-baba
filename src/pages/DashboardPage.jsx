@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.jsx
 // Cor do tema do baba aplicada via useThemeStyles nos elementos visuais:
 // - Borda do logo, gradiente do header, tabs ativas, badge de presidente,
-//   botão "Ver todos", loading spinner, label do usuário
+//   botão "Ver todos", loading spinner, label do usuário. 
 
 import React, {
   useState, useEffect, useCallback, useMemo, Suspense, lazy,
