@@ -1,6 +1,7 @@
 // src/pages/DashboardPage.jsx
-// Corrigido: isCoordinator para coordenadores, BabaSettings inline no TabManage,
-// MembersModal com props de suspensão e coordenador, sem duplicação de modais.
+// Cor do tema do baba aplicada via useThemeStyles nos elementos visuais:
+// - Borda do logo, gradiente do header, tabs ativas, badge de presidente,
+//   botão "Ver todos", loading spinner, label do usuário
 
 import React, {
   useState, useEffect, useCallback, useMemo, Suspense, lazy,
@@ -16,8 +17,8 @@ import {
 import QRCodeModal     from '../components/QRCodeModal';
 import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
-import { DAY_SHORT }   from '../utils/constants';
-import toast           from 'react-hot-toast';
+import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
+import toast from 'react-hot-toast';
 
 // ── Lazy tabs ─────────────────────────────────────────────────────────────────
 const TabOverview = lazy(() => import('./dashboard/TabOverview'));
@@ -64,20 +65,22 @@ const DashboardPage = () => {
     drawConfig, setDrawConfig, isDrawing, currentMatch,
   } = useBaba();
 
-  // ── Aba ativa ────────────────────────────────────────────────────────────
+  // ── Cor do tema ───────────────────────────────────────────────────────────
+  useThemeColor(); // injeta CSS variables
+  const tc = useThemeStyles(); // helpers de estilo inline
+
+  // ── Aba ativa ─────────────────────────────────────────────────────────────
   const activeTab    = searchParams.get('tab') || 'overview';
   const setActiveTab = (id) => setSearchParams({ tab: id }, { replace: true });
 
   // ── Papéis do usuário ─────────────────────────────────────────────────────
-  const isPresident   = String(currentBaba?.president_id) === String(user?.id);
+  const isPresident             = String(currentBaba?.president_id) === String(user?.id);
   const [isCoordinator, setIsCoordinator] = useState(false);
-  const canManage     = isPresident || isCoordinator;
+  const canManage               = isPresident || isCoordinator;
 
   useEffect(() => {
     if (!currentBaba?.id || !user?.id || isPresident) return;
-    supabase_check();
-
-    async function supabase_check() {
+    (async () => {
       const { supabase } = await import('../services/supabase');
       const { data } = await supabase
         .from('user_roles')
@@ -87,7 +90,7 @@ const DashboardPage = () => {
         .eq('role', 'admin')
         .maybeSingle();
       setIsCoordinator(!!data);
-    }
+    })();
   }, [currentBaba?.id, user?.id, isPresident]);
 
   // ── Estado local ──────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ const DashboardPage = () => {
     }),
   [players, playerRatings]);
 
-  // ── Expiry do convite ─────────────────────────────────────────────────────
+  // ── Expiry ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
     const id = setInterval(
@@ -160,14 +163,18 @@ const DashboardPage = () => {
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !currentBaba) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+      {/* Spinner com cor do tema */}
+      <div
+        className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: `${tc.color} transparent transparent transparent` }}
+      />
     </div>
   );
 
   const sharedProps = { currentBaba, isPresident, canManage, players: playersWithRatings };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24 font-sans selection:bg-cyan-electric selection:text-black">
+    <div className="min-h-screen bg-black text-white pb-24 font-sans">
 
       {/* ── Header com capa ── */}
       <div className="relative h-72 w-full">
@@ -179,18 +186,37 @@ const DashboardPage = () => {
               alt="Capa"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-text-muted font-black text-6xl italic">
-              DRAFT PLAY
+            /* Gradiente com cor do tema quando não há cover */
+            <div
+              className="w-full h-full"
+              style={{
+                background: `radial-gradient(ellipse at top right, rgba(${tc.color === '#06b6d4' ? '6,182,212' : tc.color.replace('#','').match(/.{2}/g).map(h=>parseInt(h,16)).join(',')},0.15) 0%, transparent 70%)`,
+              }}
+            >
+              <div className="w-full h-full flex items-center justify-center font-black text-6xl italic"
+                style={{ color: `rgba(${(() => { const r=parseInt(tc.color.slice(1,3),16); const g=parseInt(tc.color.slice(3,5),16); const b=parseInt(tc.color.slice(5,7),16); return `${r},${g},${b}`; })()},0.15)` }}
+              >
+                DRAFT PLAY
+              </div>
             </div>
           )}
+
           {isUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-10">
-              <RefreshCw className="text-cyan-electric animate-spin" size={32} />
+              <RefreshCw className="animate-spin" size={32} style={tc.text} />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
+
+          {/* Gradiente com cor do tema na parte inferior */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to top, #000000 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%)`,
+            }}
+          />
+
           {canManage && !isUploading && (
-            <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-mid hover:text-cyan-electric cursor-pointer transition-colors">
+            <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-mid cursor-pointer transition-colors hover:text-white">
               <Camera size={20} />
               <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'cover')} />
             </label>
@@ -206,34 +232,55 @@ const DashboardPage = () => {
         {/* Logo + nome */}
         <div className="absolute left-6 bottom-0 flex items-end gap-5">
           <div className="relative">
-            <div className="w-32 h-32 rounded-[2.5rem] border-4 border-black bg-gray-800 shadow-2xl overflow-hidden relative">
-              {currentBaba?.logo_url && (
+            {/* Borda do logo com cor do tema */}
+            <div
+              className="w-32 h-32 rounded-[2.5rem] border-4 bg-gray-800 shadow-2xl overflow-hidden relative"
+              style={{
+                borderColor: tc.color,
+                boxShadow: `0 0 24px rgba(${parseInt(tc.color.slice(1,3),16)},${parseInt(tc.color.slice(3,5),16)},${parseInt(tc.color.slice(5,7),16)},0.3)`,
+              }}
+            >
+              {currentBaba?.logo_url ? (
                 <img src={currentBaba.logo_url} className="w-full h-full object-cover" alt="Logo" />
+              ) : (
+                <div
+                  className="absolute inset-0 flex items-center justify-center text-4xl font-black italic"
+                  style={{ color: tc.color, backgroundColor: `rgba(${parseInt(tc.color.slice(1,3),16)},${parseInt(tc.color.slice(3,5),16)},${parseInt(tc.color.slice(5,7),16)},0.1)` }}
+                >
+                  {(currentBaba?.name || '?').charAt(0)}
+                </div>
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-cyan-electric/10 text-cyan-electric text-4xl font-black italic -z-10">
-                {(currentBaba?.name || '?').charAt(0)}
-              </div>
             </div>
+
             {canManage && !isUploading && (
-              <label className="absolute bottom-0 right-0 p-2 bg-cyan-electric rounded-xl text-black cursor-pointer hover:scale-110 transition-transform shadow-lg">
+              <label
+                className="absolute bottom-0 right-0 p-2 rounded-xl text-black cursor-pointer hover:scale-110 transition-transform shadow-lg"
+                style={tc.bg}
+              >
                 <Edit3 size={16} />
                 <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'avatar')} />
               </label>
             )}
           </div>
+
           <div className="mb-2">
             <h1 className="text-3xl font-black italic uppercase tracking-tighter leading-none">
               {currentBaba?.name}
             </h1>
             <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-widest flex-wrap">
-              <span className="text-cyan-electric">@{profile?.name || 'atleta'}</span>
+              {/* Username com cor do tema */}
+              <span style={tc.text}>@{profile?.name || 'atleta'}</span>
+
               {isPresident && (
-                <span className="bg-cyan-electric/10 text-cyan-electric px-2 py-0.5 rounded border border-cyan-electric/20">
+                <span
+                  className="px-2 py-0.5 rounded border text-[9px] font-black uppercase"
+                  style={{ ...tc.bgAlpha(0.15), ...tc.border(0.3), color: tc.color }}
+                >
                   Presidente
                 </span>
               )}
               {isCoordinator && !isPresident && (
-                <span className="bg-purple-400/10 text-purple-400 px-2 py-0.5 rounded border border-purple-400/20">
+                <span className="bg-purple-400/10 text-purple-400 px-2 py-0.5 rounded border border-purple-400/20 text-[9px]">
                   Coordenador
                 </span>
               )}
@@ -269,29 +316,34 @@ const DashboardPage = () => {
               </div>
               <span className="text-sm font-black text-white">{players?.length || 0} atletas</span>
             </div>
+            {/* Botão "Ver todos" com cor do tema */}
             <button
               onClick={() => setShowMembers(true)}
-              className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
+              className="flex items-center gap-1 text-[9px] font-black uppercase hover:opacity-70 transition-opacity"
+              style={tc.text}
             >
               Ver todos <ChevronRight size={10} />
             </button>
           </div>
         </div>
 
-        {/* ── Tabs ── */}
+        {/* ── Tabs com cor do tema ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
           <div className="flex gap-1">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-cyan-electric/10 text-cyan-electric border border-cyan-electric/20'
-                    : 'text-text-low hover:text-text-mid hover:bg-surface-2 border border-transparent'
+                className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                  activeTab === tab.id ? '' : 'text-text-low hover:text-text-mid hover:bg-surface-2 border-transparent'
                 }`}
+                style={activeTab === tab.id ? {
+                  ...tc.bgAlpha(0.1),
+                  ...tc.border(0.25),
+                  color: tc.color,
+                } : {}}
               >
-                <span className={activeTab === tab.id ? 'text-cyan-electric' : 'text-text-muted'}>
+                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }}>
                   {tab.icon}
                 </span>
                 {tab.label}
