@@ -1,262 +1,295 @@
-// src/pages/ProfilePage.jsx
-// Corrigido: tabs limpas (stats | conquistas | editar), sem duplicação,
-// botão perfil público funcionando, BadgesSection integrada corretamente.
+import React, { useMemo } from 'react';
+import { Star, Zap, TrendingUp, Users, Trophy } from 'lucide-react';
 
-import React, { useState, useEffect, useReducer, useCallback } from 'react';
-import { Share2, ExternalLink, Copy, Check, Shield } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth }  from '../contexts/AuthContext';
-import { useBaba }  from '../contexts/BabaContext';
-import { supabase } from '../services/supabase';
-import toast        from 'react-hot-toast';
 
-import ProfileHeader      from '../components/ProfileHeader';
-import ProfileStats       from '../components/ProfileStats';
-import ProfileEdit        from '../components/ProfileEdit';
-import ShareableCardModal from '../components/ShareableCardModal';
-import BadgesSection      from '../components/BadgesSection';
+// ─────────────────────────────────────────────
+// MICRO-COMPONENTES
+// ─────────────────────────────────────────────
 
-// ─── Estado ──────────────────────────────────────────────────────────────────
+const StarBar = ({ value, max = 5 }) => (
+  <div className="flex items-center gap-2">
+    <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+      <div
+        className="h-full bg-gradient-to-r from-cyan-electric to-purple-500 rounded-full transition-all duration-700"
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
+    </div>
+    <span className="text-[10px] font-black font-mono text-text-mid w-6 text-right">
+      {Number(value).toFixed(1)}
+    </span>
+  </div>
+);
 
-const INITIAL = {
-  ratings:     [],
-  matchStats:  [],
-  bestOfMonth: [],
-  ranking:     [],
-  loading:     true,
-  error:       null,
-};
-
-const reducer = (state, action) => {
-  switch (action.type) {
-    case 'LOADING': return { ...state, loading: true,  error: null };
-    case 'SUCCESS': return { ...state, loading: false, error: null, ...action.payload };
-    case 'ERROR':   return { ...state, loading: false, error: action.error };
-    default:        return state;
-  }
-};
-
-// ─── Tabs ─────────────────────────────────────────────────────────────────────
-
-const TABS = [
-  { id: 'stats',    label: 'Estatísticas'  },
-  { id: 'badges',   label: 'Conquistas'    },
-  { id: 'edit',     label: 'Editar'        },
-];
-
-// ─── ProfilePage ──────────────────────────────────────────────────────────────
-
-const ProfilePage = () => {
-  const navigate                          = useNavigate();
-  const { profile, user, refreshProfile } = useAuth();
-  const { myBabas, currentBaba, players } = useBaba();
-
-  const [tab,       setTab]       = useState('stats');
-  const [showShare, setShowShare] = useState(false);
-  const [copied,    setCopied]    = useState(false);
-  const [state, dispatch]         = useReducer(reducer, INITIAL);
-
-  // player_id do usuário logado no baba atual (para BadgesSection)
-  const myPlayer = currentBaba
-    ? (players || []).find(p => p.user_id === user?.id)
-    : null;
-
-  // ── Load ──────────────────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
-    if (!user || !myBabas?.length) {
-      dispatch({ type: 'SUCCESS', payload: { loading: false } });
-      return;
-    }
-    dispatch({ type: 'LOADING' });
-    try {
-      const babaIds = myBabas.map(b => b.id);
-      const { data, error } = await supabase.rpc('get_player_full_profile', {
-        p_user_id:  user.id,
-        p_baba_ids: babaIds,
-      });
-      if (error) throw error;
-
-      const result  = data || {};
-      const babaMap = new Map(myBabas.map(b => [b.id, b.name]));
-
-      dispatch({
-        type: 'SUCCESS',
-        payload: {
-          ratings:     (result.ratings     || []).map(r => ({ ...r, baba_name: r.baba_name || babaMap.get(r.baba_id) || 'Baba' })),
-          matchStats:  (result.match_stats || []).map(m => ({ ...m, baba_name: m.baba_name || babaMap.get(m.baba_id) || 'Baba' })),
-          bestOfMonth: (result.best_of_month || []).map(b => b.baba_name),
-          ranking:     result.ranking || [],
-        },
-      });
-    } catch (e) {
-      console.error('[ProfilePage]', e);
-      dispatch({ type: 'ERROR', error: e.message });
-    }
-  }, [user, myBabas]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // ── Computed ──────────────────────────────────────────────────────────────
-  const globalRating = (() => {
-    const vals = state.ratings.map(r => r.final_rating).filter(v => v > 0);
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-  })();
-
-  const totalGoals   = state.matchStats.reduce((s, m) => s + (m.goals   || 0), 0);
-  const totalAssists = state.matchStats.reduce((s, m) => s + (m.assists || 0), 0);
-  const totalMatches = state.matchStats.reduce((s, m) => s + (m.matches || 0), 0);
-
-  const profileShareData = profile ? {
-    name:       profile.name       || 'Jogador',
-    avatar_url: profile.avatar_url || null,
-    position:   profile.position   || null,
-    rating:     globalRating,
-    goals:      totalGoals,
-    assists:    totalAssists,
-    matches:    totalMatches,
-  } : null;
-
-  const publicProfileUrl = user ? `${window.location.origin}/player/${user.id}` : null;
-
-  const handleCopyPublicLink = () => {
-    if (!publicProfileUrl) return;
-    navigator.clipboard.writeText(publicProfileUrl);
-    setCopied(true);
-    toast.success('Link copiado!');
-    setTimeout(() => setCopied(false), 2000);
+const StatCard = ({ icon, label, value, sub, accent = 'cyan' }) => {
+  const map = {
+    cyan:   'text-cyan-electric  border-cyan-electric/20  bg-cyan-electric/10',
+    purple: 'text-purple-400     border-purple-400/20     bg-purple-400/10',
+    orange: 'text-orange-400     border-orange-400/20     bg-orange-400/10',
+    green:  'text-emerald-400    border-emerald-400/20    bg-emerald-400/10',
   };
-
+  const cls = map[accent] || map.cyan;
+  const textCls = cls.split(/\s+/)[0];
   return (
-    <div className="min-h-screen bg-black text-white pb-28 font-sans selection:bg-cyan-electric selection:text-black">
-
-      {/* Header — mantém o original sem alteração */}
-      <ProfileHeader
-        profile={profile}
-        globalRating={globalRating}
-        tab={tab}
-        onTabChange={setTab}
-        onProfileRefresh={refreshProfile}
-      />
-
-      <div className="max-w-xl mx-auto px-6 space-y-5 mt-4">
-
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border-mid flex-1">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg transition-all ${
-                  tab === t.id
-                    ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-500/20'
-                    : 'text-text-low hover:text-white'
-                }`}
-              >
-                {t.id === 'badges'
-                  ? <span className="flex items-center justify-center gap-1"><Shield size={10} />{t.label}</span>
-                  : t.label
-                }
-              </button>
-            ))}
-          </div>
-
-          {/* Compartilhar stats — só na aba stats */}
-          {tab === 'stats' && (
-            <button
-              onClick={() => setShowShare(true)}
-              disabled={state.loading || !profileShareData}
-              className="p-2.5 bg-surface-2 border border-border-mid rounded-xl hover:bg-surface-3 transition-colors disabled:opacity-30"
-              title="Compartilhar suas stats"
-            >
-              <Share2 size={18} className="text-cyan-electric" />
-            </button>
-          )}
-        </div>
-
-        {/* ── Banner perfil público ── */}
-        {user && tab !== 'edit' && (
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-1 border border-border-subtle">
-            <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-black uppercase text-text-muted tracking-widest mb-0.5">
-                Perfil público
-              </p>
-              <p className="text-[9px] text-text-muted truncate font-mono">
-                /player/{user.id.slice(0, 16)}...
-              </p>
-            </div>
-            <button
-              onClick={handleCopyPublicLink}
-              className={`p-2 rounded-xl border transition-all ${
-                copied
-                  ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                  : 'bg-surface-2 border-border-mid text-text-low hover:text-white'
-              }`}
-              title="Copiar link"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </button>
-            <button
-              onClick={() => navigate(`/player/${user.id}`)}
-              className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
-              title="Ver perfil público"
-            >
-              <ExternalLink size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* ── Erro ── */}
-        {state.error && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-center">
-            <p className="text-[10px] font-black text-red-400 uppercase">Erro ao carregar dados</p>
-            <button
-              onClick={loadData}
-              className="mt-2 text-[9px] font-black text-red-400/60 hover:text-red-400 uppercase transition-colors"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        )}
-
-        {/* ── Conteúdo por tab ── */}
-        {tab === 'stats' && (
-          <ProfileStats
-            statsData={{
-              ratings:     state.ratings,
-              matchStats:  state.matchStats,
-              bestOfMonth: state.bestOfMonth,
-              ranking:     state.ranking,
-            }}
-            loading={state.loading}
-          />
-        )}
-
-        {tab === 'badges' && (
-          <BadgesSection
-            playerId={myPlayer?.id}
-            babaId={currentBaba?.id}
-          />
-        )}
-
-        {tab === 'edit' && (
-          <ProfileEdit
-            profile={profile}
-            onCancel={() => setTab('stats')}
-            onSaved={() => { setTab('stats'); refreshProfile?.(); }}
-            onProfileRefresh={refreshProfile}
-          />
-        )}
+    <div className={`p-4 rounded-2xl border ${cls} flex flex-col gap-1`}>
+      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 opacity-60 ${textCls}`}>
+        {icon}{label}
       </div>
-
-      <ShareableCardModal
-        isOpen={showShare}
-        onClose={() => setShowShare(false)}
-        rankingType="profile"
-        profileData={profileShareData}
-      />
+      <p className={`text-2xl font-black font-mono ${textCls}`}>{value}</p>
+      {sub && <p className="text-[9px] text-text-low font-bold uppercase">{sub}</p>}
     </div>
   );
 };
 
-export default ProfilePage;
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse bg-surface-2 rounded-xl ${className}`} />
+);
+
+const SectionTitle = ({ children, sub }) => (
+  <div className="mb-3">
+    <p className="text-[9px] font-black text-text-low uppercase tracking-[0.2em]">{children}</p>
+    {sub && <p className="text-[8px] text-text-muted font-bold uppercase mt-0.5">{sub}</p>}
+  </div>
+);
+
+// ─────────────────────────────────────────────
+// PROFILE STATS
+// ─────────────────────────────────────────────
+
+const ProfileStats = ({ statsData, loading }) => {
+
+  const { ratings, matchStats, bestOfMonth, ranking } = statsData;
+
+  const ratingsMap = useMemo(
+    () => new Map(ratings.map(r => [r.baba_id, r])),
+    [ratings]
+  );
+
+  const matchMap = useMemo(
+    () => new Map(matchStats.map(m => [m.baba_id, m])),
+    [matchStats]
+  );
+
+  const globalRating = useMemo(() => {
+    const vals = ratings.map(r => r.final_rating).filter(v => v > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }, [ratings]);
+
+  const totalVotes = useMemo(
+    () => ratings.reduce((s, r) => s + (r.votes_count || 0), 0),
+    [ratings]
+  );
+
+  const { totalGoals, totalAssists, totalMatches } = useMemo(() => ({
+    totalGoals:   matchStats.reduce((s, m) => s + (m.goals   || 0), 0),
+    totalAssists: matchStats.reduce((s, m) => s + (m.assists || 0), 0),
+    totalMatches: matchStats.reduce((s, m) => s + (m.matches || 0), 0),
+  }), [matchStats]);
+
+  const goalsPerGame   = totalMatches > 0 ? (totalGoals   / totalMatches).toFixed(2) : '—';
+  const assistsPerGame = totalMatches > 0 ? (totalAssists / totalMatches).toFixed(2) : '—';
+
+  const avgSubs = useMemo(() => {
+    const rs = ratings.filter(r => r.votes_count > 0);
+    if (!rs.length) return null;
+    const n = rs.length;
+    return {
+      skill:      rs.reduce((s, r) => s + (r.avg_skill      || 0), 0) / n,
+      physical:   rs.reduce((s, r) => s + (r.avg_physical   || 0), 0) / n,
+      commitment: rs.reduce((s, r) => s + (r.avg_commitment || 0), 0) / n,
+    };
+  }, [ratings]);
+
+  const babaPerformance = useMemo(() => {
+    const allBabaIds = [...new Set([
+      ...ratings.map(r => r.baba_id),
+      ...matchStats.map(m => m.baba_id),
+    ])];
+    return allBabaIds
+      .map(id => {
+        const r = ratingsMap.get(id);
+        const m = matchMap.get(id);
+        return {
+          baba_id:        id,
+          baba_name:      r?.baba_name || m?.baba_name || 'Baba',
+          final_rating:   r?.final_rating   || 0,
+          overall_rating: r?.overall_rating || 0,
+          avg_skill:      r?.avg_skill      || 0,
+          avg_physical:   r?.avg_physical   || 0,
+          avg_commitment: r?.avg_commitment || 0,
+          votes_count:    r?.votes_count    || 0,
+          rank_position:  ranking?.find(rk => rk.baba_id === id)?.rank_position || null,
+          goals:          m?.goals   || 0,
+          assists:        m?.assists || 0,
+          matches:        m?.matches || 0,
+        };
+      })
+      .sort((a, b) => b.final_rating - a.final_rating);
+  }, [ratings, matchStats, ratingsMap, matchMap, ranking]);
+
+  // ─────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────
+
+  return (
+    <div className="space-y-6">
+
+      {/* REPUTAÇÃO GLOBAL */}
+      <section>
+        <SectionTitle>Reputação Global</SectionTitle>
+        {loading ? (
+          <Skeleton className="h-32" />
+        ) : globalRating > 0 ? (
+          <div className="p-5 rounded-[1.75rem] bg-surface-1 border border-border-subtle space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-4xl font-black font-mono text-white leading-none">
+                  {Number(globalRating).toFixed(2)}
+                </p>
+                <p className="text-[10px] text-text-low font-bold uppercase mt-1">
+                  {totalVotes} voto{totalVotes !== 1 ? 's' : ''} recebido{totalVotes !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(i => (
+                  <Star
+                    key={i}
+                    size={16}
+                    className={i <= Math.round(globalRating) ? 'text-cyan-electric' : 'text-text-muted'}
+                    fill={i <= Math.round(globalRating) ? 'currentColor' : 'none'}
+                  />
+                ))}
+              </div>
+            </div>
+            {avgSubs && (
+              <div className="space-y-2 pt-3 border-t border-border-subtle">
+                {[
+                  { label: '⚽ Habilidade',  val: avgSubs.skill      },
+                  { label: '💪 Físico',       val: avgSubs.physical   },
+                  { label: '🤝 Compromisso',  val: avgSubs.commitment },
+                ].map(item => (
+                  <div key={item.label}>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1">
+                      {item.label}
+                    </p>
+                    <StarBar value={item.val} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-5 rounded-[1.75rem] bg-surface-1 border border-dashed border-border-mid text-center">
+            <Star size={24} className="text-text-muted mx-auto mb-2" />
+            <p className="text-[10px] text-text-muted font-black uppercase">Ainda sem avaliações</p>
+            <p className="text-[9px] text-text-muted mt-1">Peça para seus companheiros te avaliarem</p>
+          </div>
+        )}
+      </section>
+
+      {/* ESTATÍSTICAS GERAIS */}
+      <section>
+        <SectionTitle>Estatísticas Gerais</SectionTitle>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard icon={<Zap size={10}/>}        label="Gols"         value={totalGoals}              sub={`${goalsPerGame}/jogo`}   accent="orange" />
+            <StatCard icon={<TrendingUp size={10}/>}  label="Assistências" value={totalAssists}            sub={`${assistsPerGame}/jogo`} accent="cyan"   />
+            <StatCard icon={<Users size={10}/>}       label="Partidas"     value={totalMatches}            sub="jogos disputados"         accent="purple" />
+            <StatCard icon={<Trophy size={10}/>}      label="G + A"        value={totalGoals+totalAssists} sub="contribuições totais"     accent="green"  />
+          </div>
+        )}
+      </section>
+
+      {/* PERFORMANCE POR BABA */}
+      {(loading || babaPerformance.length > 0) && (
+        <section>
+          <SectionTitle>Performance por Baba</SectionTitle>
+          <div className="space-y-3">
+            {loading
+              ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-28" />)
+              : babaPerformance.map(b => (
+                <div key={b.baba_id} className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center text-cyan-electric font-black text-sm shrink-0">
+                        {b.baba_name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-white leading-none">{b.baba_name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[9px] text-text-low font-bold uppercase">
+                            {b.matches} jogo{b.matches !== 1 ? 's' : ''}
+                          </p>
+                          {b.rank_position && (
+                            <span className="text-[9px] font-black text-purple-400 uppercase">
+                              #{b.rank_position}º ranking
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {b.final_rating > 0 && (
+                      <div className="flex items-center gap-1 bg-cyan-electric/10 px-2.5 py-1.5 rounded-xl border border-cyan-electric/20 shrink-0">
+                        <Star size={10} className="text-cyan-electric" fill="currentColor" />
+                        <span className="text-sm font-black font-mono text-cyan-electric">
+                          {Number(b.final_rating).toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    {[
+                      { label: 'Gols',    value: b.goals             },
+                      { label: 'Assists', value: b.assists           },
+                      { label: 'G+A',     value: b.goals + b.assists },
+                    ].map(s => (
+                      <div key={s.label} className="bg-surface-1 rounded-xl py-2">
+                        <p className="text-lg font-black font-mono text-white">{s.value}</p>
+                        <p className="text-[8px] font-bold text-text-low uppercase">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {b.votes_count > 0 && (
+                    <div className="pt-2 border-t border-border-subtle space-y-1.5">
+                      {[
+                        { label: 'Hab', val: b.avg_skill      },
+                        { label: 'Fís', val: b.avg_physical   },
+                        { label: 'Cmp', val: b.avg_commitment },
+                      ].map(item => (
+                        <div key={item.label} className="flex items-center gap-2">
+                          <span className="text-[8px] font-black text-text-muted uppercase w-6 shrink-0">
+                            {item.label}
+                          </span>
+                          <StarBar value={item.val} />
+                        </div>
+                      ))}
+                      <p className="text-[8px] text-text-muted font-bold uppercase text-right">
+                        {b.votes_count} voto{b.votes_count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </section>
+      )}
+
+      {/* Estado vazio total */}
+      {!loading && babaPerformance.length === 0 && !globalRating && (
+        <div className="text-center py-16 border-2 border-dashed border-border-subtle rounded-3xl">
+          <Users size={32} className="text-text-muted mx-auto mb-3" />
+          <p className="text-text-muted font-black uppercase text-sm">Nenhuma estatística ainda</p>
+          <p className="text-text-muted text-[10px] mt-1">Participe de um baba para começar</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProfileStats;
