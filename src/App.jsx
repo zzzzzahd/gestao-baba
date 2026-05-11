@@ -21,6 +21,7 @@ import HistoryPage        from './pages/HistoryPage';
 import DrawPage           from './pages/DrawPage';
 import PrivacyPage        from './pages/PrivacyPage';
 import TermsPage          from './pages/TermsPage';
+import FollowersPage      from './pages/FollowersPage';
 import JoinPage           from './pages/JoinPage';
 
 // Componentes globais
@@ -86,7 +87,9 @@ const AppInner = () => {
         <Route path="/privacidade"   element={<PrivacyPage />} />
         <Route path="/termos"        element={<TermsPage />} />
         <Route path="/join/:code"    element={<JoinPage />} />
-        <Route path="/player/:userId" element={<PublicProfilePage />} />
+        <Route path="/player/:userId"    element={<PublicProfilePage />} />
+        <Route path="/followers/:userId" element={<FollowersPage />} />
+        <Route path="/followers"         element={<FollowersPage />} />
 
         {/* Protegidas */}
         <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
