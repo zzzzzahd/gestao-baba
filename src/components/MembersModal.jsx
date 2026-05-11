@@ -1,28 +1,16 @@
 // src/components/MembersModal.jsx
-// Corrigido: suspensão integrada na lista (sem painel separado),
-// botão de nomear coordenador para o presidente,
-// badge de papel (Presidente / Coordenador / Atleta)
+// Corrigido: botão de visitar perfil público de cada membro,
+// suspensão inline, nomear coordenador, badge de papel.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, ChevronDown, AlertTriangle, RefreshCw } from 'lucide-react';
+import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, ChevronDown, AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { POSITION_LABEL } from '../utils/constants';
 import { supabase } from '../services/supabase';
 import { useAuth }  from '../contexts/AuthContext';
 import toast        from 'react-hot-toast';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const suspensionStatus = (player) => {
-  if (!player.is_suspended) return null;
-  if (!player.suspension_until) return 'indefinido';
-  const until = new Date(player.suspension_until);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  if (until < today) return null;
-  const diff = Math.ceil((until - today) / 86400000);
-  return `${diff} dia${diff !== 1 ? 's' : ''}`;
-};
-
-// ── Modal de suspensão inline ─────────────────────────────────────────────────
+// ── Modal de suspensão ────────────────────────────────────────────────────────
 
 const SuspendSheet = ({ player, onClose, onConfirm }) => {
   const [days,       setDays]       = useState(7);
@@ -104,31 +92,50 @@ const SuspendSheet = ({ player, onClose, onConfirm }) => {
   );
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const suspensionStatus = (player) => {
+  if (!player.is_suspended) return null;
+  if (!player.suspension_until) return 'indefinido';
+  const until = new Date(player.suspension_until);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (until < today) return null;
+  const diff = Math.ceil((until - today) / 86400000);
+  return `${diff} dia${diff !== 1 ? 's' : ''}`;
+};
+
 // ── MembersModal ──────────────────────────────────────────────────────────────
 
-const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, presidentId, onPlayersUpdated }) => {
-  const { user }            = useAuth();
+const MembersModal = ({
+  players,
+  onClose,
+  onOpenRate,
+  currentUserId,
+  babaId,
+  presidentId,
+  onPlayersUpdated,
+}) => {
+  const { user }   = useAuth();
+  const navigate   = useNavigate();
+
   const [suspendTarget, setSuspendTarget] = useState(null);
   const [loading,       setLoading]       = useState(false);
-  const [roles,         setRoles]         = useState(new Map()); // user_id → 'admin' | 'player'
+  const [roles,         setRoles]         = useState(new Map());
   const [openMenuId,    setOpenMenuId]    = useState(null);
 
   const isPresident = String(presidentId) === String(user?.id);
 
-  // Carregar roles dos membros
   const loadRoles = useCallback(async () => {
     if (!babaId) return;
     const { data } = await supabase
       .from('user_roles')
       .select('user_id, role')
       .eq('baba_id', babaId);
-    const map = new Map((data || []).map(r => [r.user_id, r.role]));
-    setRoles(map);
+    setRoles(new Map((data || []).map(r => [r.user_id, r.role])));
   }, [babaId]);
 
   useEffect(() => { loadRoles(); }, [loadRoles]);
 
-  // Suspender / reativar jogador
   const handleSuspend = async (playerId, suspend, until) => {
     setLoading(true);
     try {
@@ -139,25 +146,20 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
       if (error) throw error;
       toast.success(suspend ? 'Jogador suspenso' : 'Suspensão removida');
       onPlayersUpdated?.();
-    } catch (err) {
+    } catch {
       toast.error('Erro ao atualizar suspensão');
     } finally {
       setLoading(false);
     }
   };
 
-  // Nomear / remover coordenador
   const handleToggleCoordinator = async (player) => {
     const targetUserId = player.user_id;
     if (!targetUserId) { toast.error('Jogador sem conta vinculada'); return; }
-
-    const currentRole = roles.get(targetUserId);
-    const isAdmin     = currentRole === 'admin';
-
+    const isAdmin = roles.get(targetUserId) === 'admin';
     setLoading(true);
     try {
       if (isAdmin) {
-        // Remover papel admin (mantém player)
         await supabase
           .from('user_roles')
           .delete()
@@ -166,20 +168,27 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
           .eq('role', 'admin');
         toast.success(`${player.display_name || player.name} deixou de ser coordenador`);
       } else {
-        // Dar papel admin
         await supabase
           .from('user_roles')
-          .insert({ baba_id: babaId, user_id: targetUserId, role: 'admin', granted_by: user?.id })
-          .on('conflict', 'user_id,baba_id,role', 'ignore');
+          .insert({ baba_id: babaId, user_id: targetUserId, role: 'admin', granted_by: user?.id });
         toast.success(`${player.display_name || player.name} agora é coordenador! 🎖️`);
       }
       await loadRoles();
-    } catch (err) {
+    } catch {
       toast.error('Erro ao atualizar cargo');
     } finally {
       setLoading(false);
       setOpenMenuId(null);
     }
+  };
+
+  const handleVisitProfile = (player) => {
+    if (!player.user_id) {
+      toast('Este jogador ainda não tem conta vinculada', { icon: '⚠️' });
+      return;
+    }
+    onClose();
+    navigate(`/player/${player.user_id}`);
   };
 
   const getRoleBadge = (player) => {
@@ -221,16 +230,22 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
               const menuOpen = openMenuId === p.id;
 
               return (
-                <div key={p.id || i} className={`rounded-2xl border transition-all ${
-                  susp ? 'bg-red-500/5 border-red-500/20' : 'bg-surface-2 border-border-subtle'
-                }`}>
+                <div
+                  key={p.id || i}
+                  className={`rounded-2xl border transition-all ${
+                    susp ? 'bg-red-500/5 border-red-500/20' : 'bg-surface-2 border-border-subtle'
+                  }`}
+                >
                   <div className="flex items-center gap-3 p-3">
-                    {/* Avatar */}
-                    <div className="w-11 h-11 rounded-2xl bg-gray-800 border border-border-mid overflow-hidden flex items-center justify-center text-white font-black text-base flex-shrink-0">
+                    {/* Avatar — clicável para ver perfil */}
+                    <button
+                      onClick={() => handleVisitProfile(p)}
+                      className="w-11 h-11 rounded-2xl bg-gray-800 border border-border-mid overflow-hidden flex items-center justify-center text-white font-black text-base flex-shrink-0 hover:ring-2 hover:ring-cyan-electric/40 transition-all"
+                    >
                       {p.avatar_url
                         ? <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.display_name} />
                         : (p.display_name || p.name || '?').charAt(0).toUpperCase()}
-                    </div>
+                    </button>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -261,11 +276,24 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
 
                     {/* Ações */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+
+                      {/* Ver perfil público */}
+                      {p.user_id && (
+                        <button
+                          onClick={() => handleVisitProfile(p)}
+                          className="p-2.5 bg-surface-3 text-text-muted rounded-xl hover:bg-cyan-electric/10 hover:text-cyan-electric transition-all"
+                          title="Ver perfil público"
+                        >
+                          <ExternalLink size={14} />
+                        </button>
+                      )}
+
                       {/* Avaliar */}
                       {!isSelf && (
                         <button
                           onClick={() => onOpenRate(p)}
                           className="p-2.5 bg-surface-3 text-text-muted rounded-xl hover:bg-cyan-electric hover:text-black transition-all"
+                          title="Avaliar jogador"
                         >
                           <Star size={14} />
                         </button>
@@ -286,7 +314,7 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
                           </button>
 
                           {menuOpen && (
-                            <div className="absolute right-0 top-11 z-20 w-48 bg-surface-1 border border-border-mid rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="absolute right-0 top-11 z-20 w-52 bg-surface-1 border border-border-mid rounded-2xl shadow-2xl overflow-hidden">
                               {/* Suspender / Reativar */}
                               <button
                                 onClick={() => {
@@ -317,8 +345,7 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
                               >
                                 {loading
                                   ? <RefreshCw size={13} className="animate-spin" />
-                                  : <ShieldCheck size={13} />
-                                }
+                                  : <ShieldCheck size={13} />}
                                 {isAdmin ? 'Remover coordenador' : 'Nomear coordenador'}
                               </button>
                             </div>
@@ -333,17 +360,14 @@ const MembersModal = ({ players, onClose, onOpenRate, currentUserId, babaId, pre
           </div>
 
           {/* Legenda */}
-          {isPresident && (
-            <div className="mt-4 pt-3 border-t border-border-subtle">
-              <p className="text-[8px] font-black text-text-muted uppercase tracking-widest text-center">
-                Toque em ▾ para suspender ou nomear coordenador
-              </p>
-            </div>
-          )}
+          <div className="mt-4 pt-3 border-t border-border-subtle">
+            <p className="text-[8px] font-black text-text-muted uppercase tracking-widest text-center">
+              Toque no avatar ou em ↗ para ver o perfil público
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Modal de suspensão */}
       {suspendTarget && (
         <SuspendSheet
           player={suspendTarget}
