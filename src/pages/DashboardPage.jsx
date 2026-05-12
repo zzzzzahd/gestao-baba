@@ -329,10 +329,14 @@ const DashboardPage = () => {
 
         {/* ── Tabs com cor do tema ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
-          <div className="flex gap-1">
+          <div className="flex gap-1" role="tablist" aria-label="Seções do baba">
             {TABS.map(tab => (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`tabpanel-${tab.id}`}
+                id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border ${
                   activeTab === tab.id ? '' : 'text-text-low hover:text-text-mid hover:bg-surface-2 border-transparent'
@@ -343,7 +347,7 @@ const DashboardPage = () => {
                   color: tc.color,
                 } : {}}
               >
-                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }}>
+                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }} aria-hidden="true">
                   {tab.icon}
                 </span>
                 {tab.label}
@@ -355,44 +359,65 @@ const DashboardPage = () => {
         {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
           <Suspense fallback={<TabLoader />}>
-            {activeTab === 'overview' && (
-              <TabOverview
-                {...sharedProps}
-                nextGameDay={nextGameDay}
-                countdown={countdown}
-                gameConfirmations={gameConfirmations}
-                myConfirmation={myConfirmation}
-                canConfirm={canConfirm}
-                confirmPresence={confirmPresence}
-                cancelConfirmation={cancelConfirmation}
-                reloadConfirmations={reloadConfirmations}
-                drawConfig={drawConfig}
-                setDrawConfig={setDrawConfig}
-                isDrawing={isDrawing}
-                loading={loading}
-                inviteExpiry={inviteExpiry}
-                handleCopyCode={handleCopyCode}
-                copied={copied}
-                generateInviteCode={generateInviteCode}
-                onShowQR={() => setShowQRCode(true)}
-              />
-            )}
-            {activeTab === 'manage' && (
-              <TabManage
-                {...sharedProps}
-                currentMatch={currentMatch}
-                isDrawing={isDrawing}
-                playersWithRatings={playersWithRatings}
-                getAllRatings={getAllRatings}
-                setPlayerRatings={setPlayerRatings}
-              />
-            )}
-            {activeTab === 'postgame' && (
-              <TabPostGame
-                {...sharedProps}
-                players={playersWithRatings}
-              />
-            )}
+            <div
+              id="tabpanel-overview"
+              role="tabpanel"
+              aria-labelledby="tab-overview"
+              hidden={activeTab !== 'overview'}
+            >
+              {activeTab === 'overview' && (
+                <TabOverview
+                  {...sharedProps}
+                  nextGameDay={nextGameDay}
+                  countdown={countdown}
+                  gameConfirmations={gameConfirmations}
+                  myConfirmation={myConfirmation}
+                  canConfirm={canConfirm}
+                  confirmPresence={confirmPresence}
+                  cancelConfirmation={cancelConfirmation}
+                  reloadConfirmations={reloadConfirmations}
+                  drawConfig={drawConfig}
+                  setDrawConfig={setDrawConfig}
+                  isDrawing={isDrawing}
+                  loading={loading}
+                  inviteExpiry={inviteExpiry}
+                  handleCopyCode={handleCopyCode}
+                  copied={copied}
+                  generateInviteCode={generateInviteCode}
+                  onShowQR={() => setShowQRCode(true)}
+                />
+              )}
+            </div>
+            <div
+              id="tabpanel-manage"
+              role="tabpanel"
+              aria-labelledby="tab-manage"
+              hidden={activeTab !== 'manage'}
+            >
+              {activeTab === 'manage' && (
+                <TabManage
+                  {...sharedProps}
+                  currentMatch={currentMatch}
+                  isDrawing={isDrawing}
+                  playersWithRatings={playersWithRatings}
+                  getAllRatings={getAllRatings}
+                  setPlayerRatings={setPlayerRatings}
+                />
+              )}
+            </div>
+            <div
+              id="tabpanel-postgame"
+              role="tabpanel"
+              aria-labelledby="tab-postgame"
+              hidden={activeTab !== 'postgame'}
+            >
+              {activeTab === 'postgame' && (
+                <TabPostGame
+                  {...sharedProps}
+                  players={playersWithRatings}
+                />
+              )}
+            </div>
           </Suspense>
         </div>
       </div>
