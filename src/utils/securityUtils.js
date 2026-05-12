@@ -1,7 +1,6 @@
 // src/utils/securityUtils.js
-// ─────────────────────────────────────────────────────────────────────────────
-// Utilitários de segurança e LGPD. Sprint 10.5, Fase E.
-// ─────────────────────────────────────────────────────────────────────────────
+// Fase 1.4 — sanitização robusta e utilitários de segurança LGPD.
+// Sessão agora é gerenciada pelo JWT do Supabase (sem isSessionExpired local).
 
 // ─── Mascaramento de dados sensíveis ─────────────────────────────────────────
 
@@ -32,49 +31,41 @@ export const maskEmail = (email) => {
   return `${user.charAt(0)}***@${domain}`;
 };
 
-// ─── Session timeout ──────────────────────────────────────────────────────────
+// ─── Sanitização de input ─────────────────────────────────────────────────────
 
-const LAST_ACTIVE_KEY  = 'draft_play_last_active';
-const INACTIVITY_LIMIT = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
-
-/** Registrar atividade do usuário (chamar em eventos de interação) */
-export const touchSession = () => {
-  try {
-    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
-  } catch {}
-};
-
-/** Verificar se a sessão expirou por inatividade */
-export const isSessionExpired = () => {
-  try {
-    const last = localStorage.getItem(LAST_ACTIVE_KEY);
-    if (!last) return false;
-    return Date.now() - Number(last) > INACTIVITY_LIMIT;
-  } catch {
-    return false;
-  }
-};
-
-/** Limpar dados de sessão local */
-export const clearSessionData = () => {
-  try {
-    localStorage.removeItem(LAST_ACTIVE_KEY);
-    localStorage.removeItem('draft_play_draw_wizard');
-    localStorage.removeItem('draft_play_onboarding_done');
-  } catch {}
-};
-
-// ─── Sanitização básica ───────────────────────────────────────────────────────
-
-/** Remove caracteres perigosos de strings de input */
+/**
+ * Sanitiza string de input do usuário.
+ * React já faz escape de JSX, então esta função é para dados que vão
+ * para o banco ou são usados em contextos não-JSX (ex: nomes, textos livres).
+ * Não usar DOMPurify porque não há render de HTML no app.
+ */
 export const sanitizeText = (str, maxLength = 200) => {
   if (typeof str !== 'string') return '';
   return str
     .trim()
     .slice(0, maxLength)
-    .replace(/[<>]/g, ''); // previne XSS básico
+    // Remove caracteres de controle (exceto espaço)
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    // Remove tags HTML básicas (extra cautela, React já escapa)
+    .replace(/<[^>]*>/g, '');
 };
 
-/** Valida se é UUID válido */
+/** Valida se é UUID v4 válido */
 export const isValidUUID = (str) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+
+/** Valida formato de email */
+export const isValidEmail = (email) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+// ─── Stub para compatibilidade retroativa ─────────────────────────────────────
+// Mantidos como no-ops para não quebrar imports existentes.
+// A expiração de sessão agora é responsabilidade do JWT do Supabase.
+export const touchSession    = () => {};
+export const isSessionExpired = () => false;
+export const clearSessionData = () => {
+  try {
+    localStorage.removeItem('draft_play_draw_wizard');
+    localStorage.removeItem('draft_play_onboarding_done');
+  } catch {}
+};
