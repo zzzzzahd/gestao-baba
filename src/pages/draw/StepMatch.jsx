@@ -1,12 +1,14 @@
 // src/pages/draw/StepMatch.jsx
-// Sprint 9.3: Realtime via supabase.channel para sincronizar placar e gols
-// entre múltiplos dispositivos (presidente + jogadores assistindo).
+// Sprint 9.3: Realtime via useRealtimeMatch (hook encapsulado) para sincronizar
+// placar e gols entre múltiplos dispositivos (presidente + jogadores assistindo).
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Target, UserPlus, ChevronLeft } from 'lucide-react';
 import { useBaba } from '../../contexts/BabaContext';
 import { supabase } from '../../services/supabase';
 import WinnerPhotoModal from '../../components/WinnerPhotoModal';
+import MatchShareButton from '../../components/MatchShareButton';
+import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 import toast from 'react-hot-toast';
 
 const formatTime = (s) =>
@@ -50,26 +52,10 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     }
   }, [matchId]);
 
-  // ── Sprint 9.3: Canal Realtime ────────────────────────────────────────────
-  useEffect(() => {
-    if (!matchId) return;
-
-    const channel = supabase
-      .channel(`match:${matchId}`)
-      .on(
-        'postgres_changes',
-        {
-          event:  '*',
-          schema: 'public',
-          table:  'match_players',
-          filter: `match_id=eq.${matchId}`,
-        },
-        () => refreshMatchState()
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [matchId, refreshMatchState]);
+  // ── Hook de Realtime (encapsulado) ───────────────────────────────────────
+  useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
+    setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
+  }, { enabled: !!matchId });
 
   // ── Carregar times ao montar ──────────────────────────────────────────────
   useEffect(() => {
