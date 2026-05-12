@@ -1,24 +1,22 @@
+// src/contexts/AuthContext.jsx
+// Fase 1.5 — Sessão baseada no JWT do Supabase (claim exp) em vez de localStorage.
+// A lógica de isSessionExpired por inatividade local é removida;
+// o Supabase cuida do refresh automático via onAuthStateChange.
+
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
-import { touchSession, isSessionExpired, clearSessionData } from '../utils/securityUtils';
 
-// BUG-003 FIX: O schema original criava a tabela como "users",
-// mas todo o código de aplicação usa "profiles".
-// A solução adotada é padronizar tudo para "profiles"
-// (ver supabase-migrations.sql para o ALTER TABLE correspondente).
 const PROFILE_TABLE = 'profiles';
-
-const AuthContext = createContext({});
+const AuthContext   = createContext({});
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
-// Mapa de tradução para mensagens de erro do Supabase Auth
-// UX-002 FIX: erros em português
+// Mapa de tradução para erros do Supabase Auth → português
 const AUTH_ERROR_MAP = {
   'Invalid login credentials':    'Email ou senha incorretos',
   'Email not confirmed':          'Confirme seu email antes de entrar',
@@ -29,71 +27,60 @@ const AUTH_ERROR_MAP = {
   'over_email_send_rate_limit':   'Muitas tentativas. Aguarde alguns minutos',
 };
 
-const translateAuthError = (message) => AUTH_ERROR_MAP[message] || message;
+const translateAuthError = (msg) => AUTH_ERROR_MAP[msg] || msg;
 
 export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(undefined); // undefined = carregando
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }
     try {
       const { data, error } = await supabase
-        .from(PROFILE_TABLE)  // BUG-003 FIX: constante centralizada
+        .from(PROFILE_TABLE)
         .select('*')
         .eq('id', userId)
         .single();
-
       if (error && error.code !== 'PGRST116') {
         console.error('[AuthContext] loadProfile:', error);
       }
       setProfile(data || null);
-    } catch (error) {
-      console.error('[AuthContext] loadProfile (catch):', error);
+    } catch (err) {
+      console.error('[AuthContext] loadProfile (catch):', err);
       setProfile(null);
     }
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Inicialização: busca sessão existente via Supabase (JWT)
+    supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
-
-      // Session timeout: logout por inatividade após 7 dias
-      if (currentUser && isSessionExpired()) {
-        await supabase.auth.signOut();
-        clearSessionData();
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-        toast.error('Sessão expirada. Faça login novamente.');
-        return;
-      }
-
-      if (currentUser) touchSession();
       setUser(currentUser);
-      if (currentUser) loadProfile(currentUser.id);
+      if (currentUser) {
+        loadProfile(currentUser.id);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Supabase lida com refresh do JWT automaticamente;
+    // onAuthStateChange cobre token_refreshed, signed_out, etc.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUser = session?.user ?? null;
-      if (currentUser) touchSession();
       setUser(currentUser);
-      if (currentUser) loadProfile(currentUser.id);
-      else setProfile(null);
+      if (currentUser) {
+        loadProfile(currentUser.id);
+      } else {
+        setProfile(null);
+        // Limpar dados locais ao fazer signout
+        localStorage.removeItem('selected_baba_id');
+        localStorage.removeItem('push_eligible_after_confirm');
+      }
     });
 
-    // Atualizar última atividade em interações do usuário
-    const handleActivity = () => touchSession();
-    window.addEventListener('click',     handleActivity, { passive: true });
-    window.addEventListener('touchstart', handleActivity, { passive: true });
-
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener('click',     handleActivity);
-      window.removeEventListener('touchstart', handleActivity);
-    };
+    return () => subscription.unsubscribe();
   }, [loadProfile]);
 
   const signUp = async (email, password, metadata = {}) => {
@@ -110,7 +97,7 @@ export const AuthProvider = ({ children }) => {
           .from(PROFILE_TABLE)
           .insert([{
             id:              data.user.id,
-            email:           email,
+            email,
             name:            metadata.name || email.split('@')[0],
             created_at:      new Date().toISOString(),
             consent_at:      metadata.consent_at || new Date().toISOString(),
@@ -121,9 +108,9 @@ export const AuthProvider = ({ children }) => {
 
       toast.success('Conta criada! Verifique seu email.');
       return { data, error: null };
-    } catch (error) {
-      toast.error(translateAuthError(error.message));  // UX-002 FIX
-      return { data: null, error };
+    } catch (err) {
+      toast.error(translateAuthError(err.message));
+      return { data: null, error: err };
     }
   };
 
@@ -133,22 +120,19 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
-    } catch (error) {
-      toast.error(translateAuthError(error.message));  // UX-002 FIX
-      return { data: null, error };
+    } catch (err) {
+      toast.error(translateAuthError(err.message));
+      return { data: null, error: err };
     }
   };
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
-      localStorage.removeItem('selected_baba_id');
-      toast.success('Logout realizado!');
-    } catch (error) {
-      toast.error(error.message);
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -156,7 +140,7 @@ export const AuthProvider = ({ children }) => {
     if (!user) return { error: 'Usuário não autenticado' };
     try {
       const { data, error } = await supabase
-        .from(PROFILE_TABLE)  // BUG-003 FIX
+        .from(PROFILE_TABLE)
         .update(updates)
         .eq('id', user.id)
         .select()
@@ -165,9 +149,9 @@ export const AuthProvider = ({ children }) => {
       setProfile(data);
       if (!silent) toast.success('Perfil atualizado!');
       return { data, error: null };
-    } catch (error) {
+    } catch (err) {
       toast.error('Erro ao atualizar perfil');
-      return { data: null, error };
+      return { data: null, error: err };
     }
   };
 
@@ -176,20 +160,12 @@ export const AuthProvider = ({ children }) => {
     [loadProfile, user?.id]
   );
 
-  const value = {
-    user,
-    profile,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    updateProfile,
-    refreshProfile,
-    loadProfile,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user, profile, loading,
+      signUp, signIn, signOut,
+      updateProfile, refreshProfile, loadProfile,
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   );
