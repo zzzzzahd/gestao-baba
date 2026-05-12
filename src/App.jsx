@@ -43,36 +43,62 @@ const ProtectedRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+// Chave para rastrear elegibilidade do push (após 1ª confirmação de presença)
+const PUSH_ELIGIBLE_KEY = 'push_eligible_after_confirm';
+
 // ─── AppInner ─────────────────────────────────────────────────────────────────
 const AppInner = () => {
   const { user, profile } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
-  const [needsConsent,   setNeedsConsent]   = useState(false);
+  // null = ainda carregando (evita flash); false = sem consentimento necessário; true = precisa consentir
+  const [needsConsent, setNeedsConsent] = useState(null);
 
-  // Onboarding (apenas uma vez)
+  // Verificar consentimento LGPD — só decide depois do profile carregar
   useEffect(() => {
-    if (user && shouldShowOnboarding()) {
-      const id = setTimeout(() => setShowOnboarding(true), 800);
+    if (!user) { setNeedsConsent(false); return; }
+    if (profile === undefined) return; // ainda carregando — aguarda
+    setNeedsConsent(profile ? !profile.consent_at : false);
+  }, [user, profile]);
+
+  // Onboarding (apenas uma vez, após consentimento resolvido)
+  useEffect(() => {
+    if (!user || needsConsent !== false) return;
+    if (shouldShowOnboarding()) {
+      const id = setTimeout(() => setShowOnboarding(true), 1000);
       return () => clearTimeout(id);
     }
-  }, [user]);
+  }, [user, needsConsent]);
 
-  // Push prompt (3s após login)
+  // Push prompt — só após confirmar presença (sinalizado via window.__markPushEligible)
+  // OU na 2ª sessão se já confirmou antes.
   useEffect(() => {
-    if (!user) { setShowPushPrompt(false); return; }
-    const id = setTimeout(() => setShowPushPrompt(true), 3000);
-    return () => clearTimeout(id);
-  }, [user]);
-
-  // Sprint 10.5 — verificar consentimento LGPD
-  useEffect(() => {
-    if (user && profile && !profile.consent_at) {
-      setNeedsConsent(true);
-    } else {
-      setNeedsConsent(false);
+    if (!user || needsConsent !== false) { setShowPushPrompt(false); return; }
+    const eligible =
+      sessionStorage.getItem(PUSH_ELIGIBLE_KEY) === 'true' ||
+      localStorage.getItem(PUSH_ELIGIBLE_KEY) === 'true';
+    if (eligible) {
+      const id = setTimeout(() => setShowPushPrompt(true), 2000);
+      return () => clearTimeout(id);
     }
-  }, [user, profile]);
+  }, [user, needsConsent]);
+
+  // Expor helper global para que PresenceConfirmation marque elegibilidade após 1ª confirmação
+  useEffect(() => {
+    window.__markPushEligible = () => {
+      localStorage.setItem(PUSH_ELIGIBLE_KEY, 'true');
+      sessionStorage.setItem(PUSH_ELIGIBLE_KEY, 'true');
+      setShowPushPrompt(true);
+    };
+    return () => { delete window.__markPushEligible; };
+  }, []);
+
+  // Spinner enquanto aguarda profile carregar (evita flash do modal de consentimento)
+  if (needsConsent === null && user) return (
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <>
@@ -108,16 +134,16 @@ const AppInner = () => {
 
       <BottomNav />
 
-      {/* Sprint 10.5 — Consentimento LGPD (bloqueia tudo até aceitar) */}
-      {needsConsent && (
+      {/* Consentimento LGPD — bloqueia tudo até aceitar, sem flash */}
+      {needsConsent === true && (
         <ConsentModal onAccepted={() => setNeedsConsent(false)} />
       )}
 
-      {/* Push prompt — só exibe se já deu consent */}
-      {showPushPrompt && !needsConsent && <PushPrompt />}
+      {/* Push prompt — só exibe se já deu consent e é elegível */}
+      {showPushPrompt && needsConsent === false && <PushPrompt />}
 
       {/* Onboarding — só exibe se já deu consent */}
-      {showOnboarding && !needsConsent && (
+      {showOnboarding && needsConsent === false && (
         <OnboardingModal onClose={() => setShowOnboarding(false)} />
       )}
     </>
