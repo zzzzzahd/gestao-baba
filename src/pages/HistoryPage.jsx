@@ -16,6 +16,7 @@ import { MatchCardSkeleton }   from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 import { usePullToRefresh }    from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator  from '../components/PullToRefreshIndicator';
+import MatchShareButton        from '../components/MatchShareButton';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -114,17 +115,27 @@ const MatchCard = ({ match }) => {
           </div>
         )}
 
-        <button
-          onClick={loadPlayers}
-          className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-[9px] font-black uppercase text-text-low hover:text-cyan-electric transition-colors"
-        >
-          {loadingPlayers
-            ? <div className="w-3 h-3 border-2 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-            : open
-              ? <><ChevronUp size={12} /> Ocultar detalhes</>
-              : <><ChevronDown size={12} /> Ver escalação e gols</>
-          }
-        </button>
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            onClick={loadPlayers}
+            aria-expanded={open}
+            aria-label={open ? 'Ocultar detalhes da partida' : 'Ver escalação e gols'}
+            className="flex-1 py-2 flex items-center justify-center gap-2 text-[9px] font-black uppercase text-text-low hover:text-cyan-electric transition-colors"
+          >
+            {loadingPlayers
+              ? <div className="w-3 h-3 border-2 border-cyan-electric border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              : open
+                ? <><ChevronUp size={12} aria-hidden="true" /> Ocultar detalhes</>
+                : <><ChevronDown size={12} aria-hidden="true" /> Ver escalação e gols</>
+            }
+          </button>
+          {match.status === 'finished' && (
+            <MatchShareButton
+              match={{ ...match, match_date: match.match_date }}
+              topScorers={scorers.filter(p => p.goals > 0).map(p => ({ name: p.player?.name, goals: p.goals }))}
+            />
+          )}
+        </div>
       </div>
 
       {open && players.length > 0 && (
