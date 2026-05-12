@@ -1,14 +1,12 @@
 // src/components/SkeletonLoader.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton loaders reutilizáveis. Fase 3, Tarefa 3.1.
-// Substitui spinners nas listas de jogadores, rankings e histórico.
-// ─────────────────────────────────────────────────────────────────────────────
+// Fase 2/3/4 — Skeleton loaders com aria-busy para acessibilidade.
+// Novos tipos: DashboardHeaderSkeleton, ConfirmationListSkeleton, FinancialSkeleton.
 
 import React from 'react';
 
 // Bloco pulsante base
 const Pulse = ({ className = '' }) => (
-  <div className={`animate-pulse bg-surface-2 rounded-2xl ${className}`} />
+  <div className={`animate-pulse bg-surface-2 rounded-2xl ${className}`} aria-hidden="true" />
 );
 
 // ─── Skeleton de linha de jogador (lista de atletas) ─────────────────────────
@@ -128,5 +126,78 @@ export const PageSkeleton = ({ rows = 4 }) => (
         <Pulse key={i} className={`h-16 w-full rounded-3xl`} style={{ opacity: 1 - i * 0.15 }} />
       ))}
     </div>
+  </div>
+);
+
+// ─── Skeleton do header do Dashboard ─────────────────────────────────────────
+export const DashboardHeaderSkeleton = () => (
+  <div className="space-y-4" role="status" aria-busy="true" aria-label="Carregando dashboard...">
+    <div className="flex items-center gap-3">
+      <Pulse className="w-12 h-12 rounded-2xl flex-shrink-0" />
+      <div className="flex-1 space-y-2">
+        <Pulse className="h-4 w-3/4 rounded-xl" />
+        <Pulse className="h-3 w-1/2 rounded-xl" />
+      </div>
+    </div>
+    <Pulse className="h-28 w-full rounded-3xl" />
+    <div className="flex gap-2">
+      <Pulse className="flex-1 h-20 rounded-2xl" />
+      <Pulse className="flex-1 h-20 rounded-2xl" />
+    </div>
+  </div>
+);
+
+// ─── Skeleton da lista de confirmações ───────────────────────────────────────
+export const ConfirmationListSkeleton = ({ count = 6 }) => (
+  <div className="space-y-2" role="status" aria-busy="true" aria-label="Carregando confirmações...">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="flex items-center gap-3 p-3" style={{ opacity: 1 - i * 0.12 }}>
+        <Pulse className="w-8 h-8 rounded-full flex-shrink-0" />
+        <div className="flex-1 space-y-1.5">
+          <Pulse className="h-3 w-2/3 rounded-lg" />
+          <Pulse className="h-2 w-1/3 rounded-lg" />
+        </div>
+        <Pulse className="w-14 h-6 rounded-xl" />
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Skeleton de cartão financeiro ───────────────────────────────────────────
+export const FinancialSkeleton = () => (
+  <div className="space-y-4" role="status" aria-busy="true" aria-label="Carregando dados financeiros...">
+    <div className="grid grid-cols-2 gap-3">
+      <Pulse className="h-24 rounded-3xl" />
+      <Pulse className="h-24 rounded-3xl" />
+    </div>
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="flex items-center gap-3 p-4 bg-surface-1 rounded-2xl" style={{ opacity: 1 - i * 0.15 }}>
+        <Pulse className="w-10 h-10 rounded-xl flex-shrink-0" />
+        <div className="flex-1 space-y-2">
+          <Pulse className="h-3 w-1/2 rounded-lg" />
+          <Pulse className="h-2 w-1/3 rounded-lg" />
+        </div>
+        <Pulse className="w-16 h-6 rounded-xl" />
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Skeleton de perfil público ───────────────────────────────────────────────
+export const ProfileSkeleton = () => (
+  <div className="space-y-5 p-5" role="status" aria-busy="true" aria-label="Carregando perfil...">
+    <div className="flex flex-col items-center gap-4">
+      <Pulse className="w-20 h-20 rounded-full" />
+      <div className="space-y-2 text-center w-full">
+        <Pulse className="h-5 w-1/3 rounded-xl mx-auto" />
+        <Pulse className="h-3 w-1/4 rounded-lg mx-auto" />
+      </div>
+    </div>
+    <div className="grid grid-cols-3 gap-3">
+      <Pulse className="h-16 rounded-2xl" />
+      <Pulse className="h-16 rounded-2xl" />
+      <Pulse className="h-16 rounded-2xl" />
+    </div>
+    <Pulse className="h-32 rounded-3xl" />
   </div>
 );
