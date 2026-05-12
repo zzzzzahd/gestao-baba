@@ -51,7 +51,11 @@ const ProfilePage = () => {
   const { profile, user, refreshProfile } = useAuth();
   const { myBabas, currentBaba, players } = useBaba();
 
+  const [tab,           setTab]           = useState('stats');
+  const [showShare,     setShowShare]     = useState(false);
+  const [copied,        setCopied]        = useState(false);
   const [followerCount, setFollowerCount] = useState(null);
+  const [state, dispatch]                 = useReducer(reducer, INITIAL);
 
   // Buscar contagem de seguidores do usuário logado
   useEffect(() => {
@@ -62,9 +66,6 @@ const ProfilePage = () => {
       .eq('followed_id', user.id)
       .then(({ count }) => setFollowerCount(count || 0));
   }, [user?.id]);
-  const [showShare, setShowShare] = useState(false);
-  const [copied,    setCopied]    = useState(false);
-  const [state, dispatch]         = useReducer(reducer, INITIAL);
 
   // player_id do usuário logado no baba atual (para BadgesSection)
   const myPlayer = currentBaba
