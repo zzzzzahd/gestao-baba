@@ -140,3 +140,79 @@
   color: #fff;
   border-radius: var(--radius-lg);
 }
+
+/* ─── Fase 2 — Acessibilidade (foco visível, contraste AA) ──────────────────
+   Garante outline claro em navegação por teclado, essencial para a11y.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Foco visível apenas para navegação por teclado (não afeta mouse/touch) */
+:focus-visible {
+  outline: 2px solid var(--cyan-electric);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Remove outline padrão do browser (substituído pelo :focus-visible acima) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip link para acessibilidade (screen readers e navegação por teclado) */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  background: var(--cyan-electric);
+  color: #000;
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  z-index: 9999;
+  border-radius: 0 0 var(--radius-sm) 0;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Contraste melhorado para texto de metadados (text-low → text-mid em contextos críticos) */
+.text-contrast-safe {
+  color: rgba(255, 255, 255, 0.55); /* Ratio ≥ 4.5:1 sobre fundo #0d0d0d */
+}
+
+/* Indicador de loading acessível (aria-busy) */
+[aria-busy="true"] {
+  cursor: wait;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Disabled state consistente */
+[disabled], [aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ─── Fase 3 — Animações de realtime ─────────────────────────────────────── */
+@keyframes scoreFlash {
+  0%   { background: rgba(0, 242, 255, 0.3); }
+  100% { background: transparent; }
+}
+
+.score-flash {
+  animation: scoreFlash 0.8s ease-out forwards;
+}
+
+/* Indicador de conexão realtime */
+.realtime-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #39ff14;
+  animation: realtimePulse 2s ease-in-out infinite;
+}
+
+@keyframes realtimePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.4); }
+  50%       { opacity: 0.8; box-shadow: 0 0 0 6px rgba(57, 255, 20, 0); }
+}
