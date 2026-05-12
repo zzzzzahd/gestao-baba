@@ -60,6 +60,9 @@ const OfflineBanner = () => {
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2.5 px-4 text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${
         isOffline
           ? 'bg-red-500/90 text-white backdrop-blur-md'
