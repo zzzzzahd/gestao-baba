@@ -357,6 +357,10 @@ export const BabaProvider = ({ children }) => {
         toast(`Você entrou na lista de espera (${waitlistCount + 1}º)`, { icon: '⏳' });
       } else {
         toast.success('Presença confirmada! ✅');
+        // Sinaliza elegibilidade para push prompt (após 1ª ação de valor)
+        if (typeof window.__markPushEligible === 'function') {
+          window.__markPushEligible();
+        }
       }
     } catch (error) {
       console.error('[confirmPresence]', error);
