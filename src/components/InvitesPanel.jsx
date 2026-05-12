@@ -2,7 +2,7 @@
 // Sprint 13 — Gerenciar convites do baba: criar, listar, copiar, revogar.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link2, QrCode, RefreshCw, Copy, Check, Trash2, Plus, Clock } from 'lucide-react';
+import { Link2, QrCode, RefreshCw, Copy, Check, Trash2, Plus, Clock, MessageCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
@@ -77,6 +77,12 @@ export default function InvitesPanel({ babaId, isPresident }) {
     setCopied(code);
     toast.success('Link copiado!');
     setTimeout(() => setCopied(null), 2500);
+  };
+
+  const handleWhatsApp = (code, babaNome) => {
+    const url = `${BASE_URL}/join/${code}`;
+    const text = `🏟️ Te convido para o nosso baba${babaNome ? ` *${babaNome}*` : ''}!\n\nUse o link para entrar:\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleRevoke = async (inviteId) => {
@@ -230,6 +236,13 @@ export default function InvitesPanel({ babaId, isPresident }) {
                 {/* Ações */}
                 {inv.is_active && (
                   <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleWhatsApp(inv.code, null)}
+                      title="Compartilhar via WhatsApp"
+                      className="p-2 rounded-xl bg-surface-2 border border-border-mid text-green-400 hover:bg-green-500/10 hover:border-green-500/30 transition-all"
+                    >
+                      <MessageCircle size={13} />
+                    </button>
                     <button
                       onClick={() => handleCopy(inv.code)}
                       className={`p-2 rounded-xl border transition-all ${
