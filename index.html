@@ -5,18 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Draft Play - Gestão de Baba</title>
 
-    <!-- ── Segurança ── -->
-    <meta http-equiv="Content-Security-Policy" content="
-      default-src 'self';
-      script-src 'self' 'unsafe-inline' https://plausible.io https://cdnjs.cloudflare.com;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
-      font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-      img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in;
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://o4511287445291008.ingest.us.sentry.io;
-      base-uri 'self';
-      form-action 'self';
-    ">
-
     <!-- PWA Essencial -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#00f2ff" />
@@ -36,15 +24,22 @@
     <link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96x96.png" />
     <link rel="shortcut icon" href="/icons/icon-96x96.png" />
 
-    <!-- SEO e compartilhamento -->
+    <!-- SEO e Open Graph -->
     <meta name="description" content="Sistema profissional de gestão de peladas e babas. Sorteio de times, rankings, presenças e financeiro." />
-    <meta name="keywords" content="baba, pelada, futebol, sorteio times, gestão futebol" />
+    <meta name="keywords" content="baba, pelada, futebol, sorteio times, gestão futebol, draft play" />
     <meta property="og:title" content="Draft Play - Gestão de Baba" />
     <meta property="og:description" content="Gestão completa de peladas: times, rankings e presenças." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/icons/icon-512x512.png" />
-    <meta property="og:url" content="https://gestao-baba.vercel.app" /> <!-- ← NOVO Sprint 8.2 -->
-    <meta name="twitter:card" content="summary_large_image" />           <!-- ← NOVO Sprint 8.2 -->
+    <meta property="og:image" content="https://gestao-baba.vercel.app/icons/icon-512x512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:url" content="https://gestao-baba.vercel.app" />
+    <meta property="og:site_name" content="Draft Play" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Draft Play - Gestão de Baba" />
+    <meta name="twitter:description" content="Gestão completa de peladas: times, rankings e presenças." />
+    <meta name="twitter:image" content="https://gestao-baba.vercel.app/icons/icon-512x512.png" />
 
     <!-- Fontes -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -57,17 +52,12 @@
     <!-- html2canvas para cartões compartilháveis -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- Plausible Analytics ← NOVO Sprint 12 (5min, já ativa agora) -->
+    <!-- Plausible Analytics -->
     <script defer data-domain="gestao-baba.vercel.app" src="https://plausible.io/js/script.js"></script>
 
     <style>
       :root { --cyan-electric: #00f2ff; }
       .font-display { font-family: 'Rajdhani', sans-serif; }
-      @keyframes fade-in {
-        from { opacity: 0; transform: translateY(10px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
-      .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
       * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
       body {
         margin: 0; padding: 0;
@@ -75,9 +65,34 @@
         font-family: 'Inter', sans-serif;
         color: white;
         overflow-x: hidden;
-        min-height: 100vh;
+        min-height: 100dvh;
       }
-      #root { min-height: 100vh; }
+      #root { min-height: 100dvh; }
+
+      /* Skip link para acessibilidade */
+      .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        background: var(--cyan-electric);
+        color: #000;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        font-family: 'Rajdhani', sans-serif;
+        z-index: 9999;
+        border-radius: 0 0 8px 0;
+        text-decoration: none;
+        transition: top 0.15s;
+      }
+      .skip-link:focus { top: 0; }
+
+      /* Foco visível global */
+      :focus-visible {
+        outline: 2px solid var(--cyan-electric);
+        outline-offset: 3px;
+      }
+      :focus:not(:focus-visible) { outline: none; }
+
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: #000; }
       ::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 10px; box-shadow: 0 0 10px #00f2ff; }
@@ -85,7 +100,13 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Skip link: pula direto para o conteúdo principal (a11y / teclado) -->
+    <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
+
+    <div id="root">
+      <main id="main-content"></main>
+    </div>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
