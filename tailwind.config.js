@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+// Fase 2.4 — Tokens semânticos agora apontam para CSS vars,
+// permitindo que useAppTheme.js troque dark/light em runtime
+// sem rebuild do Tailwind.
+
 export default {
   content: [
     "./index.html",
@@ -7,35 +11,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── Cores base (existentes) ─────────────────────────────
+        // ── Cores base fixas (não mudam com o tema) ─────────────
         'cyber-dark':    '#0d0d0d',
         'cyan-electric': '#00f2ff',
         'green-neon':    '#39ff14',
         'danger-red':    '#ff003c',
         'warning-gold':  '#ffbd00',
-
-        // ── Tokens semânticos de texto ──────────────────────────
-        // Substituem text-white/N hardcoded em todo o projeto
-        'text-high':  'rgba(255,255,255,1.00)',  // labels, valores principais
-        'text-mid':   'rgba(255,255,255,0.60)',  // subtítulos, labels secundários
-        'text-low':   'rgba(255,255,255,0.35)',  // placeholders, metadados
-        'text-muted': 'rgba(255,255,255,0.20)',  // disabled, decorativos
-
-        // ── Tokens semânticos de superfície ────────────────────
-        // Substituem bg-white/[N] hardcoded
-        'surface-1': 'rgba(255,255,255,0.02)',  // card mais escuro
-        'surface-2': 'rgba(255,255,255,0.05)',  // card padrão
-        'surface-3': 'rgba(255,255,255,0.10)',  // card destacado / hover
-
-        // ── Tokens semânticos de borda ──────────────────────────
-        'border-subtle': 'rgba(255,255,255,0.05)',
-        'border-mid':    'rgba(255,255,255,0.10)',
-        'border-strong': 'rgba(255,255,255,0.20)',
-
-        // ── Aliases de primary ──────────────────────────────────
         'primary':       '#00f2ff',
         'primary-dim':   'rgba(0,242,255,0.10)',
         'primary-glow':  'rgba(0,242,255,0.30)',
+
+        // ── Tokens semânticos → CSS vars (trocam com dark/light) ─
+        // Texto
+        'text-high':  'var(--color-text-primary)',
+        'text-mid':   'var(--color-text-mid)',
+        'text-low':   'var(--color-text-low)',
+        'text-muted': 'var(--color-text-muted)',
+
+        // Superfície
+        'surface-1':  'var(--color-bg-surface-1)',
+        'surface-2':  'var(--color-bg-surface-2)',
+        'surface-3':  'var(--color-bg-surface-3)',
+
+        // Borda
+        'border-subtle': 'var(--color-border-subtle)',
+        'border-mid':    'var(--color-border-mid)',
+        'border-strong': 'var(--color-border-strong)',
       },
 
       fontFamily: {
@@ -44,22 +45,22 @@ export default {
         'display':  ['Inter', 'sans-serif'],
       },
 
-      // Tipografia numérica tabulada (placares, contadores, avaliações)
       fontVariantNumeric: { 'tabular': 'tabular-nums' },
 
       backgroundImage: {
-        'gradient-dark':  'radial-gradient(circle at top, #1a1a1a 0%, #000000 100%)',
-        'glass-gradient': 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
+        'gradient-dark':    'radial-gradient(circle at top, #1a1a1a 0%, #000000 100%)',
+        'glass-gradient':   'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
         'primary-gradient': 'linear-gradient(135deg, #00f2ff, #0066ff)',
       },
 
       animation: {
-        'glow':        'glow 2s ease-in-out infinite alternate',
-        'slide-up':    'slideUp 0.3s ease-out forwards',
-        'slide-in':    'slideIn 0.4s ease-out forwards',
-        'fade-in':     'fadeIn 0.25s ease-out forwards',
-        'pulse-neon':  'pulseNeon 2s cubic-bezier(0.4,0,0.6,1) infinite',
-        'check-pop':   'checkPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        'glow':       'glow 2s ease-in-out infinite alternate',
+        'slide-up':   'slideUp 0.3s ease-out forwards',
+        'slide-in':   'slideIn 0.4s ease-out forwards',
+        'fade-in':    'fadeIn 0.25s ease-out forwards',
+        'pulse-neon': 'pulseNeon 2s cubic-bezier(0.4,0,0.6,1) infinite',
+        'check-pop':  'checkPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        'page-in':    'pageIn 220ms ease-out both',
       },
 
       keyframes: {
@@ -86,6 +87,10 @@ export default {
         checkPop: {
           '0%':   { opacity: '0', transform: 'scale(0.5)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        pageIn: {
+          '0%':   { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
 
