@@ -88,7 +88,6 @@
 
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
-}
 
   /* Radius (Tarefa 3.2 — escala padronizada) */
   --radius-sm:  0.75rem;   /* 12px — inputs, badges */
