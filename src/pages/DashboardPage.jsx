@@ -18,6 +18,7 @@ import QRCodeModal     from '../components/QRCodeModal';
 import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
+import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
 import toast from 'react-hot-toast';
 
 // ── Lazy tabs ─────────────────────────────────────────────────────────────────
@@ -162,12 +163,8 @@ const DashboardPage = () => {
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !currentBaba) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      {/* Spinner com cor do tema */}
-      <div
-        className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
-        style={{ borderColor: `${tc.color} transparent transparent transparent` }}
-      />
+    <div className="min-h-screen bg-black px-5 pt-14 pb-24">
+      <DashboardHeaderSkeleton />
     </div>
   );
 
