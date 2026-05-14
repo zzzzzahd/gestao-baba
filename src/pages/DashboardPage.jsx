@@ -1,4 +1,8 @@
 // src/pages/DashboardPage.jsx
+// Cor do tema do baba aplicada via useThemeStyles nos elementos visuais:
+// - Borda do logo, gradiente do header, tabs ativas, badge de presidente,
+//   botão "Ver todos", loading spinner, label do usuário. 
+
 import React, {
   useState, useEffect, useCallback, useMemo, Suspense, lazy,
 } from 'react';
@@ -7,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import {
   LogOut, Camera, Edit3, ChevronRight, RefreshCw,
-  Trophy, Settings, Calendar, Shuffle, History,
+  Trophy, Settings, Calendar,
 } from 'lucide-react';
 
 import QRCodeModal     from '../components/QRCodeModal';
@@ -23,6 +27,7 @@ const TabManage   = lazy(() => import('./dashboard/TabManage'));
 const TabPostGame = lazy(() => import('./dashboard/TabPostGame'));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
 const computeExpiryLabel = (expiresAt) => {
   if (!expiresAt) return null;
   const diff = new Date(expiresAt).getTime() - Date.now();
@@ -46,36 +51,8 @@ const TabLoader = () => (
   </div>
 );
 
-// ── Atalhos rápidos do baba ───────────────────────────────────────────────────
-const BabaQuickActions = ({ onDraw, onHistory }) => (
-  <div className="grid grid-cols-2 gap-3">
-    <button
-      onClick={onDraw}
-      className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-cyan-electric/20 active:scale-95 transition-all"
-      style={{ background: 'rgba(0,242,255,0.06)' }}
-    >
-      <div className="w-9 h-9 rounded-xl bg-cyan-electric/10 flex items-center justify-center">
-        <Shuffle size={18} className="text-cyan-electric" />
-      </div>
-      <span className="text-[10px] font-black uppercase tracking-wide text-white">Sorteio</span>
-      <span className="text-[8px] text-text-low text-center leading-tight">Sortear times</span>
-    </button>
-
-    <button
-      onClick={onHistory}
-      className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-purple-400/20 active:scale-95 transition-all"
-      style={{ background: 'rgba(168,85,247,0.06)' }}
-    >
-      <div className="w-9 h-9 rounded-xl bg-purple-400/10 flex items-center justify-center">
-        <History size={18} className="text-purple-400" />
-      </div>
-      <span className="text-[10px] font-black uppercase tracking-wide text-white">Histórico</span>
-      <span className="text-[8px] text-text-low text-center leading-tight">Partidas anteriores</span>
-    </button>
-  </div>
-);
-
 // ── DashboardPage ─────────────────────────────────────────────────────────────
+
 const DashboardPage = () => {
   const navigate                        = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -89,12 +66,15 @@ const DashboardPage = () => {
     drawConfig, setDrawConfig, isDrawing, currentMatch,
   } = useBaba();
 
-  useThemeColor();
-  const tc = useThemeStyles();
+  // ── Cor do tema ───────────────────────────────────────────────────────────
+  useThemeColor(); // injeta CSS variables
+  const tc = useThemeStyles(); // helpers de estilo inline
 
+  // ── Aba ativa ─────────────────────────────────────────────────────────────
   const activeTab    = searchParams.get('tab') || 'overview';
   const setActiveTab = (id) => setSearchParams({ tab: id }, { replace: true });
 
+  // ── Papéis do usuário ─────────────────────────────────────────────────────
   const isPresident             = String(currentBaba?.president_id) === String(user?.id);
   const [isCoordinator, setIsCoordinator] = useState(false);
   const canManage               = isPresident || isCoordinator;
@@ -114,6 +94,7 @@ const DashboardPage = () => {
     })();
   }, [currentBaba?.id, user?.id, isPresident]);
 
+  // ── Estado local ──────────────────────────────────────────────────────────
   const [showMembers,             setShowMembers]             = useState(false);
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
   const [showQRCode,              setShowQRCode]              = useState(false);
@@ -122,6 +103,7 @@ const DashboardPage = () => {
   const [playerRatings,           setPlayerRatings]           = useState([]);
   const [copied,                  setCopied]                  = useState(false);
 
+  // ── Ratings ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentBaba?.id) return;
     let cancelled = false;
@@ -136,6 +118,7 @@ const DashboardPage = () => {
     }),
   [players, playerRatings]);
 
+  // ── Expiry ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
     const id = setInterval(
@@ -144,6 +127,7 @@ const DashboardPage = () => {
     return () => clearInterval(id);
   }, [currentBaba?.invite_expires_at]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleCopyCode = () => {
     if (!currentBaba?.invite_code) return;
     navigator.clipboard.writeText(currentBaba.invite_code);
@@ -177,6 +161,7 @@ const DashboardPage = () => {
     setPlayerRatings(data || []);
   }, [getAllRatings]);
 
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !currentBaba) return (
     <div className="min-h-screen bg-black px-5 pt-14 pb-24">
       <DashboardHeaderSkeleton />
@@ -198,6 +183,7 @@ const DashboardPage = () => {
               alt="Capa"
             />
           ) : (
+            /* Gradiente com cor do tema quando não há cover */
             <div
               className="w-full h-full"
               style={{
@@ -218,9 +204,12 @@ const DashboardPage = () => {
             </div>
           )}
 
+          {/* Gradiente com cor do tema na parte inferior */}
           <div
             className="absolute inset-0"
-            style={{ background: `linear-gradient(to top, #000000 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%)` }}
+            style={{
+              background: `linear-gradient(to top, #000000 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%)`,
+            }}
           />
 
           {canManage && !isUploading && (
@@ -240,6 +229,7 @@ const DashboardPage = () => {
         {/* Logo + nome */}
         <div className="absolute left-6 bottom-0 flex items-end gap-5">
           <div className="relative">
+            {/* Borda do logo com cor do tema */}
             <div
               className="w-32 h-32 rounded-[2.5rem] border-4 bg-gray-800 shadow-2xl overflow-hidden relative"
               style={{
@@ -275,7 +265,9 @@ const DashboardPage = () => {
               {currentBaba?.name}
             </h1>
             <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-widest flex-wrap">
+              {/* Username com cor do tema */}
               <span style={tc.text}>@{profile?.name || 'atleta'}</span>
+
               {isPresident && (
                 <span
                   className="px-2 py-0.5 rounded border text-[9px] font-black uppercase"
@@ -321,6 +313,7 @@ const DashboardPage = () => {
               </div>
               <span className="text-sm font-black text-white">{players?.length || 0} atletas</span>
             </div>
+            {/* Botão "Ver todos" com cor do tema */}
             <button
               onClick={() => setShowMembers(true)}
               className="flex items-center gap-1 text-[9px] font-black uppercase hover:opacity-70 transition-opacity"
@@ -331,13 +324,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── Atalhos rápidos ── */}
-        <BabaQuickActions
-          onDraw={() => navigate('/draw')}
-          onHistory={() => navigate('/history')}
-        />
-
-        {/* ── Tabs ── */}
+        {/* ── Tabs com cor do tema ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
           <div className="flex gap-1" role="tablist" aria-label="Seções do baba">
             {TABS.map(tab => (
@@ -369,7 +356,12 @@ const DashboardPage = () => {
         {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
           <Suspense fallback={<TabLoader />}>
-            <div id="tabpanel-overview" role="tabpanel" aria-labelledby="tab-overview" hidden={activeTab !== 'overview'}>
+            <div
+              id="tabpanel-overview"
+              role="tabpanel"
+              aria-labelledby="tab-overview"
+              hidden={activeTab !== 'overview'}
+            >
               {activeTab === 'overview' && (
                 <TabOverview
                   {...sharedProps}
@@ -393,7 +385,12 @@ const DashboardPage = () => {
                 />
               )}
             </div>
-            <div id="tabpanel-manage" role="tabpanel" aria-labelledby="tab-manage" hidden={activeTab !== 'manage'}>
+            <div
+              id="tabpanel-manage"
+              role="tabpanel"
+              aria-labelledby="tab-manage"
+              hidden={activeTab !== 'manage'}
+            >
               {activeTab === 'manage' && (
                 <TabManage
                   {...sharedProps}
@@ -405,7 +402,12 @@ const DashboardPage = () => {
                 />
               )}
             </div>
-            <div id="tabpanel-postgame" role="tabpanel" aria-labelledby="tab-postgame" hidden={activeTab !== 'postgame'}>
+            <div
+              id="tabpanel-postgame"
+              role="tabpanel"
+              aria-labelledby="tab-postgame"
+              hidden={activeTab !== 'postgame'}
+            >
               {activeTab === 'postgame' && (
                 <TabPostGame
                   {...sharedProps}
