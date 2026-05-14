@@ -1,8 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-// Descomente quando instalar @sentry/vite-plugin:
-// import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 // Fase 5 — Sentry sourcemaps + release tracking + Vitest.
 
@@ -19,6 +18,11 @@ return {
 
   plugins: [
     react(),
+    sentryVitePlugin({
+  org: 'zdias',
+  project: 'javascript-react',
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+}),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'logo.png', 'offline.html'],
