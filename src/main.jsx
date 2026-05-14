@@ -1,74 +1,87 @@
+// src/main.jsx
+// Fase 5 — Sentry com sourcemaps + release tracking + integração com Vite PWA.
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/global.css';
 import * as Sentry from '@sentry/react';
 
-// ─── Sentry — Monitoramento de erros em produção (Sprint 10.5 Fase B) ────────
-// Configurar VITE_SENTRY_DSN nas env vars do Vercel antes de ativar.
-if (import.meta.env.VITE_SENTRY_DSN) {
+// ─── Sentry: inicialização única, limpa e com release tracking ────────────────
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'dev';
+
+if (SENTRY_DSN) {
   Sentry.init({
-    dsn:         import.meta.env.VITE_SENTRY_DSN,
+    dsn:         SENTRY_DSN,
     environment: import.meta.env.MODE,
-    // Não enviar dados pessoais (LGPD)
+    release:     `gestao-baba@${APP_VERSION}`,   // rastreamento de releases
+
+    // Sourcemaps: o Sentry usa o campo release para mapear
+    // Configurar upload via @sentry/vite-plugin (ver vite.config.js)
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        maskAllText:   true,     // LGPD: mascarar textos
+        blockAllMedia: true,
+      }),
+    ],
+
+    // 10% das sessões em produção para não estourar o free tier
+    tracesSampleRate:     import.meta.env.PROD ? 0.1  : 0,
+    // 5% das sessões com replay (só em erros)
+    replaysSessionSampleRate:  0,
+    replaysOnErrorSampleRate:  import.meta.env.PROD ? 0.05 : 0,
+
+    ignoreErrors: [
+      'ResizeObserver loop limit exceeded',
+      'ResizeObserver loop completed with undelivered notifications',
+      'Non-Error promise rejection captured',
+      /^chrome-extension/,
+      /^moz-extension/,
+      /safari-extension/,
+      'NetworkError',
+      'AbortError',
+    ],
+
+    // LGPD: remover dados pessoais antes de enviar
     beforeSend(event) {
       if (event.user) {
         delete event.user.email;
         delete event.user.ip_address;
+        delete event.user.username;
       }
       return event;
     },
-    // Capturar apenas erros, não performance em dev
-    tracesSampleRate: import.meta.env.PROD ? 0.1 : 0,
-  });
-}
-const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
-if (SENTRY_DSN && import.meta.env.PROD) {
-  import('@sentry/react').then(Sentry => {
-    Sentry.init({
-      dsn:         SENTRY_DSN, // ← CORRIGIDO: era SENTRY_DNS (typo)
-      environment:  'production',
-      // Captura apenas 20% das sessões para não estourar o free tier
-      tracesSampleRate: 0.2,
-      // Ignora erros comuns de extensões de browser
-      ignoreErrors: [
-        'ResizeObserver loop limit exceeded',
-        'Non-Error promise rejection captured',
-        /^chrome-extension/,
-        /^moz-extension/,
-      ],
-      beforeSend(event) {
-        // Remove dados sensíveis antes de enviar
-        if (event.user) {
-          delete event.user.email;
-          delete event.user.ip_address;
-        }
-        return event;
-      },
-    });
-    console.log('[Sentry] Inicializado em produção');
-  }).catch(err => {
-    console.warn('[Sentry] Falha ao carregar:', err);
+    // Não rastrear rotas internas de auth
+    tracePropagationTargets: [
+      /^https:\/\/gestao-baba\.vercel\.app/,
+      /^https:\/\/itvfnargszozygcdhlrq\.supabase\.co/,
+    ],
   });
 }
 
-// ─── Service Worker (PWA) ─────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
+// ─── PWA: Service Worker via Vite PWA plugin ─────────────────────────────────
+// O registerSW é injetado automaticamente pelo vite-plugin-pwa.
+// Mantemos listener manual apenas como fallback.
+if ('serviceWorker' in navigator && !import.meta.env.DEV) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/service-worker.js')
-      .then(registration => {
-        registration.onupdatefound = () => {
-          const worker = registration.installing;
+      .register('/sw.js')   // Workbox gera /sw.js via vite-plugin-pwa
+      .then(reg => {
+        reg.onupdatefound = () => {
+          const worker = reg.installing;
+          if (!worker) return;
           worker.onstatechange = () => {
             if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[PWA] Nova versão disponível. Recarregue para atualizar.');
+              // Disparar evento customizado para o app mostrar banner de atualização
+              window.dispatchEvent(new CustomEvent('pwa-update-available'));
             }
           };
         };
       })
-      .catch(err => console.error('[PWA] Erro ao registrar Service Worker:', err));
+      .catch(err => console.warn('[PWA] Service Worker falhou:', err));
   });
 }
 
