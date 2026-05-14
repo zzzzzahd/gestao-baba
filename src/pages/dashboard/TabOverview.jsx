@@ -4,12 +4,13 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2, Link2 } from 'lucide-react';
+import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2, Link2, Users } from 'lucide-react';
 import { DAY_FULL } from '../../utils/constants';
-import PresenceBlock  from '../../components/PresenceBlock';
-import DrawConfigBlock from '../../components/DrawConfigBlock';
-import WaitlistPanel  from '../../components/WaitlistPanel';
-import InvitesPanel   from '../../components/InvitesPanel';
+import PresenceBlock       from '../../components/PresenceBlock';
+import DrawConfigBlock     from '../../components/DrawConfigBlock';
+import WaitlistPanel       from '../../components/WaitlistPanel';
+import InvitesPanel        from '../../components/InvitesPanel';
+import CalendarExportButton from '../../components/CalendarExportButton';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,9 +107,19 @@ const TabOverview = ({
               </div>
             </div>
             {gameDaysDisplay && (
-              <div className="mt-4 pt-4 border-t border-border-subtle flex items-center gap-2 text-[10px] font-black text-text-low uppercase">
-                <Calendar size={12} className="text-text-muted" />
-                <span>{gameDaysDisplay}</span>
+              <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[10px] font-black text-text-low uppercase">
+                  <Calendar size={12} className="text-text-muted" />
+                  <span>{gameDaysDisplay}</span>
+                </div>
+                <CalendarExportButton
+                  baba={currentBaba}
+                  nextDates={nextGameDay ? [{
+                    date:     new Date(nextGameDay.fullDate ?? Date.now()),
+                    time:     nextGameDay.time?.substring(0, 5) ?? '18:00',
+                    location: nextGameDay.location || currentBaba?.location,
+                  }] : []}
+                />
               </div>
             )}
           </div>
