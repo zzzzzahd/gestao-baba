@@ -138,10 +138,51 @@ const PrivacyPage = () => {
             </p>
           </Section>
 
-          <Section title="7. Contato">
+          <Section title="7. Encarregado de Dados (DPO)">
             <p>
-              Dúvidas ou solicitações relacionadas à privacidade:{' '}
-              <span className="text-cyan-electric">zharickdiias@gmail.com</span>
+              Nos termos do Art. 41 da LGPD, o responsável pelo tratamento de dados pessoais
+              no Draft Play é o próprio desenvolvedor da plataforma.
+            </p>
+            <p className="mt-2">
+              <strong>Canal oficial de privacidade / DPO:</strong>{' '}
+              <a href="mailto:privacidade@gestao-baba.app" className="text-cyan-electric underline">
+                privacidade@gestao-baba.app
+              </a>
+            </p>
+            <p className="mt-2 text-[11px] text-text-low">
+              Você pode exercer seus direitos previstos na LGPD (acesso, correção,
+              exclusão, portabilidade, revogação de consentimento) por este canal.
+              O prazo de resposta é de até 15 dias úteis.
+            </p>
+          </Section>
+
+          <Section title="8. Exercício de direitos">
+            <p>
+              Para exercer seus direitos como titular de dados, você pode:
+            </p>
+            <ul className="mt-2 space-y-1 text-[12px]">
+              <li>• <strong>Acessar seus dados:</strong> Perfil → Exportar dados</li>
+              <li>• <strong>Corrigir dados:</strong> Perfil → Editar</li>
+              <li>• <strong>Excluir conta:</strong> Perfil → Excluir conta</li>
+              <li>• <strong>Revogar consentimento:</strong> Perfil → Privacidade</li>
+              <li>• <strong>Portabilidade:</strong> Exportar dados em formato JSON</li>
+            </ul>
+          </Section>
+
+          <Section title="9. Contato">
+            <p>
+              Dúvidas gerais sobre privacidade:{' '}
+              <a href="mailto:privacidade@gestao-baba.app" className="text-cyan-electric underline">
+                privacidade@gestao-baba.app
+              </a>
+            </p>
+            <p className="mt-1 text-[11px] text-text-low">
+              Para denúncias à autoridade nacional: <a
+                href="https://www.gov.br/anpd"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-electric underline"
+              >www.gov.br/anpd</a>
             </p>
           </Section>
         </div>
