@@ -59,5 +59,78 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Tela inicial do Draft Play"
+    },
+    {
+      "src": "/screenshots/match.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Confirmação de presença no jogo"
+    }
+  ],
+  "categories": [
+    "sports",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Confirmar Presença",
+      "short_name": "Presença",
+      "description": "Confirmar presença no próximo jogo",
+      "url": "/dashboard?tab=overview",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Rankings",
+      "short_name": "Rankings",
+      "description": "Ver artilharia e assistências",
+      "url": "/rankings",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Sorteio de Times",
+      "short_name": "Sorteio",
+      "description": "Sortear times para o baba",
+      "url": "/draw",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Torneio",
+      "short_name": "Torneio",
+      "description": "Modo mata-mata",
+      "url": "/tournament",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "id": "app.vercel.gestao_baba"
 }
