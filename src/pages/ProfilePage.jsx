@@ -15,6 +15,9 @@ import ProfileStats       from '../components/ProfileStats';
 import ProfileEdit        from '../components/ProfileEdit';
 import ShareableCardModal from '../components/ShareableCardModal';
 import BadgesSection      from '../components/BadgesSection';
+import ThemeToggle        from '../components/ThemeToggle';
+import { PlanBadge }     from '../components/PlanBadge';
+import ReferralPanel     from '../components/ReferralPanel';
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 
@@ -267,6 +270,26 @@ const ProfilePage = () => {
             onSaved={() => { setTab('stats'); refreshProfile?.(); }}
             onProfileRefresh={refreshProfile}
           />
+        )}
+
+        {/* ── Preferências ── */}
+        {tab === 'stats' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-1 border border-border-subtle">
+              <div>
+                <p className="text-[10px] font-black uppercase text-text-low tracking-widest">Tema</p>
+                <p className="text-[9px] text-text-muted mt-0.5">Aparência do app</p>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        )}
+
+        {/* ── Indicações ── */}
+        {tab === 'stats' && (
+          <div className="bg-surface-1 border border-border-subtle rounded-3xl p-5">
+            <ReferralPanel />
+          </div>
         )}
       </div>
 
