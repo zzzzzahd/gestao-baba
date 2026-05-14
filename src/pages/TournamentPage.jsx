@@ -161,7 +161,7 @@ export default function TournamentPage() {
     acc[m.round].push(m);
     return acc;
   }, {});
-  const roundLabels: Record<number, string> = { 1: 'Fase inicial', 2: 'Quartas', 3: 'Semi', 4: 'Final' };
+  const roundLabels = { 1: 'Fase inicial', 2: 'Quartas', 3: 'Semi', 4: 'Final' };
 
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -245,7 +245,7 @@ export default function TournamentPage() {
             <div>
               <h2 className="text-sm font-black text-white">{active.name}</h2>
               <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
-                {active.status === 'finished' ? `🏆 Campeão: ${active.champion}` : `${(active.teams as any[])?.length ?? 0} times · ${active.format}`}
+                {active.status === 'finished' ? `🏆 Campeão: ${active.champion}` : `${active.teams?.length ?? 0} times · ${active.format}`}
               </p>
             </div>
             {active.status === 'draft' && isPresident && (
@@ -265,7 +265,7 @@ export default function TournamentPage() {
                 {roundLabels[Number(round)] ?? `Rodada ${round}`}
               </p>
               <div className="space-y-2">
-                {(rMatches as any[]).map(m => (
+                {rMatches.map(m => (
                   <MatchCard
                     key={m.id}
                     match={m}
