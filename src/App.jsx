@@ -1,256 +1,215 @@
-// supabase/functions/send-email/index.ts
-// Fase 3C — Emails transacionais via Resend.
-// Templates: boas-vindas, convite, confirmação de pagamento, recap mensal.
-//
-// Variáveis de ambiente (Supabase Dashboard → Edge Functions → Secrets):
-//   RESEND_API_KEY   → chave da API Resend (re_xxxx)
-//   FROM_EMAIL       → email remetente verificado no Resend (ex: noreply@gestao-baba.app)
-//   APP_URL          → https://gestao-baba.vercel.app
+// src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { BabaProvider } from './contexts/BabaContext';
 
-import { serve }        from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { z }            from "npm:zod@3.22.4";
+// Páginas
+import LandingPage        from './pages/LandingPage';
+import LoginPage          from './pages/LoginPage';
+import HomePage           from './pages/HomePage';
+import ProfilePage        from './pages/ProfilePage';
+import PublicProfilePage  from './pages/PublicProfilePage';
+import MatchPageVisitor   from './pages/MatchPageVisitor';
+import RankingsPage       from './pages/RankingsPage';
+import FinancialPage      from './pages/FinancialPage';
+import VisitorMode        from './pages/VisitorMode';
+import DashboardPage      from './pages/DashboardPage';
+import CreatePage         from './pages/CreatePage';
+import HistoryPage        from './pages/HistoryPage';
+import DrawPage           from './pages/DrawPage';
+import PrivacyPage        from './pages/PrivacyPage';
+import TermsPage          from './pages/TermsPage';
+import FollowersPage      from './pages/FollowersPage';
+import JoinPage           from './pages/JoinPage';
+import ComparisonPage     from './pages/ComparisonPage';
 
-const RESEND_KEY  = Deno.env.get("RESEND_API_KEY")           ?? "";
-const FROM_EMAIL  = Deno.env.get("FROM_EMAIL")               ?? "noreply@gestao-baba.app";
-const APP_URL     = Deno.env.get("APP_URL")                  ?? "https://gestao-baba.vercel.app";
-const CRON_SECRET = Deno.env.get("CRON_SECRET")              ?? "";
-const SVC_ROLE    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// Componentes globais
+import BottomNav     from './components/BottomNav';
+import OfflineBanner from './components/OfflineBanner';
+import PageWrapper   from './components/PageWrapper';
+import PushPrompt    from './components/PushPrompt';
+import ConsentModal  from './components/ConsentModal';
+import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
+import ChangelogModal, { shouldShowChangelog } from './components/ChangelogModal';
+import FeedbackModal from './components/FeedbackModal';
 
-const CORS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+// ─── ProtectedRoute ───────────────────────────────────────────────────────────
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  return user ? children : <Navigate to="/login" />;
 };
 
-const json = (data: unknown, s = 200) =>
-  new Response(JSON.stringify(data), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
+// Chave para rastrear elegibilidade do push (após 1ª confirmação de presença)
+const PUSH_ELIGIBLE_KEY = 'push_eligible_after_confirm';
 
-// ─── Schema Zod ───────────────────────────────────────────────────────────────
+// ─── AppInner ─────────────────────────────────────────────────────────────────
+const AppInner = () => {
+  const { user, profile } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [showChangelog,  setShowChangelog]  = useState(false);
+  const [showFeedback,   setShowFeedback]   = useState(false);
+  // null = ainda carregando (evita flash); false = sem consentimento necessário; true = precisa consentir
+  const [needsConsent, setNeedsConsent] = useState(null);
 
-const EmailSchema = z.discriminatedUnion("template", [
-  z.object({
-    template:   z.literal("welcome"),
-    to:         z.string().email(),
-    name:       z.string().min(1),
-  }),
-  z.object({
-    template:   z.literal("invite"),
-    to:         z.string().email(),
-    name:       z.string().min(1),
-    baba_name:  z.string().min(1),
-    invite_url: z.string().url(),
-    inviter:    z.string().optional().default("Um amigo"),
-  }),
-  z.object({
-    template:    z.literal("payment_confirmed"),
-    to:          z.string().email(),
-    name:        z.string().min(1),
-    baba_name:   z.string().min(1),
-    amount:      z.number().positive(),
-    pix_key:     z.string().optional(),
-  }),
-  z.object({
-    template:    z.literal("monthly_recap"),
-    to:          z.string().email(),
-    name:        z.string().min(1),
-    baba_name:   z.string().min(1),
-    goals:       z.number().int().min(0),
-    assists:     z.number().int().min(0),
-    matches:     z.number().int().min(0),
-    wins:        z.number().int().min(0),
-    streak:      z.number().int().min(0),
-    top_scorer:  z.string().optional(),
-  }),
-  z.object({
-    template:    z.literal("payment_reminder"),
-    to:          z.string().email(),
-    name:        z.string().min(1),
-    baba_name:   z.string().min(1),
-    amount:      z.number().positive(),
-    due_date:    z.string(),
-    pix_key:     z.string().optional(),
-  }),
-]);
+  // Verificar consentimento LGPD — só decide depois do profile carregar
+  useEffect(() => {
+    if (!user) { setNeedsConsent(false); return; }
+    if (profile === undefined) return; // ainda carregando — aguarda
+    setNeedsConsent(profile ? !profile.consent_at : false);
+  }, [user, profile]);
 
-type EmailPayload = z.infer<typeof EmailSchema>;
+  // Onboarding (apenas uma vez, após consentimento resolvido)
+  useEffect(() => {
+    if (!user || needsConsent !== false) return;
+    if (shouldShowOnboarding()) {
+      const id = setTimeout(() => setShowOnboarding(true), 1000);
+      return () => clearTimeout(id);
+    }
+    // Changelog: só exibe se não é onboarding (usuário já conhece o app)
+    if (shouldShowChangelog()) {
+      const id = setTimeout(() => setShowChangelog(true), 1500);
+      return () => clearTimeout(id);
+    }
+  }, [user, needsConsent]);
 
-// ─── Templates HTML ───────────────────────────────────────────────────────────
+  // Push prompt — só após confirmar presença (sinalizado via window.__markPushEligible)
+  // OU na 2ª sessão se já confirmou antes.
+  useEffect(() => {
+    if (!user || needsConsent !== false) { setShowPushPrompt(false); return; }
+    const eligible =
+      sessionStorage.getItem(PUSH_ELIGIBLE_KEY) === 'true' ||
+      localStorage.getItem(PUSH_ELIGIBLE_KEY) === 'true';
+    if (eligible) {
+      const id = setTimeout(() => setShowPushPrompt(true), 2000);
+      return () => clearTimeout(id);
+    }
+  }, [user, needsConsent]);
 
-const baseStyle = `
-  font-family: 'Inter', Arial, sans-serif;
-  background: #000;
-  color: #fff;
-  padding: 40px 20px;
-  max-width: 600px;
-  margin: 0 auto;
-`;
+  // Expor helper global para que PresenceConfirmation marque elegibilidade após 1ª confirmação
+  useEffect(() => {
+    window.__markPushEligible = () => {
+      localStorage.setItem(PUSH_ELIGIBLE_KEY, 'true');
+      sessionStorage.setItem(PUSH_ELIGIBLE_KEY, 'true');
+      setShowPushPrompt(true);
+    };
+    return () => { delete window.__markPushEligible; };
+  }, []);
 
-const btnStyle = `
-  display: inline-block;
-  background: #00f2ff;
-  color: #000;
-  font-weight: 900;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  text-decoration: none;
-  padding: 14px 32px;
-  border-radius: 50px;
-  margin: 24px 0;
-`;
+  // Spinner enquanto aguarda profile carregar (evita flash do modal de consentimento)
+  if (needsConsent === null && user) return (
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
-const cardStyle = `
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px;
-  padding: 24px;
-  margin: 16px 0;
-`;
+  return (
+    <>
+      <OfflineBanner />
 
-const footer = `
-  <p style="color:rgba(255,255,255,0.3);font-size:11px;margin-top:40px;text-align:center;">
-    Draft Play · Gestão de Baba<br>
-    <a href="${APP_URL}/privacidade" style="color:#00f2ff;">Privacidade</a> ·
-    <a href="${APP_URL}/termos" style="color:#00f2ff;">Termos</a>
-  </p>
-`;
+      <Routes>
+        {/* Públicas */}
+        <Route path="/"              element={<LandingPage />} />
+        <Route path="/login"         element={<LoginPage />} />
+        <Route path="/visitor"       element={<VisitorMode />} />
+        <Route path="/visitor-match" element={<MatchPageVisitor />} />
+        <Route path="/privacidade"   element={<PrivacyPage />} />
+        <Route path="/termos"        element={<TermsPage />} />
+        <Route path="/join/:code"    element={<JoinPage />} />
+        <Route path="/player/:userId"    element={<PublicProfilePage />} />
+        <Route path="/followers/:userId" element={<FollowersPage />} />
+        <Route path="/followers"         element={<FollowersPage />} />
 
-const templates: Record<string, (p: EmailPayload) => { subject: string; html: string }> = {
-  welcome: (p: any) => ({
-    subject: `Bem-vindo ao Draft Play, ${p.name}! ⚽`,
-    html: `<div style="${baseStyle}">
-      <h1 style="color:#00f2ff;font-size:28px;font-weight:900;">⚽ Bem-vindo ao Draft Play!</h1>
-      <p>Olá, <strong>${p.name}</strong>!</p>
-      <p>Sua conta foi criada com sucesso. Agora você pode gerenciar seu baba, sortear times e acompanhar rankings.</p>
-      <div style="${cardStyle}">
-        <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.7);">🎲 Sorteio balanceado por avaliação<br>📊 Rankings e estatísticas em tempo real<br>💰 Controle financeiro integrado</p>
-      </div>
-      <a href="${APP_URL}" style="${btnStyle}">Entrar no app</a>
-      ${footer}
-    </div>`,
-  }),
+        {/* Protegidas */}
+        <Route path="/home"      element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><PageWrapper><DashboardPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/create"    element={<ProtectedRoute><PageWrapper><CreatePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/profile"   element={<ProtectedRoute><PageWrapper><ProfilePage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/rankings"  element={<ProtectedRoute><PageWrapper><RankingsPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/financial" element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/history"    element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
 
-  invite: (p: any) => ({
-    subject: `${p.inviter} te convidou para o baba ${p.baba_name}! ⚽`,
-    html: `<div style="${baseStyle}">
-      <h1 style="color:#00f2ff;font-size:24px;font-weight:900;">Convite para o Baba!</h1>
-      <p>Olá, <strong>${p.name}</strong>!</p>
-      <p><strong>${p.inviter}</strong> te convidou para participar do <strong>${p.baba_name}</strong> no Draft Play.</p>
-      <div style="${cardStyle}">
-        <p style="margin:0;color:rgba(255,255,255,0.7);font-size:13px;">Confirme presenças, veja o sorteio dos times e acompanhe seu desempenho — tudo em um lugar.</p>
-      </div>
-      <a href="${p.invite_url}" style="${btnStyle}">Aceitar convite</a>
-      <p style="color:rgba(255,255,255,0.4);font-size:11px;">Link válido por 7 dias.</p>
-      ${footer}
-    </div>`,
-  }),
+        {/* Redirects */}
+        <Route path="/teams" element={<Navigate to="/draw" replace />} />
+        <Route path="/match" element={<Navigate to="/draw" replace />} />
+      </Routes>
 
-  payment_confirmed: (p: any) => ({
-    subject: `Pagamento confirmado — ${p.baba_name} ✅`,
-    html: `<div style="${baseStyle}">
-      <h1 style="color:#39ff14;font-size:24px;font-weight:900;">✅ Pagamento Confirmado!</h1>
-      <p>Olá, <strong>${p.name}</strong>!</p>
-      <p>Seu pagamento para o <strong>${p.baba_name}</strong> foi confirmado.</p>
-      <div style="${cardStyle}">
-        <p style="margin:0;font-size:20px;font-weight:900;color:#00f2ff;">R$ ${Number(p.amount).toFixed(2).replace('.',',')}</p>
-        <p style="margin:4px 0 0;color:rgba(255,255,255,0.5);font-size:12px;">Pago via PIX</p>
-      </div>
-      <a href="${APP_URL}/financial" style="${btnStyle}">Ver financeiro</a>
-      ${footer}
-    </div>`,
-  }),
+      <BottomNav />
 
-  payment_reminder: (p: any) => ({
-    subject: `Lembrete: mensalidade do ${p.baba_name} vence em breve 💳`,
-    html: `<div style="${baseStyle}">
-      <h1 style="color:#ffbd00;font-size:24px;font-weight:900;">💳 Lembrete de Pagamento</h1>
-      <p>Olá, <strong>${p.name}</strong>!</p>
-      <p>A mensalidade do <strong>${p.baba_name}</strong> vence em <strong>${p.due_date}</strong>.</p>
-      <div style="${cardStyle}">
-        <p style="margin:0;font-size:20px;font-weight:900;color:#ffbd00;">R$ ${Number(p.amount).toFixed(2).replace('.',',')}</p>
-        ${p.pix_key ? `<p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:12px;">PIX: ${p.pix_key}</p>` : ''}
-      </div>
-      <a href="${APP_URL}/financial" style="${btnStyle}">Pagar agora</a>
-      ${footer}
-    </div>`,
-  }),
+      {/* Consentimento LGPD — bloqueia tudo até aceitar, sem flash */}
+      {needsConsent === true && (
+        <ConsentModal onAccepted={() => setNeedsConsent(false)} />
+      )}
 
-  monthly_recap: (p: any) => ({
-    subject: `Seu mês no baba ${p.baba_name} ⚽📊`,
-    html: `<div style="${baseStyle}">
-      <h1 style="color:#00f2ff;font-size:24px;font-weight:900;">📊 Recap do Mês</h1>
-      <p>Olá, <strong>${p.name}</strong>! Veja seu desempenho no <strong>${p.baba_name}</strong> este mês:</p>
-      <div style="${cardStyle}">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px 0;color:rgba(255,255,255,0.6);">⚽ Gols</td><td style="text-align:right;font-weight:900;color:#fff;">${p.goals}</td></tr>
-          <tr><td style="padding:8px 0;color:rgba(255,255,255,0.6);">🎯 Assistências</td><td style="text-align:right;font-weight:900;color:#fff;">${p.assists}</td></tr>
-          <tr><td style="padding:8px 0;color:rgba(255,255,255,0.6);">🏟️ Partidas</td><td style="text-align:right;font-weight:900;color:#fff;">${p.matches}</td></tr>
-          <tr><td style="padding:8px 0;color:rgba(255,255,255,0.6);">🏆 Vitórias</td><td style="text-align:right;font-weight:900;color:#fff;">${p.wins}</td></tr>
-          ${p.streak > 0 ? `<tr><td style="padding:8px 0;color:rgba(255,255,255,0.6);">🔥 Sequência</td><td style="text-align:right;font-weight:900;color:#00f2ff;">${p.streak} jogos</td></tr>` : ''}
-        </table>
-      </div>
-      ${p.top_scorer ? `<p style="color:rgba(255,255,255,0.5);font-size:12px;">🥇 Artilheiro do mês: <strong style="color:#fff;">${p.top_scorer}</strong></p>` : ''}
-      <a href="${APP_URL}/rankings" style="${btnStyle}">Ver rankings</a>
-      ${footer}
-    </div>`,
-  }),
+      {/* Push prompt — só exibe se já deu consent e é elegível */}
+      {showPushPrompt && needsConsent === false && <PushPrompt />}
+
+      {/* Onboarding — só exibe se já deu consent */}
+      {showOnboarding && needsConsent === false && (
+        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+      )}
+
+      {/* Changelog — novidades da versão, após onboarding */}
+      {showChangelog && needsConsent === false && !showOnboarding && (
+        <ChangelogModal isOpen onClose={() => setShowChangelog(false)} />
+      )}
+
+      {/* Botão flutuante de feedback (visível apenas para usuários logados) */}
+      {user && needsConsent === false && (
+        <button
+          onClick={() => setShowFeedback(true)}
+          aria-label="Enviar feedback ou reportar bug"
+          title="Feedback"
+          className="fixed bottom-28 right-4 z-50 w-10 h-10 rounded-full bg-surface-2 border border-border-mid text-text-low hover:text-cyan-electric hover:border-cyan-electric/30 transition-all shadow-glass flex items-center justify-center active:scale-90"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Feedback modal */}
+      <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+    </>
+  );
 };
 
-// ─── Envio via Resend API ─────────────────────────────────────────────────────
-
-async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  if (!RESEND_KEY) {
-    console.warn("[send-email] RESEND_API_KEY não configurado");
-    return false;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_KEY}`,
-      "Content-Type":  "application/json",
-    },
-    body: JSON.stringify({
-      from:    `Draft Play <${FROM_EMAIL}>`,
-      to:      [to],
-      subject,
-      html,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.error("[send-email] Resend error:", res.status, err);
-    return false;
-  }
-  return true;
+// ─── App root ─────────────────────────────────────────────────────────────────
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <BabaProvider>
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background:   '#0d0d0d',
+                color:        '#fff',
+                border:       '1px solid rgba(0,242,255,0.2)',
+                borderRadius: '1rem',
+                fontFamily:   'Rajdhani, sans-serif',
+                fontWeight:   'bold',
+              },
+              success: { iconTheme: { primary: '#00f2ff', secondary: '#0d0d0d' } },
+              error:   { iconTheme: { primary: '#ff003c', secondary: '#0d0d0d' } },
+            }}
+          />
+          <AppInner />
+        </BabaProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-// ─── Handler ─────────────────────────────────────────────────────────────────
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-
-  const auth  = req.headers.get("Authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (token !== CRON_SECRET && token !== SVC_ROLE) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
-  let payload: EmailPayload;
-  try {
-    const raw = await req.json();
-    payload   = EmailSchema.parse(raw);
-  } catch (err) {
-    const issues = err instanceof z.ZodError ? err.flatten().fieldErrors : String(err);
-    return json({ error: "Payload inválido", issues }, 400);
-  }
-
-  const tmpl = templates[payload.template];
-  if (!tmpl) return json({ error: `Template '${payload.template}' não encontrado` }, 400);
-
-  const { subject, html } = tmpl(payload);
-  const ok = await sendEmail(payload.to, subject, html);
-
-  return json({ ok, template: payload.template, to: payload.to });
-});
+export default App;
