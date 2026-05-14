@@ -8,15 +8,11 @@ import {
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
-// Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 
 // ─── Countdown hook inline ─────────────────────────────────────────────────────
-// Recebe índice do dia da semana (0=Dom) + horário "HH:MM" e retorna string
-// legível como "2d 3h 15m". Mantido inline para evitar conflito de contexto
-// React entre hooks aninhados em componentes definidos fora do render tree.
 const useCountdown = (targetDayOfWeek, targetTime) => {
   const [display, setDisplay] = useState('');
 
@@ -110,12 +106,10 @@ const HeroBabaCard = ({ baba, onClick }) => {
         boxShadow: '0 0 40px rgba(0,242,255,0.06)',
       }}
     >
-      {/* Label */}
       <p className="text-[9px] font-black text-cyan-electric/50 uppercase tracking-widest mb-3">
         próximo jogo
       </p>
 
-      {/* Nome + logo */}
       <div className="flex items-center gap-3 mb-4">
         {baba.logo_url ? (
           <img src={baba.logo_url} className="w-12 h-12 rounded-2xl object-cover border border-border-mid" alt="" />
@@ -138,7 +132,6 @@ const HeroBabaCard = ({ baba, onClick }) => {
         </div>
       </div>
 
-      {/* Countdown + CTA */}
       <div className="flex items-center justify-between">
         {countdown ? (
           <div className="flex items-center gap-2">
@@ -159,13 +152,33 @@ const HeroBabaCard = ({ baba, onClick }) => {
   );
 };
 
+// ─── Atalhos rápidos ──────────────────────────────────────────────────────────
+const QuickActions = ({ onTournament }) => (
+  <div className="grid grid-cols-1 gap-3">
+    <button
+      onClick={onTournament}
+      className="flex items-center justify-between p-4 rounded-2xl border border-yellow-400/20 active:scale-95 transition-all"
+      style={{ background: 'rgba(234,179,8,0.06)' }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-yellow-400/10 flex items-center justify-center">
+          <Trophy size={18} className="text-yellow-400" />
+        </div>
+        <div className="text-left">
+          <p className="text-[11px] font-black text-white uppercase tracking-wide">Torneio / Mata-mata</p>
+          <p className="text-[9px] text-text-low">Crie e gerencie chaveamentos</p>
+        </div>
+      </div>
+      <ArrowRight size={14} className="text-text-muted" />
+    </button>
+  </div>
+);
+
 // ─── Item da lista de babas ───────────────────────────────────────────────────
 const BabaListItem = ({ baba, onClick }) => {
   const dayIndex = baba.game_days_config?.[0] ?? baba.game_day_of_week ?? null;
   const gameTime = baba.game_time?.substring(0, 5) ?? null;
   const dayLabel = dayIndex != null ? DAY_SHORT[dayIndex] : null;
-
-  // Stub de presença — futuramente virá do contexto
   const confirmed = baba.userConfirmed ?? false;
 
   return (
@@ -217,15 +230,13 @@ const FAB = ({ onClick }) => (
   </button>
 );
 
-// ─── FAB Menu (criar / entrar) ────────────────────────────────────────────────
+// ─── FAB Menu ─────────────────────────────────────────────────────────────────
 const FABMenu = ({ onClose, onCreate, onJoin }) => (
   <>
-    {/* Backdrop */}
     <div
       className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     />
-    {/* Opções */}
     <div className="fixed bottom-44 right-5 z-[60] flex flex-col items-end gap-3">
       <div className="flex items-center gap-3">
         <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
@@ -254,7 +265,7 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
   </>
 );
 
-// ─── Componente principal ────────────────────────────────────────────────────
+// ─── Componente principal ─────────────────────────────────────────────────────
 const HomePage = () => {
   const navigate  = useNavigate();
   const { profile } = useAuth();
@@ -271,7 +282,6 @@ const HomePage = () => {
 
   const joinBoxRef = useRef(null);
 
-  // Tarefa 4.2 — Pull-to-refresh
   const { pulling, pullY, refreshing, progress } = usePullToRefresh(
     async () => { await syncData?.(); },
     { disabled: loading },
@@ -316,6 +326,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-black text-white px-5 pt-6 pb-32 space-y-5">
       <PullToRefreshIndicator pulling={pulling} pullY={pullY} refreshing={refreshing} progress={progress} />
+
       {/* ── Topo compacto ── */}
       <div className="flex items-center justify-between">
         <Logo size="small" />
@@ -341,7 +352,10 @@ const HomePage = () => {
             <HeroBabaCard baba={nextBaba} onClick={() => openBaba(nextBaba)} />
           )}
 
-          {/* ── Demais babas (a partir do 2º) ── */}
+          {/* ── Atalhos rápidos ── */}
+          <QuickActions onTournament={() => navigate('/tournament')} />
+
+          {/* ── Demais babas ── */}
           {restBabas.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1">
@@ -359,7 +373,7 @@ const HomePage = () => {
         </>
       )}
 
-      {/* ── Join Box — sempre no final ── */}
+      {/* ── Join Box ── */}
       <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-border-subtle">
         <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
           Entrar com código
