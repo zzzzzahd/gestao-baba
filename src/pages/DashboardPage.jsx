@@ -19,6 +19,7 @@ import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
 import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
+import { PlanBadge } from '../components/PlanBadge';
 import toast from 'react-hot-toast';
 
 // ── Lazy tabs ─────────────────────────────────────────────────────────────────
@@ -280,6 +281,10 @@ const DashboardPage = () => {
                 <span className="bg-purple-400/10 text-purple-400 px-2 py-0.5 rounded border border-purple-400/20 text-[9px]">
                   Coordenador
                 </span>
+              )}
+              {/* Badge do plano do baba */}
+              {currentBaba?.plan && currentBaba.plan !== 'free' && (
+                <PlanBadge plan={currentBaba.plan} compact />
               )}
             </div>
           </div>
