@@ -24,6 +24,7 @@ import TermsPage          from './pages/TermsPage';
 import FollowersPage      from './pages/FollowersPage';
 import JoinPage           from './pages/JoinPage';
 import ComparisonPage     from './pages/ComparisonPage';
+import TournamentPage     from './pages/TournamentPage';
 
 // Componentes globais
 import BottomNav     from './components/BottomNav';
@@ -136,7 +137,8 @@ const AppInner = () => {
         <Route path="/financial" element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/history"    element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/comparison"  element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/tournament"  element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
 
         {/* Redirects */}
         <Route path="/teams" element={<Navigate to="/draw" replace />} />
