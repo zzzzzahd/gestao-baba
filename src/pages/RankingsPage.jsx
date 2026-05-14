@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2, ExternalLink, Users } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 import ShareableCardModal from '../components/ShareableCardModal';
@@ -130,6 +130,47 @@ const RankingsPage = () => {
     try {
       setLoading(true);
 
+      // ── Aba: Fair-play via RPC ──────────────────────────────────────────────
+      if (activeTab === 'fairplay') {
+        const { data, error } = await supabase.rpc('get_fairplay_ranking', {
+          p_baba_id: currentBaba.id,
+          p_limit:   10,
+        });
+        if (error) throw error;
+        setRankings((data || []).map(p => ({
+          id:           p.player_id,
+          name:         p.player_name,
+          avatar_url:   p.avatar_url,
+          assists:      p.assists,
+          yellow_cards: p.yellow_cards,
+          red_cards:    p.red_cards,
+          total:        p.fairplay_pts,
+        })));
+        return;
+      }
+
+      // ── Aba: Artilheiro do mês via RPC ─────────────────────────────────────
+      if (activeTab === 'mes') {
+        const now   = new Date();
+        const { data, error } = await supabase.rpc('get_monthly_top_scorer', {
+          p_baba_id: currentBaba.id,
+          p_year:    now.getFullYear(),
+          p_month:   now.getMonth() + 1,
+        });
+        if (error) throw error;
+        setRankings((data || []).map(p => ({
+          id:         p.player_id,
+          name:       p.player_name,
+          avatar_url: p.avatar_url,
+          goals:      Number(p.goals),
+          assists:    Number(p.assists),
+          matches:    Number(p.matches),
+          total:      Number(p.goals),
+        })));
+        return;
+      }
+
+      // ── Abas: Artilheiros / Garçons / MVPs ─────────────────────────────────
       let dateFilter = null;
       if (period === '7days') {
         const d = new Date(); d.setDate(d.getDate() - 7);
@@ -196,14 +237,18 @@ const RankingsPage = () => {
   useEffect(() => { loadRankings(); }, [loadRankings]);
 
   const TABS = [
-    { id: 'artilheiros', icon: Trophy, label: 'Gols'   },
-    { id: 'garcons',     icon: Target, label: 'Assist' },
-    { id: 'mvps',        icon: Award,  label: 'MVP'    },
+    { id: 'artilheiros', icon: Trophy, label: 'Gols'      },
+    { id: 'garcons',     icon: Target, label: 'Assist'    },
+    { id: 'mvps',        icon: Award,  label: 'MVP'       },
+    { id: 'mes',         icon: Trophy, label: 'Mês'       },
+    { id: 'fairplay',    icon: Award,  label: 'Fair-Play' },
   ];
 
   const getStatValue = useCallback((player) => {
     if (activeTab === 'artilheiros') return { value: player.goals,   unit: 'gols'   };
     if (activeTab === 'garcons')     return { value: player.assists, unit: 'assists' };
+    if (activeTab === 'mes')         return { value: player.goals,   unit: 'gols/mês' };
+    if (activeTab === 'fairplay')    return { value: player.total,   unit: 'pts'    };
     return                                  { value: player.total,   unit: 'G+A'    };
   }, [activeTab]);
 
@@ -242,7 +287,7 @@ const RankingsPage = () => {
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-surface-3 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-surface-3 rounded-full transition-colors" aria-label="Voltar">
             <ArrowLeft size={24} />
           </button>
           <div className="text-center flex-1">
@@ -280,15 +325,26 @@ const RankingsPage = () => {
               </p>
             ) : null}
           </div>
-          {/* Sprint 12: botão compartilhar */}
-          <button
-            onClick={() => setShowShare(true)}
-            disabled={!rankings.length}
-            className="p-2 hover:bg-surface-3 rounded-full transition-colors disabled:opacity-30"
-            title="Compartilhar ranking"
-          >
-            <Share2 size={20} className="text-cyan-electric" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Comparação 1v1 */}
+            <button
+              onClick={() => navigate('/comparison')}
+              aria-label="Comparar jogadores 1v1"
+              title="Comparar jogadores"
+              className="p-2 hover:bg-surface-3 rounded-full transition-colors"
+            >
+              <Users size={20} className="text-text-low" />
+            </button>
+            {/* Sprint 12: botão compartilhar */}
+            <button
+              onClick={() => setShowShare(true)}
+              disabled={!rankings.length}
+              className="p-2 hover:bg-surface-3 rounded-full transition-colors disabled:opacity-30"
+              aria-label="Compartilhar ranking"
+            >
+              <Share2 size={20} className="text-cyan-electric" />
+            </button>
+          </div>
         </div>
 
         {/* Filtro de período */}
