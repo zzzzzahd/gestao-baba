@@ -1,11 +1,22 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+// Descomente quando instalar @sentry/vite-plugin:
+// import { sentryVitePlugin } from '@sentry/vite-plugin';
 
-// ARCH-005: substituindo o service-worker manual pelo Workbox gerado automaticamente.
-// Benefícios: precaching com hash, atualização automática e score Lighthouse mais alto.
+// Fase 5 — Sentry sourcemaps + release tracking + Vitest.
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+return {
+  define: {
+    // Injeta versão do package.json como variável de ambiente
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(
+      process.env.npm_package_version ?? '1.3.0'
+    ),
+  },
+
   plugins: [
     react(),
     VitePWA({
@@ -109,8 +120,36 @@ export default defineConfig({
     }),
   ],
 
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-ui':       ['lucide-react', 'react-hot-toast'],
+          'vendor-sentry':   ['@sentry/react'],
+        },
+      },
+    },
+  },
+
   server: {
     port: 3000,
     host: true,
   },
-});
+
+  test: {
+    globals:     true,
+    environment: 'jsdom',
+    setupFiles:  ['./src/__tests__/setup.js'],
+    include:     ['src/**/*.{test,spec}.{js,jsx}'],
+    exclude:     ['node_modules', 'dist'],
+    coverage: {
+      provider:   'v8',
+      reporter:   ['text', 'lcov', 'html'],
+      include:    ['src/utils/**', 'src/services/**', 'src/hooks/**'],
+      thresholds: { lines: 60, functions: 60, branches: 50 },
+    },
+  },
+}; });
