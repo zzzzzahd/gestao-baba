@@ -1,63 +1,54 @@
 // src/pages/draw/StepMatch.jsx
-// Sprint 9.3: Realtime via useRealtimeMatch (hook encapsulado) para sincronizar
-// placar e gols entre múltiplos dispositivos (presidente + jogadores assistindo).
+// Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Target, UserPlus, ChevronLeft } from 'lucide-react';
-import { useBaba } from '../../contexts/BabaContext';
-import { supabase } from '../../services/supabase';
-import WinnerPhotoModal from '../../components/WinnerPhotoModal';
-import MatchShareButton from '../../components/MatchShareButton';
-import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
-import toast from 'react-hot-toast';
+import { useBaba }           from '../../contexts/BabaContext';
+import { useAuth }           from '../../contexts/AuthContext';
+import { supabase }          from '../../services/supabase';
+import WinnerPhotoModal      from '../../components/WinnerPhotoModal';
+import MatchShareButton      from '../../components/MatchShareButton';
+import MatchIntro            from '../../components/MatchIntro';
+import PostGameScreen        from '../../components/PostGameScreen';
+import MatchReactions        from '../../components/MatchReactions';
+import { useRealtimeMatch }  from '../../hooks/useRealtimeMatch';
+import { Sounds }            from '../../utils/sounds';
+import { fmt, GOAL_MESSAGES } from '../../utils/messages';
+import { useFeatures }       from '../../utils/babaMode';
+import toast                 from 'react-hot-toast';
 
 const formatTime = (s) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) => {
-  const { currentBaba } = useBaba();
+  const { currentBaba }   = useBaba();
+  const { user }          = useAuth();
+  const features          = useFeatures();
 
-  const [loading,         setLoading]         = useState(!matchState?.allTeams);
-  const [allTeams,        setAllTeams]        = useState(matchState?.allTeams || []);
-  const [currentMatch,    setCurrentMatch]    = useState(matchState?.currentMatch || null);
-  const [timer,           setTimer]           = useState(matchState?.timer ?? 600);
-  const [isActive,        setIsActive]        = useState(false);
-  const [matchId,         setMatchId]         = useState(matchState?.matchId || null);
-  const [showGoalModal,   setShowGoalModal]   = useState(false);
-  const [goalTeam,        setGoalTeam]        = useState(null);
-  const [selectedScorer,  setSelectedScorer]  = useState('');
-  const [selectedAssist,  setSelectedAssist]  = useState('');
-  const [showWinnerPhoto, setShowWinnerPhoto] = useState(false);
-  const [winnerInfo,      setWinnerInfo]      = useState({ name: '', matchId: null });
-  const [pendingQueue,    setPendingQueue]    = useState([]);
+  const [loading,          setLoading]          = useState(!matchState?.allTeams);
+  const [allTeams,         setAllTeams]         = useState(matchState?.allTeams || []);
+  const [currentMatch,     setCurrentMatch]     = useState(matchState?.currentMatch || null);
+  const [timer,            setTimer]            = useState(matchState?.timer ?? 600);
+  const [isActive,         setIsActive]         = useState(false);
+  const [matchId,          setMatchId]          = useState(matchState?.matchId || null);
+  const [showGoalModal,    setShowGoalModal]    = useState(false);
+  const [goalTeam,         setGoalTeam]         = useState(null);
+  const [selectedScorer,   setSelectedScorer]   = useState('');
+  const [selectedAssist,   setSelectedAssist]   = useState('');
+  const [showWinnerPhoto,  setShowWinnerPhoto]  = useState(false);
+  const [winnerInfo,       setWinnerInfo]       = useState({ name: '', matchId: null });
+  const [pendingQueue,     setPendingQueue]     = useState([]);
+  const [showIntro,        setShowIntro]        = useState(false);
+  const [showPostGame,     setShowPostGame]     = useState(false);
+  const [finishedMatch,    setFinishedMatch]    = useState(null);
+  const [allMatchPlayers,  setAllMatchPlayers]  = useState([]);
 
-  // ── Sprint 9.3: Refresh do estado via banco ───────────────────────────────
-  const refreshMatchState = useCallback(async () => {
-    if (!matchId) return;
-    try {
-      const { data: mp } = await supabase
-        .from('match_players')
-        .select('player_id, team, goals, assists')
-        .eq('match_id', matchId);
-
-      if (!mp) return;
-
-      // Recalcula placar a partir dos dados reais do banco
-      const scoreA = mp.filter(p => p.team === 'A').reduce((sum, p) => sum + (p.goals || 0), 0);
-      const scoreB = mp.filter(p => p.team === 'B').reduce((sum, p) => sum + (p.goals || 0), 0);
-
-      setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
-    } catch (err) {
-      console.error('[StepMatch] refreshMatchState:', err);
-    }
-  }, [matchId]);
-
-  // ── Hook de Realtime (encapsulado) ───────────────────────────────────────
+  // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
     setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
   }, { enabled: !!matchId });
 
-  // ── Carregar times ao montar ──────────────────────────────────────────────
+  // Carregar ao montar
   useEffect(() => {
     if (matchState?.allTeams) {
       setAllTeams(matchState.allTeams);
@@ -67,7 +58,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       setLoading(false);
       return;
     }
-
     if (!drawResult?.teams?.length) return;
     const teams = drawResult.teams;
     const match = { teamA: teams[0], teamB: teams[1], scoreA: 0, scoreB: 0 };
@@ -75,15 +65,16 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setCurrentMatch(match);
     loadOrCreateMatch(teams[0], teams[1]);
     setLoading(false);
+    setShowIntro(true);
   }, []);
 
-  // ── Persistir estado no wizard ────────────────────────────────────────────
+  // Persistir estado no wizard
   useEffect(() => {
     if (!currentMatch) return;
     setMatchState({ allTeams, currentMatch, timer, matchId });
   }, [allTeams, currentMatch, timer, matchId]);
 
-  // ── Timer ─────────────────────────────────────────────────────────────────
+  // Timer
   useEffect(() => {
     let iv = null;
     if (isActive && timer > 0) {
@@ -95,7 +86,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     return () => clearInterval(iv);
   }, [isActive, timer]);
 
-  // ── Auto-fim por placar ───────────────────────────────────────────────────
+  // Auto-fim por placar (2 gols)
   useEffect(() => {
     if (currentMatch && (currentMatch.scoreA >= 2 || currentMatch.scoreB >= 2)) {
       setIsActive(false);
@@ -120,11 +111,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         const gt = currentBaba.game_time ? String(currentBaba.game_time).substring(0, 5) : '20:00';
         const { data: nm, error: ce } = await supabase.from('matches')
           .insert([{
-            baba_id: currentBaba.id,
-            match_date: `${today}T${gt}:00`,
+            baba_id:     currentBaba.id,
+            match_date:  `${today}T${gt}:00`,
             team_a_name: teamA.name,
             team_b_name: teamB.name,
-            status: 'in_progress',
+            status:      'in_progress',
           }]).select().single();
         if (ce) throw ce;
         mid = nm.id;
@@ -139,6 +130,10 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       const exIds = (exPs || []).map(p => p.player_id);
       const newPs = mps.filter(mp => !exIds.includes(mp.player_id));
       if (newPs.length > 0) await supabase.from('match_players').insert(newPs);
+
+      // Buscar jogadores para reações
+      const allP = [...(teamA.players || []), ...(teamB.players || [])];
+      setAllMatchPlayers(allP);
     } catch (err) {
       console.error('[StepMatch] loadOrCreateMatch:', err);
     }
@@ -161,8 +156,10 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         await supabase.from('match_players').update({ assists: (ad?.assists || 0) + 1 })
           .eq('match_id', matchId).eq('player_id', selectedAssist);
       }
-      // Sprint 9.3: o Realtime vai disparar refreshMatchState automaticamente,
-      // mas atualizamos localmente também para resposta imediata no dispositivo do presidente
+      const scorer = (goalTeam === 'A' ? currentMatch.teamA.players : currentMatch.teamB.players)
+        ?.find(p => p.id === selectedScorer);
+      const scorerName = scorer?.name ?? 'Jogador';
+
       setCurrentMatch(prev => ({
         ...prev,
         scoreA: goalTeam === 'A' ? prev.scoreA + 1 : prev.scoreA,
@@ -170,7 +167,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       }));
       setShowGoalModal(false);
       if (navigator.vibrate) navigator.vibrate(80);
-      toast.success('⚽ Gol registrado!');
+      Sounds.goal();
+      toast.success(fmt(GOAL_MESSAGES, { name: scorerName }));
     } catch (err) {
       console.error(err); toast.error('Erro ao registrar gol');
     }
@@ -178,6 +176,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
   const handleMatchEnd = useCallback(async () => {
     if (!currentMatch) return;
+    Sounds.whistle();
     const { scoreA, scoreB, teamA, teamB } = currentMatch;
     let queue = [...allTeams];
     let winnerName = null;
@@ -185,47 +184,54 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
     if (scoreA > scoreB) {
       winnerName = teamA.name; winnerTeam = 'A';
-      toast.success(`🏆 ${teamA.name} VENCEU!`);
       const l = queue.splice(1, 1)[0]; queue.push(l);
     } else if (scoreB > scoreA) {
       winnerName = teamB.name; winnerTeam = 'B';
-      toast.success(`🏆 ${teamB.name} VENCEU!`);
       const l = queue.splice(0, 1)[0]; queue.push(l);
     } else {
-      toast('EMPATE! Saem os dois times.', { icon: '🤝' });
       const t1 = queue.shift(); const t2 = queue.shift(); queue.push(t1, t2);
     }
 
     if (matchId) {
       await supabase.from('matches').update({
-        status: 'finished', winner_team: winnerTeam,
-        team_a_score: scoreA, team_b_score: scoreB,
-        finished_at: new Date().toISOString(),
+        status:       'finished',
+        winner_team:  winnerTeam,
+        team_a_score: scoreA,
+        team_b_score: scoreB,
+        finished_at:  new Date().toISOString(),
       }).eq('id', matchId);
     }
 
+    // Mostrar tela pós-jogo
+    setFinishedMatch({ teamA, teamB, scoreA, scoreB });
     setPendingQueue(queue);
+    setShowPostGame(true);
+
     if (winnerName && matchId) {
       setWinnerInfo({ name: winnerName, matchId });
-      setShowWinnerPhoto(true);
-      return;
     }
-    continueAfterMatch(queue);
   }, [currentMatch, allTeams, matchId]);
 
   const continueAfterMatch = useCallback(async (queue) => {
-    if (queue.length < 2) {
-      toast.success('Fim das partidas!');
-      onReset();
+    setShowPostGame(false);
+    if (winnerInfo.name && matchId) {
+      setShowWinnerPhoto(true);
       return;
     }
+    proceedToNextMatch(queue);
+  }, [winnerInfo, matchId]);
+
+  const proceedToNextMatch = useCallback(async (queue) => {
+    if (queue.length < 2) { toast.success('Fim das partidas!'); onReset(); return; }
     setAllTeams(queue);
     setTimer(600);
     setIsActive(false);
     const match = { teamA: queue[0], teamB: queue[1], scoreA: 0, scoreB: 0 };
     setCurrentMatch(match);
     setMatchId(null);
+    setFinishedMatch(null);
     await loadOrCreateMatch(queue[0], queue[1]);
+    setShowIntro(true);
   }, [loadOrCreateMatch, onReset]);
 
   if (loading || !currentMatch) return (
@@ -238,118 +244,146 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   );
 
   return (
-    <div className="space-y-5">
+    <>
+      {/* Intro dos times */}
+      {showIntro && (
+        <MatchIntro
+          teamA={currentMatch.teamA}
+          teamB={currentMatch.teamB}
+          onDone={() => setShowIntro(false)}
+        />
+      )}
 
-      {/* Placar + timer */}
-      <div className="p-6 rounded-[2.5rem] bg-surface-1 border border-border-mid text-center space-y-4">
-        <div className={`text-6xl font-black font-mono tabular-nums tracking-tighter ${
-          timer < 60 ? 'text-red-500 animate-pulse' : 'text-white'
-        }`}>
-          {formatTime(timer)}
+      {/* Tela pós-jogo */}
+      {showPostGame && finishedMatch && (
+        <PostGameScreen
+          match={finishedMatch}
+          players={allMatchPlayers}
+          matchId={matchId}
+          babaId={currentBaba?.id}
+          babaName={currentBaba?.name}
+          onClose={() => continueAfterMatch(pendingQueue)}
+        />
+      )}
+
+      <div className="space-y-5">
+        {/* Placar + timer */}
+        <div className="p-6 rounded-[2.5rem] bg-surface-1 border border-border-mid text-center space-y-4">
+          <div className={`text-6xl font-black font-mono tabular-nums tracking-tighter ${
+            timer < 60 ? 'text-red-500 animate-pulse' : 'text-white'
+          }`}>
+            {formatTime(timer)}
+          </div>
+
+          {matchId && (
+            <div className="flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-green-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Ao vivo
+            </div>
+          )}
+
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-2">
+              <p className="text-[10px] font-black text-cyan-electric uppercase truncate">
+                {currentMatch.teamA.name}
+              </p>
+              <button
+                onClick={() => handleGoalClick('A')}
+                className="text-5xl font-black tabular-nums w-full py-5 bg-surface-2 rounded-2xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all"
+              >
+                {currentMatch.scoreA}
+              </button>
+            </div>
+            <span className="text-lg font-black text-text-muted italic">VS</span>
+            <div className="flex-1 space-y-2">
+              <p className="text-[10px] font-black text-yellow-500 uppercase truncate">
+                {currentMatch.teamB.name}
+              </p>
+              <button
+                onClick={() => handleGoalClick('B')}
+                className="text-5xl font-black tabular-nums w-full py-5 bg-surface-2 rounded-2xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all"
+              >
+                {currentMatch.scoreB}
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={() => { setIsActive(a => !a); if (!isActive) Sounds.whistle(); }}
+            className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+              isActive
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
+                : 'bg-cyan-electric text-black'
+            }`}
+          >
+            {isActive ? '⏸ Pausar' : '▶ Iniciar Cronômetro'}
+          </button>
+
+          <button
+            onClick={handleMatchEnd}
+            className="w-full py-3 bg-surface-2 border border-border-mid rounded-xl font-black text-xs uppercase tracking-widest text-text-low hover:text-white hover:bg-surface-3 transition-all"
+          >
+            Finalizar Partida
+          </button>
         </div>
 
-        {/* Sprint 9.3: badge Realtime */}
-        {matchId && (
-          <div className="flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-green-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            Ao vivo
+        {/* Reações — apenas se feature habilitada */}
+        {features.reactions && matchId && (
+          <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle">
+            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-2 text-center">
+              Reagir
+            </p>
+            <MatchReactions matchId={matchId} currentUserId={user?.id} />
           </div>
         )}
 
-        <div className="flex items-center gap-4">
-          <div className="flex-1 space-y-2">
-            <p className="text-[10px] font-black text-cyan-electric uppercase truncate">
-              {currentMatch.teamA.name}
-            </p>
-            <button
-              onClick={() => handleGoalClick('A')}
-              className="text-5xl font-black tabular-nums w-full py-5 bg-surface-2 rounded-2xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all"
-            >
-              {currentMatch.scoreA}
-            </button>
-          </div>
-
-          <span className="text-lg font-black text-text-muted italic">VS</span>
-
-          <div className="flex-1 space-y-2">
-            <p className="text-[10px] font-black text-yellow-500 uppercase truncate">
-              {currentMatch.teamB.name}
-            </p>
-            <button
-              onClick={() => handleGoalClick('B')}
-              className="text-5xl font-black tabular-nums w-full py-5 bg-surface-2 rounded-2xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all"
-            >
-              {currentMatch.scoreB}
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsActive(a => !a)}
-          className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
-            isActive
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
-              : 'bg-cyan-electric text-black'
-          }`}
-        >
-          {isActive ? '⏸ Pausar' : '▶ Iniciar Cronômetro'}
-        </button>
-
-        <button
-          onClick={handleMatchEnd}
-          className="w-full py-3 bg-surface-2 border border-border-mid rounded-xl font-black text-xs uppercase tracking-widest text-text-low hover:text-white hover:bg-surface-3 transition-all"
-        >
-          Finalizar Partida
-        </button>
-      </div>
-
-      {/* Jogadores em campo */}
-      <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle">
-        <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-3">Em campo</p>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { team: currentMatch.teamA, color: 'text-cyan-electric', dot: 'bg-cyan-electric' },
-            { team: currentMatch.teamB, color: 'text-yellow-500',    dot: 'bg-yellow-500'    },
-          ].map(({ team, color, dot }) => (
-            <div key={team.name}>
-              <p className={`text-[10px] font-black mb-2 uppercase ${color}`}>{team.name}</p>
-              <div className="space-y-1">
-                {team.players?.map((p, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-[10px] text-text-low">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      p.position === 'goleiro' ? 'bg-green-500' : dot
-                    }`} />
-                    <span className="truncate">{p.name}</span>
-                  </div>
-                ))}
+        {/* Jogadores em campo */}
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle">
+          <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-3">Em campo</p>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { team: currentMatch.teamA, color: 'text-cyan-electric', dot: 'bg-cyan-electric' },
+              { team: currentMatch.teamB, color: 'text-yellow-500',    dot: 'bg-yellow-500'    },
+            ].map(({ team, color, dot }) => (
+              <div key={team.name}>
+                <p className={`text-[10px] font-black mb-2 uppercase ${color}`}>{team.name}</p>
+                <div className="space-y-1">
+                  {team.players?.map((p, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-text-low">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        p.position === 'goleiro' ? 'bg-green-500' : dot
+                      }`} />
+                      <span className="truncate">{p.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Fila */}
-      {allTeams.length > 2 && (
-        <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle flex items-center justify-between">
-          <div>
-            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Próximo</p>
-            <p className="text-sm font-black uppercase text-cyan-electric italic mt-0.5">
-              {allTeams[2].name}
-            </p>
+            ))}
           </div>
-          <span className="text-[8px] font-black text-text-muted uppercase bg-surface-2 px-2 py-1 rounded">
-            Aguardando
-          </span>
         </div>
-      )}
 
-      {/* Voltar */}
-      <button
-        onClick={onBack}
-        className="w-full py-3 rounded-2xl bg-surface-1 border border-border-subtle text-text-muted font-black uppercase text-[10px] tracking-widest hover:bg-surface-2 transition-all flex items-center justify-center gap-2"
-      >
-        <ChevronLeft size={12} /> Ver times
-      </button>
+        {/* Fila */}
+        {allTeams.length > 2 && (
+          <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Próximo</p>
+              <p className="text-sm font-black uppercase text-cyan-electric italic mt-0.5">
+                {allTeams[2].name}
+              </p>
+            </div>
+            <span className="text-[8px] font-black text-text-muted uppercase bg-surface-2 px-2 py-1 rounded">
+              Aguardando
+            </span>
+          </div>
+        )}
+
+        <button
+          onClick={onBack}
+          className="w-full py-3 rounded-2xl bg-surface-1 border border-border-subtle text-text-muted font-black uppercase text-[10px] tracking-widest hover:bg-surface-2 transition-all flex items-center justify-center gap-2"
+        >
+          <ChevronLeft size={12} /> Ver times
+        </button>
+      </div>
 
       {/* Modal de gol */}
       {showGoalModal && (
@@ -424,13 +458,13 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
       <WinnerPhotoModal
         isOpen={showWinnerPhoto}
-        onClose={() => { setShowWinnerPhoto(false); continueAfterMatch(pendingQueue); }}
+        onClose={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
         matchId={winnerInfo.matchId}
         babaId={currentBaba?.id}
         winnerName={winnerInfo.name}
-        onSaved={() => { setShowWinnerPhoto(false); continueAfterMatch(pendingQueue); }}
+        onSaved={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
       />
-    </div>
+    </>
   );
 };
 
