@@ -1,13 +1,108 @@
 // src/pages/dashboard/TabPostGame.jsx
-// Sprint 18 — AiInsightsPanel integrado na aba pós-jogo
+// Sprint 4/5 — SeasonCard + ActivityFeed + narrativa IA integrados.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate }    from 'react-router-dom';
-import { Trophy, Calendar, ChevronRight, Star, Target, Zap, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trophy, Calendar, ChevronRight, Sparkles, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { supabase }       from '../../services/supabase';
 import { useBaba }        from '../../contexts/BabaContext';
+import { useFeatures }    from '../../utils/babaMode';
 import { MatchCardSkeleton } from '../../components/SkeletonLoader';
 import AiInsightsPanel    from '../../components/AiInsightsPanel';
+import SeasonCard         from '../../components/SeasonCard';
+import ActivityFeed       from '../../components/ActivityFeed';
+
+// ─── Narrativa da última partida ──────────────────────────────────────────────
+
+const MatchNarrative = ({ babaId }) => {
+  const [narrative, setNarrative] = useState(null);
+  const [loading,   setLoading]   = useState(false);
+  const [matchId,   setMatchId]   = useState(null);
+
+  useEffect(() => {
+    if (!babaId) return;
+    // Buscar última partida finalizada
+    supabase
+      .from('matches')
+      .select('id')
+      .eq('baba_id', babaId)
+      .eq('status', 'finished')
+      .order('finished_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.id) {
+          setMatchId(data.id);
+          // Verificar se já tem narrativa
+          supabase
+            .from('match_narratives')
+            .select('narrative')
+            .eq('match_id', data.id)
+            .maybeSingle()
+            .then(({ data: n }) => { if (n) setNarrative(n.narrative); });
+        }
+      });
+  }, [babaId]);
+
+  const generate = async () => {
+    if (!matchId || loading) return;
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/narrate-match`,
+        {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ match_id: matchId, baba_id: babaId }),
+        }
+      );
+      const result = await res.json();
+      if (result.narrative) setNarrative(result.narrative);
+    } catch (err) {
+      console.error('[MatchNarrative]', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!matchId) return null;
+
+  return (
+    <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-cyan-electric" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-text-low">
+            Narrativa do último jogo
+          </span>
+        </div>
+        {!narrative && (
+          <button
+            onClick={generate}
+            disabled={loading}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[9px] font-black uppercase disabled:opacity-50"
+          >
+            {loading ? <RefreshCw size={10} className="animate-spin" /> : <Sparkles size={10} />}
+            {loading ? 'Gerando...' : 'Gerar'}
+          </button>
+        )}
+      </div>
+      {narrative ? (
+        <p className="text-[12px] text-text-mid leading-relaxed font-bold italic">
+          "{narrative}"
+        </p>
+      ) : (
+        <p className="text-[10px] text-text-muted font-black">
+          Clique em Gerar para a IA narrar a última pelada 🎙️
+        </p>
+      )}
+    </div>
+  );
+};
 
 // ─── Últimas partidas compactas ───────────────────────────────────────────────
 
@@ -48,9 +143,10 @@ const RecentMatchCard = ({ match }) => {
 
 const TabPostGame = ({ currentBaba, isPresident }) => {
   const navigate              = useNavigate();
+  const features              = useFeatures();
   const [recentMatches,   setRecentMatches]   = useState([]);
   const [loadingMatches,  setLoadingMatches]  = useState(true);
-  const [showInsights,    setShowInsights]    = useState(true);
+  const [showInsights,    setShowInsights]    = useState(false);
 
   useEffect(() => {
     if (!currentBaba?.id) return;
@@ -70,28 +166,47 @@ const TabPostGame = ({ currentBaba, isPresident }) => {
   return (
     <div className="space-y-5">
 
-      {/* Sprint 18 — AI Insights */}
-      <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
-        <button
-          onClick={() => setShowInsights(v => !v)}
-          className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-cyan-electric" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">
-              Insights da IA
-            </span>
-          </div>
-          {showInsights
-            ? <ChevronUp   size={14} className="text-text-low" />
-            : <ChevronDown size={14} className="text-text-low" />}
-        </button>
-        {showInsights && (
-          <div className="px-5 pb-5 border-t border-border-subtle pt-4">
-            <AiInsightsPanel babaId={currentBaba?.id} isPresident={isPresident} />
-          </div>
-        )}
-      </div>
+      {/* Sprint 4 — Temporada ativa */}
+      {features.seasons && (
+        <SeasonCard babaId={currentBaba?.id} />
+      )}
+
+      {/* Sprint 5 — Narrativa IA da última partida */}
+      {features.ai && (
+        <MatchNarrative babaId={currentBaba?.id} />
+      )}
+
+      {/* Sprint 7 — Feed de atividade */}
+      {features.reactions && (
+        <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle">
+          <ActivityFeed babaId={currentBaba?.id} limit={8} />
+        </div>
+      )}
+
+      {/* Sprint 5 — AI Insights (colapsável) */}
+      {features.ai && (
+        <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+          <button
+            onClick={() => setShowInsights(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} className="text-cyan-electric" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                Insights da IA
+              </span>
+            </div>
+            {showInsights
+              ? <ChevronUp   size={14} className="text-text-low" />
+              : <ChevronDown size={14} className="text-text-low" />}
+          </button>
+          {showInsights && (
+            <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+              <AiInsightsPanel babaId={currentBaba?.id} isPresident={isPresident} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Acessos rápidos */}
       <div className="grid grid-cols-2 gap-3">
