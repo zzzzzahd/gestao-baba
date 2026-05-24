@@ -1,31 +1,30 @@
 // src/pages/DashboardPage.jsx
-// Cor do tema do baba aplicada via useThemeStyles nos elementos visuais:
-// - Borda do logo, gradiente do header, tabs ativas, badge de presidente,
-//   botão "Ver todos", loading spinner, label do usuário. 
+// Sprint 1/4/7 — integra SeasonCard, ActivityFeed, ModeSelector e feature flags.
 
 import React, {
   useState, useEffect, useCallback, useMemo, Suspense, lazy,
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useBaba } from '../contexts/BabaContext';
+import { useAuth }   from '../contexts/AuthContext';
+import { useBaba }   from '../contexts/BabaContext';
+import { useFeatures } from '../utils/babaMode';
 import {
   LogOut, Camera, Edit3, ChevronRight, RefreshCw,
-  Trophy, Settings, Calendar,
+  Trophy, Settings, Calendar, Zap,
 } from 'lucide-react';
 
 import QRCodeModal     from '../components/QRCodeModal';
 import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
+import ModeSelector    from '../components/ModeSelector';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
 import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
 import { PlanBadge } from '../components/PlanBadge';
 import toast from 'react-hot-toast';
 
-// ── Lazy tabs ─────────────────────────────────────────────────────────────────
-const TabOverview = lazy(() => import('./dashboard/TabOverview'));
-const TabManage   = lazy(() => import('./dashboard/TabManage'));
-const TabPostGame = lazy(() => import('./dashboard/TabPostGame'));
+const TabOverview  = lazy(() => import('./dashboard/TabOverview'));
+const TabManage    = lazy(() => import('./dashboard/TabManage'));
+const TabPostGame  = lazy(() => import('./dashboard/TabPostGame'));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +51,7 @@ const TabLoader = () => (
   </div>
 );
 
-// ── DashboardPage ─────────────────────────────────────────────────────────────
+// ─── DashboardPage ─────────────────────────────────────────────────────────────
 
 const DashboardPage = () => {
   const navigate                        = useNavigate();
@@ -67,18 +66,28 @@ const DashboardPage = () => {
     drawConfig, setDrawConfig, isDrawing, currentMatch,
   } = useBaba();
 
-  // ── Cor do tema ───────────────────────────────────────────────────────────
-  useThemeColor(); // injeta CSS variables
-  const tc = useThemeStyles(); // helpers de estilo inline
+  const features = useFeatures();
 
-  // ── Aba ativa ─────────────────────────────────────────────────────────────
+  useThemeColor();
+  const tc = useThemeStyles();
+
   const activeTab    = searchParams.get('tab') || 'overview';
   const setActiveTab = (id) => setSearchParams({ tab: id }, { replace: true });
 
-  // ── Papéis do usuário ─────────────────────────────────────────────────────
   const isPresident             = String(currentBaba?.president_id) === String(user?.id);
   const [isCoordinator, setIsCoordinator] = useState(false);
   const canManage               = isPresident || isCoordinator;
+
+  // Sprint 1 — mostrar ModeSelector se baba não tem modo definido
+  const [showModeSelector, setShowModeSelector] = useState(false);
+
+  useEffect(() => {
+    if (isPresident && currentBaba && !currentBaba.mode) {
+      // Aguarda 800ms para não mostrar logo ao abrir
+      const t = setTimeout(() => setShowModeSelector(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [isPresident, currentBaba?.id, currentBaba?.mode]);
 
   useEffect(() => {
     if (!currentBaba?.id || !user?.id || isPresident) return;
@@ -95,7 +104,6 @@ const DashboardPage = () => {
     })();
   }, [currentBaba?.id, user?.id, isPresident]);
 
-  // ── Estado local ──────────────────────────────────────────────────────────
   const [showMembers,             setShowMembers]             = useState(false);
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
   const [showQRCode,              setShowQRCode]              = useState(false);
@@ -104,7 +112,6 @@ const DashboardPage = () => {
   const [playerRatings,           setPlayerRatings]           = useState([]);
   const [copied,                  setCopied]                  = useState(false);
 
-  // ── Ratings ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentBaba?.id) return;
     let cancelled = false;
@@ -119,7 +126,6 @@ const DashboardPage = () => {
     }),
   [players, playerRatings]);
 
-  // ── Expiry ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
     const id = setInterval(
@@ -128,7 +134,6 @@ const DashboardPage = () => {
     return () => clearInterval(id);
   }, [currentBaba?.invite_expires_at]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleCopyCode = () => {
     if (!currentBaba?.invite_code) return;
     navigator.clipboard.writeText(currentBaba.invite_code);
@@ -162,7 +167,6 @@ const DashboardPage = () => {
     setPlayerRatings(data || []);
   }, [getAllRatings]);
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !currentBaba) return (
     <div className="min-h-screen bg-black px-5 pt-14 pb-24">
       <DashboardHeaderSkeleton />
@@ -170,6 +174,13 @@ const DashboardPage = () => {
   );
 
   const sharedProps = { currentBaba, isPresident, canManage, players: playersWithRatings };
+
+  // Badge de modo do baba
+  const modeBadge = {
+    casual:      { label: 'Casual',      color: 'bg-cyan-electric/10 text-cyan-electric border-cyan-electric/20' },
+    competitive: { label: 'Competitivo', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
+    full:        { label: 'Completo',    color: 'bg-purple-400/10 text-purple-400 border-purple-400/20' },
+  }[currentBaba.mode ?? 'casual'];
 
   return (
     <div className="min-h-screen bg-black text-white pb-24 font-sans">
@@ -184,18 +195,10 @@ const DashboardPage = () => {
               alt="Capa"
             />
           ) : (
-            /* Gradiente com cor do tema quando não há cover */
-            <div
-              className="w-full h-full"
-              style={{
-                background: `radial-gradient(ellipse at top right, rgba(${tc.color === '#06b6d4' ? '6,182,212' : tc.color.replace('#','').match(/.{2}/g).map(h=>parseInt(h,16)).join(',')},0.15) 0%, transparent 70%)`,
-              }}
+            <div className="w-full h-full flex items-center justify-center font-black text-6xl italic"
+              style={{ color: `rgba(${parseInt(tc.color.slice(1,3),16)},${parseInt(tc.color.slice(3,5),16)},${parseInt(tc.color.slice(5,7),16)},0.15)` }}
             >
-              <div className="w-full h-full flex items-center justify-center font-black text-6xl italic"
-                style={{ color: `rgba(${(() => { const r=parseInt(tc.color.slice(1,3),16); const g=parseInt(tc.color.slice(3,5),16); const b=parseInt(tc.color.slice(5,7),16); return `${r},${g},${b}`; })()},0.15)` }}
-              >
-                DRAFT PLAY
-              </div>
+              DRAFT PLAY
             </div>
           )}
 
@@ -205,13 +208,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* Gradiente com cor do tema na parte inferior */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(to top, #000000 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%)`,
-            }}
-          />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, #000000 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%)' }} />
 
           {canManage && !isUploading && (
             <label className="absolute bottom-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-2xl border border-border-mid text-text-mid cursor-pointer transition-colors hover:text-white">
@@ -230,31 +227,20 @@ const DashboardPage = () => {
         {/* Logo + nome */}
         <div className="absolute left-6 bottom-0 flex items-end gap-5">
           <div className="relative">
-            {/* Borda do logo com cor do tema */}
             <div
               className="w-32 h-32 rounded-[2.5rem] border-4 bg-gray-800 shadow-2xl overflow-hidden relative"
-              style={{
-                borderColor: tc.color,
-                boxShadow: `0 0 24px rgba(${parseInt(tc.color.slice(1,3),16)},${parseInt(tc.color.slice(3,5),16)},${parseInt(tc.color.slice(5,7),16)},0.3)`,
-              }}
+              style={{ borderColor: tc.color }}
             >
               {currentBaba?.logo_url ? (
                 <img src={currentBaba.logo_url} className="w-full h-full object-cover" alt="Logo" />
               ) : (
-                <div
-                  className="absolute inset-0 flex items-center justify-center text-4xl font-black italic"
-                  style={{ color: tc.color, backgroundColor: `rgba(${parseInt(tc.color.slice(1,3),16)},${parseInt(tc.color.slice(3,5),16)},${parseInt(tc.color.slice(5,7),16)},0.1)` }}
-                >
+                <div className="absolute inset-0 flex items-center justify-center text-4xl font-black italic" style={{ color: tc.color }}>
                   {(currentBaba?.name || '?').charAt(0)}
                 </div>
               )}
             </div>
-
             {canManage && !isUploading && (
-              <label
-                className="absolute bottom-0 right-0 p-2 rounded-xl text-black cursor-pointer hover:scale-110 transition-transform shadow-lg"
-                style={tc.bg}
-              >
+              <label className="absolute bottom-0 right-0 p-2 rounded-xl text-black cursor-pointer hover:scale-110 transition-transform shadow-lg" style={tc.bg}>
                 <Edit3 size={16} />
                 <input type="file" className="hidden" accept="image/*" onChange={e => handleUpload(e, 'avatar')} />
               </label>
@@ -266,23 +252,22 @@ const DashboardPage = () => {
               {currentBaba?.name}
             </h1>
             <div className="flex items-center gap-2 mt-2 text-[10px] font-black uppercase tracking-widest flex-wrap">
-              {/* Username com cor do tema */}
               <span style={tc.text}>@{profile?.name || 'atleta'}</span>
-
               {isPresident && (
-                <span
-                  className="px-2 py-0.5 rounded border text-[9px] font-black uppercase"
-                  style={{ ...tc.bgAlpha(0.15), ...tc.border(0.3), color: tc.color }}
-                >
+                <span className="px-2 py-0.5 rounded border text-[9px] font-black uppercase" style={{ ...tc.bgAlpha(0.15), ...tc.border(0.3), color: tc.color }}>
                   Presidente
                 </span>
               )}
-              {isCoordinator && !isPresident && (
-                <span className="bg-purple-400/10 text-purple-400 px-2 py-0.5 rounded border border-purple-400/20 text-[9px]">
-                  Coordenador
-                </span>
+              {/* Sprint 1 — badge do modo */}
+              {modeBadge && (
+                <button
+                  onClick={() => isPresident && setShowModeSelector(true)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[9px] font-black uppercase ${modeBadge.color} ${isPresident ? 'cursor-pointer hover:opacity-80' : ''}`}
+                >
+                  <Zap size={9} />
+                  {modeBadge.label}
+                </button>
               )}
-              {/* Badge do plano do baba */}
               {currentBaba?.plan && currentBaba.plan !== 'free' && (
                 <PlanBadge plan={currentBaba.plan} compact />
               )}
@@ -301,10 +286,7 @@ const DashboardPage = () => {
             <div className="flex items-center gap-3">
               <div className="flex -space-x-3">
                 {playersWithRatings.slice(0, 4).map((p, i) => (
-                  <div
-                    key={p.id || i}
-                    className="w-9 h-9 rounded-full border-2 border-black bg-gray-800 flex items-center justify-center text-[10px] font-black overflow-hidden shadow-lg"
-                  >
+                  <div key={p.id || i} className="w-9 h-9 rounded-full border-2 border-black bg-gray-800 flex items-center justify-center text-[10px] font-black overflow-hidden shadow-lg">
                     {p.avatar_url
                       ? <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />
                       : (p.display_name || '?').charAt(0).toUpperCase()}
@@ -318,40 +300,27 @@ const DashboardPage = () => {
               </div>
               <span className="text-sm font-black text-white">{players?.length || 0} atletas</span>
             </div>
-            {/* Botão "Ver todos" com cor do tema */}
-            <button
-              onClick={() => setShowMembers(true)}
-              className="flex items-center gap-1 text-[9px] font-black uppercase hover:opacity-70 transition-opacity"
-              style={tc.text}
-            >
+            <button onClick={() => setShowMembers(true)} className="flex items-center gap-1 text-[9px] font-black uppercase hover:opacity-70 transition-opacity" style={tc.text}>
               Ver todos <ChevronRight size={10} />
             </button>
           </div>
         </div>
 
-        {/* ── Tabs com cor do tema ── */}
+        {/* ── Tabs ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
-          <div className="flex gap-1" role="tablist" aria-label="Seções do baba">
+          <div className="flex gap-1" role="tablist">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
-                aria-controls={`tabpanel-${tab.id}`}
-                id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border ${
                   activeTab === tab.id ? '' : 'text-text-low hover:text-text-mid hover:bg-surface-2 border-transparent'
                 }`}
-                style={activeTab === tab.id ? {
-                  ...tc.bgAlpha(0.1),
-                  ...tc.border(0.25),
-                  color: tc.color,
-                } : {}}
+                style={activeTab === tab.id ? { ...tc.bgAlpha(0.1), ...tc.border(0.25), color: tc.color } : {}}
               >
-                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }} aria-hidden="true">
-                  {tab.icon}
-                </span>
+                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }}>{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
@@ -361,12 +330,7 @@ const DashboardPage = () => {
         {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
           <Suspense fallback={<TabLoader />}>
-            <div
-              id="tabpanel-overview"
-              role="tabpanel"
-              aria-labelledby="tab-overview"
-              hidden={activeTab !== 'overview'}
-            >
+            <div id="tabpanel-overview" role="tabpanel" hidden={activeTab !== 'overview'}>
               {activeTab === 'overview' && (
                 <TabOverview
                   {...sharedProps}
@@ -390,12 +354,7 @@ const DashboardPage = () => {
                 />
               )}
             </div>
-            <div
-              id="tabpanel-manage"
-              role="tabpanel"
-              aria-labelledby="tab-manage"
-              hidden={activeTab !== 'manage'}
-            >
+            <div id="tabpanel-manage" role="tabpanel" hidden={activeTab !== 'manage'}>
               {activeTab === 'manage' && (
                 <TabManage
                   {...sharedProps}
@@ -407,17 +366,9 @@ const DashboardPage = () => {
                 />
               )}
             </div>
-            <div
-              id="tabpanel-postgame"
-              role="tabpanel"
-              aria-labelledby="tab-postgame"
-              hidden={activeTab !== 'postgame'}
-            >
+            <div id="tabpanel-postgame" role="tabpanel" hidden={activeTab !== 'postgame'}>
               {activeTab === 'postgame' && (
-                <TabPostGame
-                  {...sharedProps}
-                  players={playersWithRatings}
-                />
+                <TabPostGame {...sharedProps} players={playersWithRatings} />
               )}
             </div>
           </Suspense>
@@ -450,6 +401,11 @@ const DashboardPage = () => {
         babaName={currentBaba?.name}
         onRefresh={generateInviteCode}
       />
+
+      {/* Sprint 1 — ModeSelector (presidente pode mudar modo) */}
+      {showModeSelector && (
+        <ModeSelector onClose={() => setShowModeSelector(false)} />
+      )}
     </div>
   );
 };
