@@ -1,24 +1,30 @@
 // src/components/BottomNav.jsx
-// Fase 2 — aria-label em todos os botões + safe-area-inset-bottom para iOS.
+// Sprint 1 — NAV_ITEMS dinâmicos por modo do baba (useFeatures).
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Shield, Trophy, User } from 'lucide-react';
-
-const NAV_ITEMS = [
-  { icon: Home,   label: 'Início',   path: '/home',      ariaLabel: 'Ir para Início' },
-  { icon: Shield, label: 'Baba',     path: '/dashboard', ariaLabel: 'Ir para Dashboard do Baba' },
-  { icon: Trophy, label: 'Rankings', path: '/rankings',  ariaLabel: 'Ir para Rankings' },
-  { icon: User,   label: 'Perfil',   path: '/profile',   ariaLabel: 'Ir para Perfil' },
-];
+import { Home, Shield, Trophy, User, DollarSign } from 'lucide-react';
+import { useFeatures } from '../utils/babaMode';
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/visitor', '/visitor-match']);
 
 const BottomNav = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const features  = useFeatures();
 
   if (PUBLIC_ROUTES.has(location.pathname)) return null;
+
+  const NAV_ITEMS = [
+    { icon: Home,   label: 'Início',   path: '/home',      ariaLabel: 'Ir para Início' },
+    { icon: Shield, label: 'Baba',     path: '/dashboard', ariaLabel: 'Ir para Dashboard do Baba' },
+    { icon: Trophy, label: 'Rankings', path: '/rankings',  ariaLabel: 'Ir para Rankings' },
+    // Caixa só aparece no modo full
+    ...(features.financial ? [{
+      icon: DollarSign, label: 'Caixa', path: '/financial', ariaLabel: 'Ir para Financeiro',
+    }] : []),
+    { icon: User,   label: 'Perfil',   path: '/profile',   ariaLabel: 'Ir para Perfil' },
+  ];
 
   return (
     <>
