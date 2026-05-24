@@ -41,3 +41,4 @@ coverage/
 
 # PWA
 public/icons/*.png
+supabase/.temp/
