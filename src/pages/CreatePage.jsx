@@ -1,6 +1,5 @@
 // src/pages/CreatePage.jsx
-// Sprint 9.5 — Refatorado: lógica no useCreateWizard, UI em 3 steps separados.
-// Rascunho salvo automaticamente no localStorage.
+// Sprint 1 — Exibe ModeSelector após criação do baba.
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,9 +8,10 @@ import { ArrowLeft, Check, ChevronRight, Copy, Share2, ArrowRight } from 'lucide
 import toast from 'react-hot-toast';
 
 import { useCreateWizard } from '../hooks/useCreateWizard';
-import StepIdentity from './create/StepIdentity';
-import StepSchedule from './create/StepSchedule';
-import StepConfirm  from './create/StepConfirm';
+import StepIdentity  from './create/StepIdentity';
+import StepSchedule  from './create/StepSchedule';
+import StepConfirm   from './create/StepConfirm';
+import ModeSelector  from '../components/ModeSelector';
 
 // ── Tela de sucesso ───────────────────────────────────────────────────────────
 
@@ -48,7 +48,6 @@ const SuccessScreen = ({ baba, onEnterDashboard }) => {
         <p className="text-text-low text-sm">{baba?.name}</p>
       </div>
 
-      {/* Código de convite */}
       <div className="w-full max-w-xs space-y-3">
         <p className="text-[9px] text-text-low font-black uppercase tracking-widest text-center">
           Código de convite
@@ -88,7 +87,7 @@ const SuccessScreen = ({ baba, onEnterDashboard }) => {
   );
 };
 
-// ── CreatePage ─────────────────────────────────────────────────────────────────
+// ── CreatePage ────────────────────────────────────────────────────────────────
 
 const STEP_LABELS = ['Info', 'Dias', 'Confirmar'];
 
@@ -106,9 +105,10 @@ const CreatePage = () => {
     MIN_PER_TEAM, MAX_PER_TEAM,
   } = wizard;
 
-  const [saving,      setSaving]      = useState(false);
-  const [error,       setError]       = useState(null);
-  const [createdBaba, setCreatedBaba] = useState(null);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState(null);
+  const [createdBaba,  setCreatedBaba]  = useState(null);
+  const [showMode,     setShowMode]     = useState(false); // Sprint 1
 
   const handleCreate = async () => {
     if (saving) return;
@@ -119,8 +119,10 @@ const CreatePage = () => {
       const baba    = await createBaba(payload);
       if (!baba) throw new Error('Erro ao criar baba. Tente novamente.');
       if (typeof setCurrentBaba === 'function') setCurrentBaba(baba);
-      resetWizard(); // limpa rascunho ao criar com sucesso
+      resetWizard();
       setCreatedBaba(baba);
+      // Sprint 1 — perguntar o modo logo após criar
+      setShowMode(true);
     } catch (err) {
       setError(err?.message || 'Erro desconhecido');
     } finally {
@@ -128,7 +130,10 @@ const CreatePage = () => {
     }
   };
 
-  if (createdBaba) {
+  // Após fechar o ModeSelector, ir para a tela de sucesso
+  const handleModeDone = () => setShowMode(false);
+
+  if (createdBaba && !showMode) {
     return (
       <SuccessScreen
         baba={createdBaba}
@@ -138,111 +143,117 @@ const CreatePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <>
+      <div className="min-h-screen bg-black text-white flex flex-col">
 
-      {/* Header com progresso */}
-      <div className="flex items-center gap-4 px-6 pt-6 pb-4">
-        <button
-          onClick={() => step > 1 ? goBack() : navigate('/home')}
-          className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center border border-border-mid active:scale-90 transition-transform"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1">
-          <h1 className="font-black uppercase text-sm">Criar Baba</h1>
-          <p className="text-[10px] text-text-low">Passo {step} de {STEP_LABELS.length}</p>
+        {/* Header com progresso */}
+        <div className="flex items-center gap-4 px-6 pt-6 pb-4">
+          <button
+            onClick={() => step > 1 ? goBack() : navigate('/home')}
+            className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center border border-border-mid active:scale-90 transition-transform"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <div className="flex-1">
+            <h1 className="font-black uppercase text-sm">Criar Baba</h1>
+            <p className="text-[10px] text-text-low">Passo {step} de {STEP_LABELS.length}</p>
+          </div>
+          <span className="text-[8px] text-text-muted font-bold uppercase tracking-widest">
+            💾 salvo
+          </span>
         </div>
-        {/* Indicador de rascunho salvo */}
-        <span className="text-[8px] text-text-muted font-bold uppercase tracking-widest">
-          💾 salvo
-        </span>
-      </div>
 
-      {/* Barra de progresso */}
-      <div className="px-6 mb-6">
-        <div className="flex gap-1">
-          {STEP_LABELS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 rounded-full flex-1 transition-all duration-300 ${
-                i + 1 <= step ? 'bg-cyan-electric' : 'bg-surface-3'
-              }`}
+        {/* Barra de progresso */}
+        <div className="px-6 mb-6">
+          <div className="flex gap-1">
+            {STEP_LABELS.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1 rounded-full flex-1 transition-all duration-300 ${
+                  i + 1 <= step ? 'bg-cyan-electric' : 'bg-surface-3'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between mt-1">
+            {STEP_LABELS.map((label, i) => (
+              <span
+                key={i}
+                className={`text-[8px] font-black uppercase transition-colors ${
+                  i + 1 === step ? 'text-cyan-electric' : 'text-text-muted'
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Conteúdo do step */}
+        <div className="flex-1 px-6 pb-6 overflow-y-auto">
+          {step === 1 && (
+            <StepIdentity
+              form={form}
+              set={set}
+              MIN_PER_TEAM={MIN_PER_TEAM}
+              MAX_PER_TEAM={MAX_PER_TEAM}
             />
-          ))}
+          )}
+          {step === 2 && (
+            <StepSchedule
+              form={form}
+              toggleDay={toggleDay}
+              updateDayField={updateDayField}
+              dayEditing={dayEditing}
+              setDayEditing={setDayEditing}
+            />
+          )}
+          {step === 3 && (
+            <StepConfirm
+              form={form}
+              buildPayload={buildPayload}
+              error={error}
+            />
+          )}
         </div>
-        <div className="flex justify-between mt-1">
-          {STEP_LABELS.map((label, i) => (
-            <span
-              key={i}
-              className={`text-[8px] font-black uppercase transition-colors ${
-                i + 1 === step ? 'text-cyan-electric' : 'text-text-muted'
+
+        {/* Botão de ação fixo */}
+        <div className="px-6 pb-8 pt-4 border-t border-border-subtle">
+          {step < 3 ? (
+            <button
+              disabled={!canProceed(step)}
+              onClick={goNext}
+              className={`w-full p-4 rounded-2xl font-black uppercase text-sm transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                canProceed(step)
+                  ? 'text-black'
+                  : 'bg-surface-2 text-text-muted cursor-not-allowed'
               }`}
+              style={canProceed(step) ? { background: 'linear-gradient(135deg, #00f2ff, #0066ff)' } : {}}
             >
-              {label}
-            </span>
-          ))}
+              Continuar <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button
+              disabled={saving}
+              onClick={handleCreate}
+              className="w-full p-4 rounded-2xl font-black uppercase text-sm text-black flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-cyan-500/20"
+              style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+            >
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <><Check size={16} /> Criar Baba</>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Conteúdo do step */}
-      <div className="flex-1 px-6 pb-6 overflow-y-auto">
-        {step === 1 && (
-          <StepIdentity
-            form={form}
-            set={set}
-            MIN_PER_TEAM={MIN_PER_TEAM}
-            MAX_PER_TEAM={MAX_PER_TEAM}
-          />
-        )}
-        {step === 2 && (
-          <StepSchedule
-            form={form}
-            toggleDay={toggleDay}
-            updateDayField={updateDayField}
-            dayEditing={dayEditing}
-            setDayEditing={setDayEditing}
-          />
-        )}
-        {step === 3 && (
-          <StepConfirm
-            form={form}
-            buildPayload={buildPayload}
-            error={error}
-          />
-        )}
-      </div>
-
-      {/* Botão de ação fixo */}
-      <div className="px-6 pb-8 pt-4 border-t border-border-subtle">
-        {step < 3 ? (
-          <button
-            disabled={!canProceed(step)}
-            onClick={goNext}
-            className={`w-full p-4 rounded-2xl font-black uppercase text-sm transition-all flex items-center justify-center gap-2 active:scale-95 ${
-              canProceed(step)
-                ? 'text-black'
-                : 'bg-surface-2 text-text-muted cursor-not-allowed'
-            }`}
-            style={canProceed(step) ? { background: 'linear-gradient(135deg, #00f2ff, #0066ff)' } : {}}
-          >
-            Continuar <ChevronRight size={16} />
-          </button>
-        ) : (
-          <button
-            disabled={saving}
-            onClick={handleCreate}
-            className="w-full p-4 rounded-2xl font-black uppercase text-sm text-black flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-cyan-500/20"
-            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
-          >
-            {saving ? (
-              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <><Check size={16} /> Criar Baba</>
-            )}
-          </button>
-        )}
-      </div>
-    </div>
+      {/* Sprint 1 — ModeSelector após criar */}
+      {showMode && createdBaba && (
+        <ModeSelector onClose={handleModeDone} />
+      )}
+    </>
   );
 };
 
