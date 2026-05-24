@@ -1,7 +1,5 @@
 // src/hooks/useAnalytics.js
-// Fase 5 — PostHog analytics de produto (privacidade-first).
-// Substitui o stub anterior e integra com o PostHog real.
-// Configurar VITE_POSTHOG_KEY e VITE_POSTHOG_HOST nas env vars do Vercel.
+// Sprint 1–5 — Novos eventos adicionados ao catálogo.
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,25 +8,21 @@ const POSTHOG_KEY  = import.meta.env.VITE_POSTHOG_KEY;
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST ?? 'https://app.posthog.com';
 const IS_PROD      = import.meta.env.PROD;
 
-let ph = null; // instância PostHog (carregada lazy)
+let ph = null;
 
-// ── Carregamento lazy do SDK PostHog ──────────────────────────────────────────
 const loadPostHog = async () => {
   if (ph || !POSTHOG_KEY || !IS_PROD) return ph;
   try {
     const { default: posthog } = await import('posthog-js');
     posthog.init(POSTHOG_KEY, {
       api_host:                    POSTHOG_HOST,
-      autocapture:                 false,   // só eventos manuais (LGPD)
-      capture_pageview:            false,   // controlamos manualmente
+      autocapture:                 false,
+      capture_pageview:            false,
       capture_pageleave:           false,
-      disable_session_recording:   true,    // sem gravação de sessão
+      disable_session_recording:   true,
       persistence:                 'localStorage',
-      opt_out_capturing_by_default: false,
-      // Anonimizar IPs por padrão
       ip:                          false,
       sanitize_properties:         (props) => {
-        // Remove qualquer dado que possa identificar o usuário
         delete props.$ip;
         delete props.$referrer;
         delete props.$referring_domain;
@@ -43,26 +37,23 @@ const loadPostHog = async () => {
   }
 };
 
-// ── Hook principal ────────────────────────────────────────────────────────────
 export function useAnalytics() {
   const { user, profile } = useAuth();
   const identifiedRef      = useRef(false);
 
-  // Identificar usuário (sem dados pessoais — só ID anonimizado e role)
   useEffect(() => {
     if (!user || identifiedRef.current) return;
     loadPostHog().then(posthog => {
       if (!posthog) return;
       posthog.identify(user.id, {
-        // NÃO enviar email, nome ou qualquer PII
-        has_profile: !!profile,
-        created_at:  user.created_at,
+        has_profile:  !!profile,
+        created_at:   user.created_at,
+        games_played: profile?.games_played ?? 0,
       });
       identifiedRef.current = true;
     });
   }, [user, profile]);
 
-  // Resetar ao fazer logout
   useEffect(() => {
     if (!user && identifiedRef.current) {
       loadPostHog().then(posthog => posthog?.reset());
@@ -70,26 +61,22 @@ export function useAnalytics() {
     }
   }, [user]);
 
-  /** Rastrear pageview */
   const trackPage = useCallback((pageName) => {
     if (!IS_PROD) { console.debug('[Analytics] page:', pageName); return; }
     loadPostHog().then(posthog => posthog?.capture('$pageview', { page: pageName }));
   }, []);
 
-  /** Rastrear evento de produto */
   const track = useCallback((event, properties = {}) => {
     if (!IS_PROD) { console.debug('[Analytics] event:', event, properties); return; }
     loadPostHog().then(posthog => posthog?.capture(event, {
       ...properties,
-      // Nunca enviar dados pessoais acidentalmente
-      user_id:   undefined,
-      email:     undefined,
-      name:      undefined,
-      phone:     undefined,
+      user_id: undefined,
+      email:   undefined,
+      name:    undefined,
+      phone:   undefined,
     }));
   }, []);
 
-  /** Feature flag */
   const isFeatureEnabled = useCallback(async (flag) => {
     const posthog = await loadPostHog();
     return posthog?.isFeatureEnabled(flag) ?? false;
@@ -99,17 +86,17 @@ export function useAnalytics() {
 }
 
 // ── Eventos de produto catalogados ───────────────────────────────────────────
-// Usar como constantes em vez de strings hardcoded
 export const EVENTS = {
   // Autenticação
-  LOGIN:             'user_login',
-  SIGNUP:            'user_signup',
-  LOGOUT:            'user_logout',
+  LOGIN:              'user_login',
+  SIGNUP:             'user_signup',
+  LOGOUT:             'user_logout',
 
   // Baba
-  BABA_CREATED:      'baba_created',
-  BABA_JOINED:       'baba_joined',
-  BABA_SWITCHED:     'baba_switched',
+  BABA_CREATED:       'baba_created',
+  BABA_JOINED:        'baba_joined',
+  BABA_SWITCHED:      'baba_switched',
+  BABA_MODE_SET:      'baba_mode_set',       // Sprint 1
 
   // Presença
   PRESENCE_CONFIRMED: 'presence_confirmed',
@@ -125,9 +112,26 @@ export const EVENTS = {
   MATCH_STARTED:      'match_started',
   MATCH_FINISHED:     'match_finished',
   GOAL_SCORED:        'goal_scored',
+  MATCH_INTRO_SHOWN:  'match_intro_shown',   // Sprint 3
+  REACTION_SENT:      'reaction_sent',       // Sprint 3
+
+  // MVP
+  MVP_VOTED:          'mvp_voted',           // Sprint 3
+  MVP_REVEALED:       'mvp_revealed',        // Sprint 3
+
+  // Pós-jogo
+  POST_GAME_VIEWED:   'post_game_viewed',    // Sprint 3
+  NARRATIVE_GENERATED:'narrative_generated', // Sprint 5
 
   // Avaliação
   PLAYER_RATED:       'player_rated',
+
+  // Divisão
+  DIVISION_CHANGED:   'division_changed',    // Sprint 4
+
+  // Temporada
+  SEASON_CREATED:     'season_created',      // Sprint 4
+  SEASON_VIEWED:      'season_viewed',       // Sprint 4
 
   // Compartilhamento
   MATCH_SHARED:       'match_shared',
@@ -142,4 +146,7 @@ export const EVENTS = {
   THEME_TOGGLED:      'theme_toggled',
   FEEDBACK_SENT:      'feedback_sent',
   COMPARISON_VIEWED:  'comparison_viewed',
+
+  // Onboarding Sprint 6
+  FEATURE_UNLOCKED:   'feature_unlocked',    // Sprint 1
 };
