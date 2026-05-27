@@ -1,5 +1,5 @@
 // src/App.jsx
-// Sprint 1/6 — progressiveFeaturesUnlock integrado + toasts de desbloqueio de features.
+// Sprint 9 — BetaFeedback + useBetaAnalytics integrados.
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -8,8 +8,8 @@ import toast from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 import { getNewlyUnlocked, UNLOCK_MESSAGES } from './utils/progressiveFeaturesUnlock';
+import { useBetaAnalytics } from './hooks/useBetaAnalytics';
 
-// Páginas
 import LandingPage        from './pages/LandingPage';
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
@@ -30,7 +30,6 @@ import JoinPage           from './pages/JoinPage';
 import ComparisonPage     from './pages/ComparisonPage';
 import TournamentPage     from './pages/TournamentPage';
 
-// Componentes globais
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
 import PageWrapper   from './components/PageWrapper';
@@ -38,9 +37,9 @@ import PushPrompt    from './components/PushPrompt';
 import ConsentModal  from './components/ConsentModal';
 import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
 import ChangelogModal, { shouldShowChangelog }    from './components/ChangelogModal';
-import FeedbackModal from './components/FeedbackModal';
+import FeedbackModal  from './components/FeedbackModal';
+import BetaFeedback, { shouldShowBetaFeedback }   from './components/BetaFeedback';
 
-// ─── ProtectedRoute ───────────────────────────────────────────────────────────
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return (
@@ -53,45 +52,50 @@ const ProtectedRoute = ({ children }) => {
 
 const PUSH_ELIGIBLE_KEY = 'push_eligible_after_confirm';
 
-// ─── AppInner ─────────────────────────────────────────────────────────────────
 const AppInner = () => {
-  const { user, profile } = useAuth();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showPushPrompt, setShowPushPrompt] = useState(false);
-  const [showChangelog,  setShowChangelog]  = useState(false);
-  const [showFeedback,   setShowFeedback]   = useState(false);
-  const [needsConsent,   setNeedsConsent]   = useState(null);
+  const { user, profile }                 = useAuth();
+  const { trackFunnelStep, FUNNEL_STEPS } = useBetaAnalytics();
 
-  // LGPD consent
+  const [showOnboarding,   setShowOnboarding]   = useState(false);
+  const [showPushPrompt,   setShowPushPrompt]   = useState(false);
+  const [showChangelog,    setShowChangelog]    = useState(false);
+  const [showFeedback,     setShowFeedback]     = useState(false);
+  const [showBetaFeedback, setShowBetaFeedback] = useState(false);
+  const [needsConsent,     setNeedsConsent]     = useState(null);
+
   useEffect(() => {
     if (!user) { setNeedsConsent(false); return; }
     if (profile === undefined) return;
     setNeedsConsent(profile ? !profile.consent_at : false);
   }, [user, profile]);
 
-  // Sprint 1 — verificar desbloqueio de features ao carregar
   useEffect(() => {
     if (!user || !profile || needsConsent !== false) return;
     const gamesPlayed = profile.games_played ?? 0;
     if (gamesPlayed === 0) return;
-
-    // Verificar se houve incremento recente (comparar com salvo)
     const savedKey = `draft_play_games_played_${user.id}`;
     const saved    = parseInt(localStorage.getItem(savedKey) || '0', 10);
     if (gamesPlayed > saved) {
       const newlyUnlocked = getNewlyUnlocked(saved, gamesPlayed);
       newlyUnlocked.forEach((feat, i) => {
         if (UNLOCK_MESSAGES[feat]) {
-          setTimeout(() => {
-            toast(UNLOCK_MESSAGES[feat], { icon: '🎉', duration: 5000 });
-          }, (i + 1) * 1500);
+          setTimeout(() => toast(UNLOCK_MESSAGES[feat], { icon: '🎉', duration: 5000 }), (i + 1) * 1500);
         }
       });
       localStorage.setItem(savedKey, String(gamesPlayed));
     }
+    if (shouldShowBetaFeedback(gamesPlayed)) {
+      setTimeout(() => setShowBetaFeedback(true), 3000);
+    }
   }, [user?.id, profile?.games_played, needsConsent]);
 
-  // Onboarding
+  useEffect(() => {
+    if (!user || !profile) return;
+    if ((profile.games_played ?? 0) >= 1) {
+      trackFunnelStep(FUNNEL_STEPS.FIRST_MATCH, { games: profile.games_played });
+    }
+  }, [user?.id, profile?.games_played]);
+
   useEffect(() => {
     if (!user || needsConsent !== false) return;
     if (shouldShowOnboarding()) {
@@ -104,7 +108,6 @@ const AppInner = () => {
     }
   }, [user, needsConsent]);
 
-  // Push prompt
   useEffect(() => {
     if (!user || needsConsent !== false) { setShowPushPrompt(false); return; }
     const eligible =
@@ -134,9 +137,7 @@ const AppInner = () => {
   return (
     <>
       <OfflineBanner />
-
       <Routes>
-        {/* Públicas */}
         <Route path="/"              element={<LandingPage />} />
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/visitor"       element={<VisitorMode />} />
@@ -147,8 +148,6 @@ const AppInner = () => {
         <Route path="/player/:userId"    element={<PublicProfilePage />} />
         <Route path="/followers/:userId" element={<FollowersPage />} />
         <Route path="/followers"         element={<FollowersPage />} />
-
-        {/* Protegidas */}
         <Route path="/home"       element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
         <Route path="/dashboard"  element={<ProtectedRoute><PageWrapper><DashboardPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/create"     element={<ProtectedRoute><PageWrapper><CreatePage /></PageWrapper></ProtectedRoute>} />
@@ -159,28 +158,19 @@ const AppInner = () => {
         <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/tournament" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
-
-        {/* Redirects */}
         <Route path="/teams" element={<Navigate to="/draw" replace />} />
         <Route path="/match" element={<Navigate to="/draw" replace />} />
       </Routes>
-
       <BottomNav />
-
-      {needsConsent === true && (
-        <ConsentModal onAccepted={() => setNeedsConsent(false)} />
-      )}
-
+      {needsConsent === true && <ConsentModal onAccepted={() => setNeedsConsent(false)} />}
       {showPushPrompt && needsConsent === false && <PushPrompt />}
-
-      {showOnboarding && needsConsent === false && (
-        <OnboardingModal onClose={() => setShowOnboarding(false)} />
-      )}
-
+      {showOnboarding && needsConsent === false && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
       {showChangelog && needsConsent === false && !showOnboarding && (
         <ChangelogModal isOpen onClose={() => setShowChangelog(false)} />
       )}
-
+      {showBetaFeedback && needsConsent === false && (
+        <BetaFeedback onClose={() => setShowBetaFeedback(false)} />
+      )}
       {user && needsConsent === false && (
         <button
           onClick={() => setShowFeedback(true)}
@@ -192,13 +182,11 @@ const AppInner = () => {
           </svg>
         </button>
       )}
-
       <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
     </>
   );
 };
 
-// ─── App root ─────────────────────────────────────────────────────────────────
 function App() {
   return (
     <BrowserRouter>
