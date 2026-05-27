@@ -1,25 +1,27 @@
 // src/components/ChangelogModal.jsx
-// Fase 3C — Changelog dentro do app. Exibe novidades da versão atual.
-// Mostrado automaticamente uma vez por versão, usando localStorage.
+// Sprint 6 — Changelog atualizado com novidades dos Sprints 1-5.
 
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Shield, Zap, Bug } from 'lucide-react';
+import React from 'react';
+import { X, Sparkles, Shield, Zap, Bug, Trophy, Star } from 'lucide-react';
 
-const CURRENT_VERSION = '1.3.0';
+const CURRENT_VERSION = '2.0.0';
 const STORAGE_KEY     = `draft_play_changelog_seen_${CURRENT_VERSION}`;
 
 const CHANGELOG = [
   {
-    version: '1.3.0',
-    date:    'Mai 2026',
+    version: '2.0.0',
+    date:    'Jun 2026',
     items: [
-      { type: 'feature', icon: Sparkles, text: 'Rankings de Fair-Play e Artilheiro do Mês' },
-      { type: 'feature', icon: Zap,      text: 'Sorteio de times com goleiros separados e múltiplas iterações de balanceamento' },
-      { type: 'feature', icon: Sparkles, text: 'Compartilhar resultado da partida via WhatsApp com placar e artilheiros' },
-      { type: 'feature', icon: Sparkles, text: 'Tema claro/escuro com persistência' },
-      { type: 'security', icon: Shield,  text: 'Hardening de segurança: RLS em todas as tabelas, funções com search_path fixo' },
-      { type: 'fix',     icon: Bug,      text: 'Consentimento LGPD sem flash na abertura do app' },
-      { type: 'fix',     icon: Bug,      text: 'Push notification solicitada após 1ª confirmação, não ao entrar no app' },
+      { type: 'feature',  icon: Zap,      text: 'Modo do baba: Casual, Competitivo ou Completo — você escolhe o nível de complexidade' },
+      { type: 'feature',  icon: Sparkles, text: 'Animação de intro antes de cada partida com os dois times' },
+      { type: 'feature',  icon: Trophy,   text: 'MVP do jogo — vote no craque após a partida' },
+      { type: 'feature',  icon: Zap,      text: 'Reações em tempo real durante a partida (emojis ao vivo)' },
+      { type: 'feature',  icon: Star,     text: 'Sistema de divisões: Ferro → Bronze → Prata → Ouro → Platina → Diamante' },
+      { type: 'feature',  icon: Trophy,   text: 'Temporadas mensais com ranking de pontos' },
+      { type: 'feature',  icon: Sparkles, text: 'Narrativa da partida gerada por IA (Gemini)' },
+      { type: 'feature',  icon: Zap,      text: 'Sons de gol, apito e vitória' },
+      { type: 'feature',  icon: Sparkles, text: 'Features desbloqueadas progressivamente conforme você joga' },
+      { type: 'fix',      icon: Bug,      text: 'Menu de navegação agora se adapta ao modo do baba' },
     ],
   },
 ];
@@ -41,27 +43,22 @@ export const markChangelogSeen = () => {
 
 export default function ChangelogModal({ isOpen, onClose }) {
   if (!isOpen) return null;
-
   const entry = CHANGELOG[0];
 
-  const handleClose = () => {
-    markChangelogSeen();
-    onClose?.();
-  };
+  const handleClose = () => { markChangelogSeen(); onClose?.(); };
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="changelog-title"
+      role="dialog" aria-modal="true" aria-labelledby="changelog-title"
     >
       <div className="w-full max-w-sm bg-surface-1 border border-border-mid rounded-3xl overflow-hidden shadow-2xl animate-page-in">
+
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border-subtle">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center">
-              <Sparkles size={16} className="text-cyan-electric" aria-hidden="true" />
+              <Sparkles size={16} className="text-cyan-electric" />
             </div>
             <div>
               <h2 id="changelog-title" className="text-sm font-black uppercase tracking-widest text-white">
@@ -72,20 +69,16 @@ export default function ChangelogModal({ isOpen, onClose }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            aria-label="Fechar novidades"
-            className="p-2 rounded-xl text-text-low hover:text-white transition-colors"
-          >
-            <X size={16} aria-hidden="true" />
+          <button onClick={handleClose} aria-label="Fechar" className="p-2 rounded-xl text-text-low hover:text-white transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        {/* Lista de items */}
-        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+        {/* Lista */}
+        <div className="p-5 space-y-2.5 max-h-[55vh] overflow-y-auto">
           {entry.items.map((item, i) => {
-            const cfg   = TYPE_CONFIG[item.type] || TYPE_CONFIG.feature;
-            const Icon  = item.icon;
+            const cfg  = TYPE_CONFIG[item.type] || TYPE_CONFIG.feature;
+            const Icon = item.icon;
             return (
               <div key={i} className="flex items-start gap-3">
                 <div className={`flex-shrink-0 px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${cfg.className}`}>
@@ -101,7 +94,7 @@ export default function ChangelogModal({ isOpen, onClose }) {
         <div className="p-5 border-t border-border-subtle">
           <button
             onClick={handleClose}
-            className="w-full py-3 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/20 transition-all active:scale-98"
+            className="w-full py-3 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/20 transition-all active:scale-95"
           >
             Entendido, vamos jogar! ⚽
           </button>
