@@ -1,57 +1,44 @@
 // src/components/OnboardingModal.jsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Modal de boas-vindas para novos usuários. Fase 4, Tarefa 4.1.
-// Exibido uma única vez após o primeiro cadastro, usando localStorage
-// como flag para não repetir.
-// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 6 — Onboarding revisado: mais curto, direto, com CTA por modo.
+// 3 steps máximo. Foca no que o usuário vai fazer AGORA.
 
 import React, { useState } from 'react';
-import { Users, Trophy, Shuffle, ChevronRight, X } from 'lucide-react';
+import { Users, Shuffle, CheckCircle2, X, ChevronRight } from 'lucide-react';
 
 const STEPS = [
   {
-    icon: <Users size={36} className="text-cyan-electric" />,
-    title: 'Bem-vindo ao Draft Play',
-    subtitle: 'Seu baba nunca mais vai ser o mesmo',
-    description:
-      'Gerencie seu grupo de futebol com sorteio automático de times, ranking de artilheiros, histórico de partidas e muito mais.',
-    cta: 'Próximo',
+    icon:        <span className="text-5xl">⚽</span>,
+    title:       'Bem-vindo ao Draft Play',
+    subtitle:    'Baba organizado em segundos',
+    description: 'Confirme presença, sorteie times equilibrados e acompanhe o placar — tudo no celular.',
+    cta:         'Próximo',
   },
   {
-    icon: <Shuffle size={36} className="text-cyan-electric" />,
-    title: 'Crie ou entre em um baba',
-    subtitle: 'Dois caminhos para começar',
-    description:
-      'Crie seu próprio grupo como presidente e convide seus amigos com um código de 6 dígitos. Ou entre em um grupo existente usando o código que alguém compartilhou.',
-    cta: 'Próximo',
+    icon:        <Shuffle size={40} className="text-cyan-electric" />,
+    title:       'Times equilibrados',
+    subtitle:    'Sem briga na hora do sorteio',
+    description: 'O app usa a avaliação dos jogadores para montar times justos automaticamente.',
+    cta:         'Próximo',
   },
   {
-    icon: <Trophy size={36} className="text-cyan-electric" />,
-    title: 'Confirme presença e jogue',
-    subtitle: 'O sorteio é automático',
-    description:
-      'Antes de cada baba, confirme sua presença. 30 minutos antes do horário, os times são sorteados automaticamente com base na avaliação técnica dos jogadores.',
-    cta: 'Começar agora',
+    icon:        <CheckCircle2 size={40} className="text-green-400" />,
+    title:       'Confirme sua presença',
+    subtitle:    'Simples assim',
+    description: 'Abra o app, toque em confirmar e pronto. Você está dentro do baba.',
+    cta:         'Entrar no Baba',
   },
 ];
 
-const ONBOARDING_KEY = 'draft_play_onboarding_done';
+const ONBOARDING_KEY = 'draft_play_onboarding_done_v2';
 
 export const shouldShowOnboarding = () => {
-  try {
-    return !localStorage.getItem(ONBOARDING_KEY);
-  } catch {
-    return false;
-  }
+  try { return !localStorage.getItem(ONBOARDING_KEY); }
+  catch { return false; }
 };
 
 export const markOnboardingDone = () => {
-  try {
-    localStorage.setItem(ONBOARDING_KEY, '1');
-  } catch {}
+  try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch {}
 };
-
-// ─── Componente ───────────────────────────────────────────────────────────────
 
 const OnboardingModal = ({ onClose }) => {
   const [step, setStep] = useState(0);
@@ -59,18 +46,11 @@ const OnboardingModal = ({ onClose }) => {
   const isLast  = step === STEPS.length - 1;
 
   const handleNext = () => {
-    if (isLast) {
-      markOnboardingDone();
-      onClose();
-    } else {
-      setStep(s => s + 1);
-    }
+    if (isLast) { markOnboardingDone(); onClose(); }
+    else setStep(s => s + 1);
   };
 
-  const handleSkip = () => {
-    markOnboardingDone();
-    onClose();
-  };
+  const handleSkip = () => { markOnboardingDone(); onClose(); };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md p-4">
@@ -91,26 +71,20 @@ const OnboardingModal = ({ onClose }) => {
           ))}
         </div>
 
-        {/* Botão fechar */}
+        {/* Fechar */}
         <div className="flex justify-end px-5 pt-3">
-          <button
-            onClick={handleSkip}
-            className="p-2 text-text-muted hover:text-text-mid transition-colors"
-          >
+          <button onClick={handleSkip} className="p-2 text-text-muted hover:text-text-mid transition-colors">
             <X size={16} />
           </button>
         </div>
 
         {/* Conteúdo */}
-        <div className="px-8 pb-8 space-y-6 text-center">
-
-          {/* Ícone */}
-          <div className="w-20 h-20 rounded-[1.75rem] bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(0,242,255,0.1)]">
+        <div className="px-8 pb-8 space-y-5 text-center">
+          <div className="w-20 h-20 rounded-[1.75rem] bg-surface-2 border border-border-mid flex items-center justify-center mx-auto">
             {current.icon}
           </div>
 
-          {/* Textos */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className="text-[10px] font-black text-cyan-electric/60 uppercase tracking-[0.2em]">
               {current.subtitle}
             </p>
@@ -122,7 +96,6 @@ const OnboardingModal = ({ onClose }) => {
             </p>
           </div>
 
-          {/* Botão principal */}
           <button
             onClick={handleNext}
             className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all"
@@ -132,13 +105,9 @@ const OnboardingModal = ({ onClose }) => {
             {!isLast && <ChevronRight size={18} />}
           </button>
 
-          {/* Pular */}
           {!isLast && (
-            <button
-              onClick={handleSkip}
-              className="text-[10px] text-text-muted font-black uppercase tracking-widest hover:text-text-low transition-colors"
-            >
-              Pular introdução
+            <button onClick={handleSkip} className="text-[10px] text-text-muted font-black uppercase tracking-widest hover:text-text-low transition-colors">
+              Pular
             </button>
           )}
         </div>
