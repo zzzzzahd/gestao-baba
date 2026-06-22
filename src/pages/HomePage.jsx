@@ -281,7 +281,13 @@ const HomePage = () => {
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .then(({ data }) => setTournaments(data || []));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[HomePage] tournaments:', error);
+          return;
+        }
+        setTournaments(data || []);
+      });
   }, [user?.id]);
 
   // Tarefa 4.2 — Pull-to-refresh
