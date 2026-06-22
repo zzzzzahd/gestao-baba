@@ -213,21 +213,19 @@ const FAB = ({ onClick }) => (
       background: 'linear-gradient(135deg, #00f2ff, #0066ff)',
       boxShadow: '0 8px 32px rgba(0,242,255,0.35)',
     }}
-    aria-label="Criar ou entrar em baba"
+    aria-label="Criar baba, torneio ou entrar com código"
   >
     <Plus size={24} className="text-black" strokeWidth={3} />
   </button>
 );
 
-// ─── FAB Menu (criar / entrar) ────────────────────────────────────────────────
-const FABMenu = ({ onClose, onCreate, onJoin }) => (
+// ─── FAB Menu (criar baba / criar torneio / entrar) ───────────────────────────
+const FABMenu = ({ onClose, onCreateBaba, onCreateTournament, onJoin }) => (
   <>
-    {/* Backdrop */}
     <div
       className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     />
-    {/* Opções */}
     <div className="fixed bottom-44 right-5 z-[60] flex flex-col items-end gap-3">
       <div className="flex items-center gap-3">
         <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
@@ -236,8 +234,21 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
         <button
           onClick={onJoin}
           className="w-12 h-12 rounded-full bg-surface-3 border border-border-strong flex items-center justify-center active:scale-90 transition-transform"
+          aria-label="Entrar com código"
         >
           <LogIn size={18} className="text-white" />
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
+          Criar torneio
+        </span>
+        <button
+          onClick={onCreateTournament}
+          className="w-12 h-12 rounded-full bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center active:scale-90 transition-transform"
+          aria-label="Criar torneio"
+        >
+          <Trophy size={18} className="text-yellow-400" />
         </button>
       </div>
       <div className="flex items-center gap-3">
@@ -245,9 +256,10 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
           Criar baba
         </span>
         <button
-          onClick={onCreate}
+          onClick={onCreateBaba}
           className="w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform"
           style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+          aria-label="Criar baba"
         >
           <Plus size={20} className="text-black" strokeWidth={3} />
         </button>
@@ -380,17 +392,9 @@ const HomePage = () => {
 
       {/* ── Torneios standalone (sem baba) ── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest flex items-center gap-2">
-            <Trophy size={12} className="text-yellow-400" /> Meus Torneios
-          </h3>
-          <button
-            onClick={() => setShowTournament(true)}
-            className="text-[9px] font-black uppercase text-yellow-400 hover:text-yellow-300 transition-colors"
-          >
-            + Criar
-          </button>
-        </div>
+        <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1 flex items-center gap-2">
+          <Trophy size={12} className="text-yellow-400" /> Meus Torneios
+        </h3>
 
         {tournaments.length > 0 ? (
           <div className="space-y-2">
@@ -418,14 +422,11 @@ const HomePage = () => {
             ))}
           </div>
         ) : (
-          <button
-            onClick={() => setShowTournament(true)}
-            className="w-full p-5 rounded-2xl border border-dashed border-border-mid text-center hover:border-yellow-400/30 hover:bg-yellow-400/5 transition-all"
-          >
+          <div className="w-full p-5 rounded-2xl border border-dashed border-border-mid text-center">
             <Trophy size={24} className="mx-auto mb-2 text-yellow-400/40" />
             <p className="text-[11px] font-black uppercase text-text-low">Nenhum torneio ainda</p>
-            <p className="text-[10px] text-text-muted mt-1">Crie um torneio avulso com times e jogadores manuais</p>
-          </button>
+            <p className="text-[10px] text-text-muted mt-1">Toque no + para criar um torneio avulso</p>
+          </div>
         )}
       </div>
 
@@ -459,19 +460,16 @@ const HomePage = () => {
         </button>
       </div>
 
-      {/* ── FAB ── */}
-      {hasBabas && (
-        <>
-          {fabOpen && (
-            <FABMenu
-              onClose={() => setFabOpen(false)}
-              onCreate={() => { setFabOpen(false); navigate('/create'); }}
-              onJoin={focusJoinBox}
-            />
-          )}
-          <FAB onClick={() => setFabOpen(v => !v)} />
-        </>
+      {/* ── FAB — sempre visível ── */}
+      {fabOpen && (
+        <FABMenu
+          onClose={() => setFabOpen(false)}
+          onCreateBaba={() => { setFabOpen(false); navigate('/create'); }}
+          onCreateTournament={() => { setFabOpen(false); setShowTournament(true); }}
+          onJoin={focusJoinBox}
+        />
       )}
+      <FAB onClick={() => setFabOpen(v => !v)} />
 
       <CreateTournamentModal
         open={showTournament}

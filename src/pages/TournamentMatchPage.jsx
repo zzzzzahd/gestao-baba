@@ -23,6 +23,7 @@ export default function TournamentMatchPage() {
     setMatch(m);
     setScoreA(m.score_a ?? 0);
     setScoreB(m.score_b ?? 0);
+
     if (m.team_a_id) {
       const { data } = await supabase.from('tournament_teams').select('*').eq('id', m.team_a_id).single();
       setTeamA(data);
@@ -31,9 +32,33 @@ export default function TournamentMatchPage() {
       const { data } = await supabase.from('tournament_teams').select('*').eq('id', m.team_b_id).single();
       setTeamB(data);
     }
+
     const { data: existing } = await supabase
       .from('tournament_player_stats').select('*').eq('match_id', matchId);
-    setStats(existing || []);
+
+    if (existing?.length) {
+      setStats(existing);
+      return;
+    }
+
+    const teamIds = [m.team_a_id, m.team_b_id].filter(Boolean);
+    if (teamIds.length) {
+      const { data: roster } = await supabase
+        .from('tournament_team_players')
+        .select('*')
+        .in('team_id', teamIds)
+        .order('created_at');
+      if (roster?.length) {
+        setStats(roster.map(p => ({
+          team_id: p.team_id,
+          player_name: p.name,
+          goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, fouls: 0,
+        })));
+        return;
+      }
+    }
+
+    setStats([]);
   }, [matchId]);
 
   useEffect(() => { load(); }, [load]);
@@ -120,25 +145,27 @@ export default function TournamentMatchPage() {
       </header>
 
       <section className="p-5 bg-surface-1 border-b border-border-subtle flex items-center justify-around">
-        <ScoreBox name={teamA?.name} value={scoreA} setValue={setScoreA} />
+        <ScoreBox name={teamA?.name} coach={teamA?.coach_name} value={scoreA} setValue={setScoreA} />
         <span className="text-2xl font-black text-text-muted">×</span>
-        <ScoreBox name={teamB?.name} value={scoreB} setValue={setScoreB} />
+        <ScoreBox name={teamB?.name} coach={teamB?.coach_name} value={scoreB} setValue={setScoreB} />
       </section>
 
       <section className="p-5 space-y-4">
-        <TeamStats title={teamA?.name} stats={statsA} bump={bump}
+        <TeamStats title={teamA?.name} coach={teamA?.coach_name} stats={statsA} bump={bump}
           onAdd={() => addPlayer(match.team_a_id)} />
-        <TeamStats title={teamB?.name} stats={statsB} bump={bump}
+        <TeamStats title={teamB?.name} coach={teamB?.coach_name} stats={statsB} bump={bump}
           onAdd={() => addPlayer(match.team_b_id)} />
       </section>
     </div>
   );
 }
 
-function ScoreBox({ name, value, setValue }) {
+function ScoreBox({ name, coach, value, setValue }) {
   return (
     <div className="text-center">
-      <div className="text-[10px] font-black uppercase text-text-low mb-2 max-w-[120px] truncate">{name || '—'}</div>
+      <div className="text-[10px] font-black uppercase text-text-low mb-0.5 max-w-[120px] truncate">{name || '—'}</div>
+      {coach && <div className="text-[8px] text-text-muted mb-2 truncate max-w-[120px]">Téc: {coach}</div>}
+      {!coach && <div className="mb-2" />}
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setValue(Math.max(0, value - 1))}
           className="w-9 h-9 rounded-xl bg-surface-2 border border-border-mid flex items-center justify-center">
@@ -154,7 +181,7 @@ function ScoreBox({ name, value, setValue }) {
   );
 }
 
-function TeamStats({ title, stats, bump, onAdd }) {
+function TeamStats({ title, coach, stats, bump, onAdd }) {
   const fields = [
     { k: 'goals', label: '⚽' },
     { k: 'assists', label: '🎯' },
@@ -164,8 +191,11 @@ function TeamStats({ title, stats, bump, onAdd }) {
   ];
   return (
     <div className="bg-surface-1 border border-border-subtle rounded-2xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-black uppercase text-xs">{title}</h3>
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h3 className="font-black uppercase text-xs">{title}</h3>
+          {coach && <p className="text-[9px] text-text-muted mt-0.5">Técnico: {coach}</p>}
+        </div>
         <button type="button" onClick={onAdd} className="text-yellow-400 text-[10px] font-black uppercase flex items-center gap-1">
           <Plus size={14} /> jogador
         </button>

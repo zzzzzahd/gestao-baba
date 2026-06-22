@@ -3,10 +3,12 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { generateKnockout, generateRoundRobin } from '../utils/bracket';
 import { advanceWinner } from '../services/tournamentService';
-import { X, Trophy } from 'lucide-react';
+import { X, Trophy, Plus, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SPORT_LABEL = { futebol: 'Futebol', futsal: 'Futsal', society: 'Society' };
+
+const emptyTeam = () => ({ name: '', coach: '', players: [] });
 
 export default function CreateTournamentModal({ open, onClose, onCreated, userId }) {
   const [step, setStep] = useState(1);
@@ -23,7 +25,7 @@ export default function CreateTournamentModal({ open, onClose, onCreated, userId
   const [extraTime, setExtraTime] = useState(false);
   const [penalties, setPenalties] = useState(true);
 
-  const [teamNames, setTeamNames] = useState(Array(8).fill(''));
+  const [teams, setTeams] = useState(Array.from({ length: 8 }, emptyTeam));
 
   if (!open) return null;
 
@@ -33,24 +35,57 @@ export default function CreateTournamentModal({ open, onClose, onCreated, userId
     setSport('futebol');
     setFormat('knockout');
     setTeamsCount(8);
-    setTeamNames(Array(8).fill(''));
+    setTeams(Array.from({ length: 8 }, emptyTeam));
     onClose();
   }
 
   function updateTeamsCount(n) {
     const v = Math.max(3, Math.min(32, Number(n) || 0));
     setTeamsCount(v);
-    setTeamNames(prev => {
+    setTeams(prev => {
       const arr = [...prev];
-      if (arr.length < v) while (arr.length < v) arr.push('');
-      else arr.length = v;
+      while (arr.length < v) arr.push(emptyTeam());
+      arr.length = v;
       return arr;
     });
   }
 
+  function updateTeam(i, patch) {
+    setTeams(prev => prev.map((t, idx) => idx === i ? { ...t, ...patch } : t));
+  }
+
+  function addPlayer(i) {
+    setTeams(prev => prev.map((t, idx) =>
+      idx === i ? { ...t, players: [...t.players, ''] } : t
+    ));
+  }
+
+  function updatePlayer(teamIdx, playerIdx, value) {
+    setTeams(prev => prev.map((t, i) => {
+      if (i !== teamIdx) return t;
+      const players = [...t.players];
+      players[playerIdx] = value;
+      return { ...t, players };
+    }));
+  }
+
+  function removePlayer(teamIdx, playerIdx) {
+    setTeams(prev => prev.map((t, i) => {
+      if (i !== teamIdx) return t;
+      return { ...t, players: t.players.filter((_, j) => j !== playerIdx) };
+    }));
+  }
+
   async function handleCreate() {
     if (!name.trim()) { toast.error('Dê um nome ao torneio'); return; }
-    if (teamNames.some(n => !n.trim())) { toast.error('Preencha o nome de todos os times'); return; }
+    if (teams.some(t => !t.name.trim())) { toast.error('Preencha o nome de todos os times'); return; }
+
+    const dupPlayers = teams.some(t => {
+      const names = t.players.map(p => p.trim().toLowerCase()).filter(Boolean);
+      return new Set(names).size !== names.length;
+    });
+    if (dupPlayers) { toast.error('Há jogadores com nome duplicado no mesmo time'); return; }
+
     setLoading(true);
     try {
       const { data: tour, error: e1 } = await supabase
@@ -70,18 +105,36 @@ export default function CreateTournamentModal({ open, onClose, onCreated, userId
         .single();
       if (e1) throw e1;
 
-      const teamRows = teamNames.map((nm, i) => ({
-        tournament_id: tour.id, name: nm.trim(), seed: i + 1,
+      const teamRows = teams.map((t, i) => ({
+        tournament_id: tour.id,
+        name: t.name.trim(),
+        coach_name: t.coach.trim() || null,
+        seed: i + 1,
       }));
-      const { data: teams, error: e2 } = await supabase
+      const { data: insertedTeams, error: e2 } = await supabase
         .from('tournament_teams')
         .insert(teamRows)
         .select();
       if (e2) throw e2;
 
+      const playerRows = insertedTeams.flatMap((team, i) =>
+        teams[i].players
+          .map(p => p.trim())
+          .filter(Boolean)
+          .map(playerName => ({
+            tournament_id: tour.id,
+            team_id: team.id,
+            name: playerName,
+          }))
+      );
+      if (playerRows.length > 0) {
+        const { error: ePlayers } = await supabase.from('tournament_team_players').insert(playerRows);
+        if (ePlayers) throw ePlayers;
+      }
+
       const rounds = format === 'knockout'
-        ? generateKnockout(teams)
-        : generateRoundRobin(teams);
+        ? generateKnockout(insertedTeams)
+        : generateRoundRobin(insertedTeams);
 
       const flat = rounds.flat().map(m => ({
         tournament_id: tour.id,
@@ -213,21 +266,75 @@ export default function CreateTournamentModal({ open, onClose, onCreated, userId
 
           {step === 3 && (
             <>
-              <h3 className="font-black uppercase text-xs text-white">Nomes dos times</h3>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {teamNames.map((n, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="text-text-muted w-6 text-[11px] font-black">{i + 1}.</span>
-                    <input value={n}
-                      onChange={e => {
-                        const arr = [...teamNames]; arr[i] = e.target.value; setTeamNames(arr);
-                      }}
-                      className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-cyan-electric/50"
-                      placeholder={`Time ${i + 1}`} />
+              <h3 className="font-black uppercase text-xs text-white">Times e elencos</h3>
+              <p className="text-[10px] text-text-muted">Cadastre o time, técnico (opcional) e jogadores de cada equipe.</p>
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {teams.map((team, i) => (
+                  <div key={i} className="bg-surface-1 border border-border-subtle rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-400 font-black text-xs w-6">{i + 1}.</span>
+                      <input
+                        value={team.name}
+                        onChange={e => updateTeam(i, { name: e.target.value })}
+                        className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-cyan-electric/50"
+                        placeholder={`Nome do time ${i + 1}`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-text-low tracking-widest flex items-center gap-1">
+                        <User size={10} /> Técnico <span className="text-text-muted font-normal">(opcional)</span>
+                      </label>
+                      <input
+                        value={team.coach}
+                        onChange={e => updateTeam(i, { coach: e.target.value })}
+                        className="w-full mt-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-cyan-electric/50"
+                        placeholder="Nome do técnico"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[9px] font-black uppercase text-text-low tracking-widest flex items-center gap-1">
+                          <Users size={10} /> Jogadores
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => addPlayer(i)}
+                          className="text-[9px] font-black uppercase text-cyan-electric flex items-center gap-0.5"
+                        >
+                          <Plus size={12} /> adicionar
+                        </button>
+                      </div>
+                      {team.players.length === 0 ? (
+                        <p className="text-[10px] text-text-muted py-1">Nenhum jogador — clique em adicionar</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {team.players.map((player, j) => (
+                            <div key={j} className="flex items-center gap-2">
+                              <input
+                                value={player}
+                                onChange={e => updatePlayer(i, j, e.target.value)}
+                                className="flex-1 bg-surface-2 border border-border-mid rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-electric/50"
+                                placeholder={`Jogador ${j + 1}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePlayer(i, j)}
+                                className="text-text-muted hover:text-red-400 px-1 text-lg leading-none"
+                                aria-label="Remover jogador"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-text-muted">O chaveamento será gerado aleatoriamente.</p>
+              <p className="text-[10px] text-text-muted">O chaveamento será gerado aleatoriamente após criar.</p>
             </>
           )}
         </div>
