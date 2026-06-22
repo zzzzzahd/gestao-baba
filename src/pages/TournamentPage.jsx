@@ -1,317 +1,234 @@
 // src/pages/TournamentPage.jsx
-// Modo Torneio / Mata-mata — criar, sortear chaveamento e registrar resultados.
+// Torneio standalone — sem vínculo com baba. Times e jogadores cadastrados manualmente.
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate }   from 'react-router-dom';
-import { ArrowLeft, Trophy, Plus, Play, CheckCircle, Users, ChevronRight } from 'lucide-react';
-import { useBaba }       from '../contexts/BabaContext';
-import { supabase }      from '../services/supabase';
-import toast             from 'react-hot-toast';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { computeStandings } from '../utils/bracket';
+import { Trophy, ChevronLeft, Play } from 'lucide-react';
 
-// ── Mini componente: card de partida do chaveamento ───────────────────────────
-const MatchCard = ({ match, onResult, canEdit }) => {
-  const [scoreA, setScoreA] = useState(match.score_a ?? 0);
-  const [scoreB, setScoreB] = useState(match.score_b ?? 0);
-  const [saving, setSaving] = useState(false);
-
-  const done    = match.status === 'finished';
-  const hasBye  = match.team_b === 'BYE' || match.team_a === 'BYE';
-
-  const handleSave = async () => {
-    if (scoreA === scoreB) { toast.error('Empate não é permitido em mata-mata'); return; }
-    setSaving(true);
-    const { data, error } = await supabase.rpc('record_tournament_result', {
-      p_match_id: match.id, p_score_a: scoreA, p_score_b: scoreB,
-    });
-    setSaving(false);
-    if (error || data?.error) { toast.error(data?.error ?? error?.message); return; }
-    toast.success(`Vencedor: ${data.winner}`);
-    onResult?.();
-  };
-
-  return (
-    <div className={`rounded-2xl border p-4 space-y-3 ${
-      done ? 'bg-surface-1 border-border-subtle opacity-80'
-           : hasBye ? 'bg-surface-1 border-border-subtle'
-           : 'bg-surface-2 border-border-mid'
-    }`}>
-      {/* Time A */}
-      <div className="flex items-center justify-between">
-        <span className={`text-[11px] font-black ${match.winner === match.team_a ? 'text-cyan-electric' : 'text-white'}`}>
-          {match.team_a ?? 'A definir'} {match.winner === match.team_a && '🏆'}
-        </span>
-        {!done && !hasBye && canEdit && (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setScoreA(Math.max(0, scoreA - 1))} className="w-6 h-6 rounded-lg bg-surface-3 text-white text-xs font-black">−</button>
-            <span className="w-5 text-center text-sm font-black tabular-nums">{scoreA}</span>
-            <button onClick={() => setScoreA(scoreA + 1)} className="w-6 h-6 rounded-lg bg-surface-3 text-white text-xs font-black">+</button>
-          </div>
-        )}
-        {done && <span className="text-lg font-black tabular-nums text-white">{match.score_a}</span>}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-px bg-border-subtle" />
-        <span className="text-[9px] text-text-muted font-black uppercase">vs</span>
-        <div className="flex-1 h-px bg-border-subtle" />
-      </div>
-
-      {/* Time B */}
-      <div className="flex items-center justify-between">
-        <span className={`text-[11px] font-black ${match.winner === match.team_b ? 'text-cyan-electric' : 'text-white'}`}>
-          {match.team_b ?? 'A definir'} {match.winner === match.team_b && '🏆'}
-        </span>
-        {!done && !hasBye && canEdit && (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setScoreB(Math.max(0, scoreB - 1))} className="w-6 h-6 rounded-lg bg-surface-3 text-white text-xs font-black">−</button>
-            <span className="w-5 text-center text-sm font-black tabular-nums">{scoreB}</span>
-            <button onClick={() => setScoreB(scoreB + 1)} className="w-6 h-6 rounded-lg bg-surface-3 text-white text-xs font-black">+</button>
-          </div>
-        )}
-        {done && <span className="text-lg font-black tabular-nums text-white">{match.score_b}</span>}
-      </div>
-
-      {/* Botão salvar */}
-      {!done && !hasBye && canEdit && (
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          aria-busy={saving}
-          className="w-full py-2 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[9px] font-black uppercase tracking-widest hover:bg-cyan-electric/20 transition-all disabled:opacity-40"
-        >
-          {saving ? 'Salvando…' : 'Confirmar resultado'}
-        </button>
-      )}
-    </div>
-  );
-};
-
-// ─── Página principal ─────────────────────────────────────────────────────────
 export default function TournamentPage() {
-  const navigate               = useNavigate();
-  const { currentBaba, players, isPresident } = useBaba();
-  const [tournaments, setTournaments] = useState([]);
-  const [active,      setActive]      = useState(null); // torneio ativo selecionado
-  const [matches,     setMatches]     = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [creating,    setCreating]    = useState(false);
-  const [newName,     setNewName]     = useState('');
-  const [selTeams,    setSelTeams]    = useState([]); // times selecionados (nomes)
-  const [teamInput,   setTeamInput]   = useState('');
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [tour, setTour] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [ranking, setRanking] = useState([]);
+  const [tab, setTab] = useState('bracket');
+  const [loading, setLoading] = useState(true);
 
-  const loadTournaments = useCallback(async () => {
-    if (!currentBaba?.id) return;
-    const { data } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('baba_id', currentBaba.id)
-      .order('created_at', { ascending: false });
-    setTournaments(data ?? []);
-    if (data?.[0] && data[0].status !== 'finished') {
-      setActive(data[0]);
-    }
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    const [{ data: t }, { data: ts }, { data: ms }, { data: rk }] = await Promise.all([
+      supabase.from('tournaments').select('*').eq('id', id).single(),
+      supabase.from('tournament_teams').select('*').eq('tournament_id', id).order('seed'),
+      supabase.from('tournament_matches').select('*').eq('tournament_id', id).order('round').order('match_index'),
+      supabase.from('tournament_rankings').select('*').eq('tournament_id', id),
+    ]);
+    setTour(t);
+    setTeams(ts || []);
+    setMatches(ms || []);
+    setRanking(rk || []);
     setLoading(false);
-  }, [currentBaba?.id]);
+  }, [id]);
 
-  const loadMatches = useCallback(async () => {
-    if (!active?.id) return;
-    const { data } = await supabase
-      .from('tournament_matches')
-      .select('*')
-      .eq('tournament_id', active.id)
-      .order('round').order('position');
-    setMatches(data ?? []);
-  }, [active?.id]);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => { loadTournaments(); }, [loadTournaments]);
-  useEffect(() => { loadMatches(); }, [loadMatches]);
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  const handleCreate = async () => {
-    if (!newName.trim() || selTeams.length < 2) {
-      toast.error('Nome e pelo menos 2 times são obrigatórios');
-      return;
-    }
-    const { data, error } = await supabase.from('tournaments').insert({
-      baba_id:    currentBaba.id,
-      name:       newName.trim(),
-      teams:      selTeams.map(n => ({ name: n })),
-      created_by: (await supabase.auth.getUser()).data.user?.id,
-    }).select().single();
-    if (error) { toast.error('Erro ao criar torneio'); return; }
-    toast.success('Torneio criado!');
-    setCreating(false);
-    setNewName('');
-    setSelTeams([]);
-    await loadTournaments();
-    setActive(data);
-  };
+  if (!tour) {
+    return (
+      <div className="min-h-screen bg-black text-white p-8 text-center">
+        <p className="text-text-low font-black uppercase text-sm">Torneio não encontrado</p>
+        <button onClick={() => navigate('/home')} className="mt-4 text-cyan-electric text-sm font-black uppercase">
+          Voltar ao início
+        </button>
+      </div>
+    );
+  }
 
-  const handleGenerateBracket = async () => {
-    if (!active?.id) return;
-    const { data, error } = await supabase.rpc('generate_bracket', { p_tournament_id: active.id });
-    if (error || data?.error) { toast.error(data?.error ?? error?.message); return; }
-    toast.success(`Chaveamento gerado! ${data.rounds} rodada(s).`);
-    await loadTournaments();
-    await loadMatches();
-  };
+  const teamById = Object.fromEntries(teams.map(t => [t.id, t]));
+  const rounds = [...new Set(matches.map(m => m.round))].sort((a, b) => a - b);
+  const standings = tour.format === 'round_robin' ? computeStandings(teams, matches) : [];
+  const champion = tour.champion_team_id ? teamById[tour.champion_team_id] : null;
 
-  // Agrupar partidas por rodada
-  const byRound = matches.reduce((acc, m) => {
-    acc[m.round] = acc[m.round] ?? [];
-    acc[m.round].push(m);
-    return acc;
-  }, {});
-  const roundLabels = { 1: 'Fase inicial', 2: 'Quartas', 3: 'Semi', 4: 'Final' };
+  const topScorers = [...ranking].sort((a, b) => b.goals - a.goals).slice(0, 5);
+  const topAssists = [...ranking].sort((a, b) => b.assists - a.assists).slice(0, 5);
+  const topYellows = [...ranking].sort((a, b) => b.yellow_cards - a.yellow_cards).slice(0, 5);
+  const topReds = [...ranking].sort((a, b) => b.red_cards - a.red_cards).slice(0, 5);
+  const topFouls = [...ranking].sort((a, b) => b.fouls - a.fouls).slice(0, 5);
 
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  const activeTab = tab === 'bracket' && tour.format !== 'knockout' ? 'table' : tab;
 
   return (
-    <div className="min-h-screen bg-black text-white px-5 pt-6 pb-28 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} aria-label="Voltar" className="p-2 rounded-xl bg-surface-2 border border-border-mid text-text-low hover:text-white transition-colors">
-          <ArrowLeft size={16} aria-hidden="true" />
+    <div className="min-h-screen bg-black text-white pb-28">
+      <header className="flex items-center gap-3 p-5 border-b border-border-subtle">
+        <button onClick={() => navigate('/home')} className="p-2 rounded-xl bg-surface-2 border border-border-mid text-text-low" aria-label="Voltar">
+          <ChevronLeft size={18} />
         </button>
-        <div className="flex-1">
-          <h1 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-            <Trophy size={14} className="text-cyan-electric" aria-hidden="true" /> Torneio
-          </h1>
-          <p className="text-[9px] text-text-low font-black uppercase">{currentBaba?.name}</p>
+        <Trophy className="text-yellow-400 shrink-0" size={20} />
+        <div className="flex-1 min-w-0">
+          <h1 className="font-black uppercase text-sm tracking-tight truncate">{tour.name}</h1>
+          <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
+            {tour.sport} · {tour.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'} · {teams.length} times
+            {champion && <span className="text-yellow-400 ml-2">🏆 {champion.name}</span>}
+          </p>
         </div>
-        {isPresident && !creating && (
-          <button
-            onClick={() => setCreating(true)}
-            aria-label="Criar torneio"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[9px] font-black uppercase"
-          >
-            <Plus size={12} aria-hidden="true" /> Novo
-          </button>
+      </header>
+
+      <nav className="flex border-b border-border-subtle">
+        {tour.format === 'knockout' && (
+          <TabBtn active={activeTab === 'bracket'} onClick={() => setTab('bracket')}>Chaveamento</TabBtn>
         )}
-      </div>
+        {tour.format === 'round_robin' && (
+          <TabBtn active={activeTab === 'table'} onClick={() => setTab('table')}>Tabela</TabBtn>
+        )}
+        <TabBtn active={activeTab === 'matches'} onClick={() => setTab('matches')}>Partidas</TabBtn>
+        <TabBtn active={activeTab === 'ranking'} onClick={() => setTab('ranking')}>Ranking</TabBtn>
+      </nav>
 
-      {/* Formulário de criação */}
-      {creating && (
-        <div className="bg-surface-1 border border-border-mid rounded-3xl p-5 space-y-4">
-          <h2 className="text-[11px] font-black uppercase text-white">Novo Torneio</h2>
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Nome do torneio (ex: Copa Verão)"
-            className="w-full bg-surface-2 border border-border-mid rounded-xl px-4 py-2.5 text-[12px] text-white"
-            aria-label="Nome do torneio"
-          />
-          <div className="flex gap-2">
-            <input
-              value={teamInput}
-              onChange={e => setTeamInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && teamInput.trim()) { setSelTeams(t => [...t, teamInput.trim()]); setTeamInput(''); } }}
-              placeholder="Nome do time → Enter para adicionar"
-              className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-[12px] text-white"
-              aria-label="Adicionar time"
-            />
-            <button
-              onClick={() => { if (teamInput.trim()) { setSelTeams(t => [...t, teamInput.trim()]); setTeamInput(''); } }}
-              className="px-3 py-2 rounded-xl bg-surface-3 border border-border-mid text-text-low hover:text-white"
-              aria-label="Adicionar"
-            >
-              <Plus size={14} aria-hidden="true" />
-            </button>
-          </div>
-          {selTeams.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selTeams.map((t, i) => (
-                <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2 border border-border-mid text-[10px] font-black text-white">
-                  {t}
-                  <button onClick={() => setSelTeams(ts => ts.filter((_, j) => j !== i))} aria-label={`Remover ${t}`} className="text-text-muted hover:text-red-400">×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button onClick={() => setCreating(false)} className="flex-1 py-2.5 rounded-2xl bg-surface-2 border border-border-mid text-text-low text-[10px] font-black uppercase">Cancelar</button>
-            <button onClick={handleCreate} className="flex-1 py-2.5 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[10px] font-black uppercase">Criar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Torneio ativo */}
-      {active && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black text-white">{active.name}</h2>
-              <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
-                {active.status === 'finished' ? `🏆 Campeão: ${active.champion}` : `${active.teams?.length ?? 0} times · ${active.format}`}
-              </p>
-            </div>
-            {active.status === 'draft' && isPresident && (
-              <button
-                onClick={handleGenerateBracket}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-[9px] font-black uppercase"
-              >
-                <Play size={12} aria-hidden="true" /> Iniciar
-              </button>
-            )}
-          </div>
-
-          {/* Chaveamento por rodada */}
-          {Object.entries(byRound).map(([round, rMatches]) => (
-            <div key={round} className="space-y-2">
-              <p className="text-[9px] font-black uppercase text-text-low tracking-widest px-1">
-                {roundLabels[Number(round)] ?? `Rodada ${round}`}
-              </p>
-              <div className="space-y-2">
-                {rMatches.map(m => (
-                  <MatchCard
-                    key={m.id}
-                    match={m}
-                    canEdit={isPresident && active.status === 'active'}
-                    onResult={() => { loadMatches(); loadTournaments(); }}
-                  />
+      <main className="p-5 space-y-4">
+        {activeTab === 'bracket' && (
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {rounds.map(r => (
+              <div key={r} className="min-w-[220px] space-y-2 shrink-0">
+                <h3 className="font-black text-[10px] uppercase text-text-low tracking-widest">
+                  {roundName(r, rounds.length)}
+                </h3>
+                {matches.filter(m => m.round === r).map(m => (
+                  <MatchCard key={m.id} m={m} teamById={teamById}
+                    onOpen={() => navigate(`/torneio/${id}/partida/${m.id}`)} />
                 ))}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
 
-          {matches.length === 0 && active.status === 'draft' && (
-            <div className="text-center py-8 text-text-muted text-[11px]">
-              {isPresident ? 'Clique em Iniciar para gerar o chaveamento.' : 'Aguardando o presidente iniciar o torneio.'}
-            </div>
-          )}
-        </div>
-      )}
+        {activeTab === 'table' && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-text-low text-[10px] font-black uppercase">
+                <tr>
+                  <th className="text-left py-2">#</th>
+                  <th className="text-left">Time</th>
+                  <th className="text-center">P</th>
+                  <th className="text-center">V</th>
+                  <th className="text-center">E</th>
+                  <th className="text-center">D</th>
+                  <th className="text-center">SG</th>
+                  <th className="text-center">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((r, i) => (
+                  <tr key={r.team.id} className="border-t border-border-subtle">
+                    <td className="py-2 text-text-muted">{i + 1}</td>
+                    <td className="font-black">{r.team.name}</td>
+                    <td className="text-center tabular-nums">{r.P}</td>
+                    <td className="text-center tabular-nums">{r.V}</td>
+                    <td className="text-center tabular-nums">{r.E}</td>
+                    <td className="text-center tabular-nums">{r.D}</td>
+                    <td className="text-center tabular-nums">{r.SG}</td>
+                    <td className="text-center font-black text-yellow-400 tabular-nums">{r.Pts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {/* Lista de torneios anteriores */}
-      {tournaments.filter(t => t.id !== active?.id).length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[9px] font-black uppercase text-text-low tracking-widest">Anteriores</p>
-          {tournaments.filter(t => t.id !== active?.id).map(t => (
-            <button
-              key={t.id}
-              onClick={() => { setActive(t); loadMatches(); }}
-              className="w-full flex items-center justify-between p-4 bg-surface-1 border border-border-subtle rounded-2xl hover:bg-surface-2 transition-colors"
-            >
-              <div className="text-left">
-                <p className="text-[11px] font-black text-white">{t.name}</p>
-                {t.champion && <p className="text-[9px] text-yellow-400 font-black">🏆 {t.champion}</p>}
-              </div>
-              <ChevronRight size={14} className="text-text-muted" aria-hidden="true" />
-            </button>
-          ))}
-        </div>
-      )}
+        {activeTab === 'matches' && (
+          <div className="space-y-2">
+            {matches.map(m => (
+              <MatchCard key={m.id} m={m} teamById={teamById} showRound
+                onOpen={() => navigate(`/torneio/${id}/partida/${m.id}`)} />
+            ))}
+          </div>
+        )}
 
-      {!active && !creating && tournaments.length === 0 && (
-        <div className="text-center py-16 text-text-muted">
-          <Trophy size={32} className="mx-auto mb-3 opacity-20" aria-hidden="true" />
-          <p className="text-[11px] font-black uppercase">Nenhum torneio ainda</p>
-          {isPresident && <p className="text-[10px] mt-1">Clique em Novo para criar</p>}
-        </div>
-      )}
+        {activeTab === 'ranking' && (
+          <div className="space-y-6">
+            <RankList title="🥇 Artilheiros" items={topScorers} field="goals" />
+            <RankList title="🎯 Assistências" items={topAssists} field="assists" />
+            <RankList title="🟨 Cartões amarelos" items={topYellows} field="yellow_cards" />
+            <RankList title="🟥 Cartões vermelhos" items={topReds} field="red_cards" />
+            <RankList title="🚫 Faltas cometidas" items={topFouls} field="fouls" />
+          </div>
+        )}
+      </main>
     </div>
   );
+}
+
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${
+        active ? 'border-b-2 border-cyan-electric text-cyan-electric' : 'text-text-low'
+      }`}>
+      {children}
+    </button>
+  );
+}
+
+function MatchCard({ m, teamById, onOpen, showRound }) {
+  const a = teamById[m.team_a_id];
+  const b = teamById[m.team_b_id];
+  const finished = m.status === 'finished';
+
+  return (
+    <button type="button" onClick={onOpen}
+      className="w-full bg-surface-1 border border-border-subtle rounded-2xl p-4 text-left hover:border-border-mid transition-colors active:scale-[0.99]">
+      {showRound && <div className="text-[9px] text-text-muted font-black uppercase mb-1">Rodada {m.round}</div>}
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[11px] font-black flex-1 truncate ${m.winner_team_id === a?.id ? 'text-yellow-400' : ''}`}>
+          {a?.name || '—'}
+        </span>
+        <span className="font-black tabular-nums text-sm shrink-0">
+          {finished ? `${m.score_a ?? 0} × ${m.score_b ?? 0}` : 'vs'}
+        </span>
+        <span className={`text-[11px] font-black flex-1 truncate text-right ${m.winner_team_id === b?.id ? 'text-yellow-400' : ''}`}>
+          {b?.name || '—'}
+        </span>
+      </div>
+      {!finished && m.team_a_id && m.team_b_id && (
+        <div className="flex items-center gap-1 text-[9px] text-cyan-electric/70 font-black uppercase mt-2">
+          <Play size={10} /> tocar para registrar
+        </div>
+      )}
+    </button>
+  );
+}
+
+function RankList({ title, items, field }) {
+  return (
+    <div>
+      <h3 className="font-black uppercase text-xs mb-2">{title}</h3>
+      {items.length === 0 && <p className="text-text-muted text-sm">Sem dados ainda.</p>}
+      <ul className="space-y-1">
+        {items.map((it, i) => (
+          <li key={`${it.player_name}-${i}`} className="flex justify-between bg-surface-1 border border-border-subtle rounded-xl px-4 py-2.5 text-sm">
+            <span className="font-black">{i + 1}. {it.player_name}</span>
+            <span className="font-black text-yellow-400 tabular-nums">{it[field]}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function roundName(r, total) {
+  const fromEnd = total - r;
+  if (fromEnd === 0) return 'Final';
+  if (fromEnd === 1) return 'Semifinal';
+  if (fromEnd === 2) return 'Quartas';
+  if (fromEnd === 3) return 'Oitavas';
+  return `Rodada ${r}`;
 }

@@ -298,6 +298,8 @@ const ProfilePage = () => {
         onClose={() => setShowShare(false)}
         rankingType="profile"
         profileData={profileShareData}
+        babaName={currentBaba?.name}
+        babaLogo={currentBaba?.logo_url}
       />
     </div>
   );

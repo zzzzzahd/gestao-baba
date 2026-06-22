@@ -121,7 +121,7 @@
       "name": "Torneio",
       "short_name": "Torneio",
       "description": "Modo mata-mata",
-      "url": "/tournament",
+      "url": "/home",
       "icons": [
         {
           "src": "/icons/icon-192x192.png",

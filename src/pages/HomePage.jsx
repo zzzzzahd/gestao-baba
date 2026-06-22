@@ -2,11 +2,13 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
+import { supabase } from '../services/supabase';
 import {
   Plus, LogIn, Trophy, User,
-  ArrowRight, Zap, Users, CheckCircle2, Clock
+  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight
 } from 'lucide-react';
 import Logo from '../components/Logo';
+import CreateTournamentModal from '../components/CreateTournamentModal';
 import toast from 'react-hot-toast';
 // Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
@@ -257,12 +259,14 @@ const FABMenu = ({ onClose, onCreate, onJoin }) => (
 // ─── Componente principal ────────────────────────────────────────────────────
 const HomePage = () => {
   const navigate  = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { myBabas, setCurrentBaba, joinBaba, loading, syncData } = useBaba();
 
   const [invite, setInvite]     = useState('');
   const [fabOpen, setFabOpen]   = useState(false);
   const [joining, setJoining]   = useState(false);
+  const [showTournament, setShowTournament] = useState(false);
+  const [tournaments, setTournaments] = useState([]);
 
   const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
   const restBabas = useMemo(() => myBabas?.slice(1) || [], [myBabas]);
@@ -270,6 +274,15 @@ const HomePage = () => {
   const hasBabas  = myBabas?.length > 0;
 
   const joinBoxRef = useRef(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('tournaments')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setTournaments(data || []));
+  }, [user?.id]);
 
   // Tarefa 4.2 — Pull-to-refresh
   const { pulling, pullY, refreshing, progress } = usePullToRefresh(
@@ -359,6 +372,57 @@ const HomePage = () => {
         </>
       )}
 
+      {/* ── Torneios standalone (sem baba) ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest flex items-center gap-2">
+            <Trophy size={12} className="text-yellow-400" /> Meus Torneios
+          </h3>
+          <button
+            onClick={() => setShowTournament(true)}
+            className="text-[9px] font-black uppercase text-yellow-400 hover:text-yellow-300 transition-colors"
+          >
+            + Criar
+          </button>
+        </div>
+
+        {tournaments.length > 0 ? (
+          <div className="space-y-2">
+            {tournaments.map(t => (
+              <button
+                key={t.id}
+                onClick={() => navigate(`/torneio/${t.id}`)}
+                className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-border-mid flex items-center justify-between transition-all active:scale-[0.99]"
+              >
+                <div className="text-left">
+                  <p className="font-black text-sm">{t.name}</p>
+                  <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
+                    {t.sport} · {t.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {t.status === 'finished' && (
+                    <span className="text-[8px] bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-0.5 rounded-lg font-black uppercase">
+                      Finalizado
+                    </span>
+                  )}
+                  <ChevronRight size={14} className="text-text-muted" />
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowTournament(true)}
+            className="w-full p-5 rounded-2xl border border-dashed border-border-mid text-center hover:border-yellow-400/30 hover:bg-yellow-400/5 transition-all"
+          >
+            <Trophy size={24} className="mx-auto mb-2 text-yellow-400/40" />
+            <p className="text-[11px] font-black uppercase text-text-low">Nenhum torneio ainda</p>
+            <p className="text-[10px] text-text-muted mt-1">Crie um torneio avulso com times e jogadores manuais</p>
+          </button>
+        )}
+      </div>
+
       {/* ── Join Box — sempre no final ── */}
       <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-border-subtle">
         <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
@@ -402,6 +466,16 @@ const HomePage = () => {
           <FAB onClick={() => setFabOpen(v => !v)} />
         </>
       )}
+
+      <CreateTournamentModal
+        open={showTournament}
+        onClose={() => setShowTournament(false)}
+        userId={user?.id}
+        onCreated={(t) => {
+          setTournaments(prev => [t, ...prev]);
+          navigate(`/torneio/${t.id}`);
+        }}
+      />
     </div>
   );
 };

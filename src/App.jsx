@@ -28,7 +28,8 @@ import TermsPage          from './pages/TermsPage';
 import FollowersPage      from './pages/FollowersPage';
 import JoinPage           from './pages/JoinPage';
 import ComparisonPage     from './pages/ComparisonPage';
-import TournamentPage     from './pages/TournamentPage';
+import TournamentPage       from './pages/TournamentPage';
+import TournamentMatchPage  from './pages/TournamentMatchPage';
 
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -157,7 +158,9 @@ const AppInner = () => {
         <Route path="/history"    element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
         <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/tournament" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/torneio/:id" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
+        <Route path="/tournament" element={<Navigate to="/home" replace />} />
         <Route path="/teams" element={<Navigate to="/draw" replace />} />
         <Route path="/match" element={<Navigate to="/draw" replace />} />
       </Routes>

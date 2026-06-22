@@ -22,15 +22,16 @@ const TYPE_STAT_LABEL = {
 };
 
 // ── Card de RANKING (artilheiro/garçom/mvp) ───────────────────────────────────
-const RankingCardContent = ({ rankingType, rankingData, babaName, babaLogo, today }) => {
+const RankingCardContent = ({ rankingType, rankingData, babaName, babaLogo, today, matchData }) => {
   const topPlayer  = rankingData?.[0] ?? null;
   const topScorers = rankingData?.slice(0, 3) ?? [];
+  const isMatchResult = !!matchData?.winner;
 
   return (
     <div className="relative z-10 flex flex-col items-center h-full px-6 pt-8 pb-6 gap-4">
       {/* Label */}
       <p className="text-cyan-electric font-black italic text-[9px] tracking-[0.4em] uppercase">
-        {TYPE_LABEL[rankingType] ?? 'DESTAQUE'}
+        {isMatchResult ? 'RESULTADO DA PARTIDA' : (TYPE_LABEL[rankingType] ?? 'DESTAQUE')}
       </p>
 
       {/* Baba */}
@@ -42,6 +43,13 @@ const RankingCardContent = ({ rankingType, rankingData, babaName, babaLogo, toda
           {babaName}
         </h2>
       </div>
+
+      {isMatchResult && (
+        <div className="w-full text-center bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2">
+          <p className="text-[8px] font-black text-yellow-500/70 uppercase tracking-widest">Vencedor</p>
+          <p className="text-sm font-black text-yellow-400 uppercase truncate">{matchData.winner}</p>
+        </div>
+      )}
 
       {/* Destaque */}
       {topPlayer && (
@@ -205,6 +213,7 @@ const ShareableCardModal = ({
   profileData,
   // Comum
   babaName, babaLogo,
+  matchData,
 }) => {
   const cardRef  = useRef();
   const [sharing, setSharing] = useState(false);
@@ -320,6 +329,7 @@ const ShareableCardModal = ({
               babaName={babaName}
               babaLogo={babaLogo}
               today={today}
+              matchData={matchData}
             />
           )}
         </div>
