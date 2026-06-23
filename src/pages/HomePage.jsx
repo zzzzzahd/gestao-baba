@@ -10,15 +10,11 @@ import {
 import Logo from '../components/Logo';
 import CreateTournamentModal from '../components/CreateTournamentModal';
 import toast from 'react-hot-toast';
-// Tarefa 1.1 — constantes centralizadas (antes duplicadas aqui e no Dashboard)
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 
 // ─── Countdown hook inline ─────────────────────────────────────────────────────
-// Recebe índice do dia da semana (0=Dom) + horário "HH:MM" e retorna string
-// legível como "2d 3h 15m". Mantido inline para evitar conflito de contexto
-// React entre hooks aninhados em componentes definidos fora do render tree.
 const useCountdown = (targetDayOfWeek, targetTime) => {
   const [display, setDisplay] = useState('');
 
@@ -112,12 +108,10 @@ const HeroBabaCard = ({ baba, onClick }) => {
         boxShadow: '0 0 40px rgba(0,242,255,0.06)',
       }}
     >
-      {/* Label */}
       <p className="text-[9px] font-black text-cyan-electric/50 uppercase tracking-widest mb-3">
         próximo jogo
       </p>
 
-      {/* Nome + logo */}
       <div className="flex items-center gap-3 mb-4">
         {baba.logo_url ? (
           <img src={baba.logo_url} className="w-12 h-12 rounded-2xl object-cover border border-border-mid" alt="" />
@@ -140,7 +134,6 @@ const HeroBabaCard = ({ baba, onClick }) => {
         </div>
       </div>
 
-      {/* Countdown + CTA */}
       <div className="flex items-center justify-between">
         {countdown ? (
           <div className="flex items-center gap-2">
@@ -167,7 +160,6 @@ const BabaListItem = ({ baba, onClick }) => {
   const gameTime = baba.game_time?.substring(0, 5) ?? null;
   const dayLabel = dayIndex != null ? DAY_SHORT[dayIndex] : null;
 
-  // Stub de presença — futuramente virá do contexto
   const confirmed = baba.userConfirmed ?? false;
 
   return (
@@ -302,7 +294,6 @@ const HomePage = () => {
       });
   }, [user?.id]);
 
-  // Tarefa 4.2 — Pull-to-refresh
   const { pulling, pullY, refreshing, progress } = usePullToRefresh(
     async () => { await syncData?.(); },
     { disabled: loading },
@@ -345,122 +336,127 @@ const HomePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white px-5 pt-6 pb-32 space-y-5">
-      <PullToRefreshIndicator pulling={pulling} pullY={pullY} refreshing={refreshing} progress={progress} />
-      {/* ── Topo compacto ── */}
-      <div className="flex items-center justify-between">
-        <Logo size="small" />
-        <button
-          onClick={() => navigate('/profile')}
-          className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden"
-        >
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
-          ) : (
-            <span className="text-cyan-electric font-black text-sm">{initials}</span>
-          )}
-        </button>
-      </div>
+    <>
+      {/* ── Container scrollável ── */}
+      <div className="min-h-screen bg-black text-white px-5 pt-6 pb-32 space-y-5">
+        <PullToRefreshIndicator pulling={pulling} pullY={pullY} refreshing={refreshing} progress={progress} />
 
-      {/* ── Estado vazio OR conteúdo ── */}
-      {!hasBabas ? (
-        <EmptyState onCreateClick={() => navigate('/create')} onJoinFocus={focusJoinBox} />
-      ) : (
-        <>
-          {/* ── Hero: próximo baba ── */}
-          {nextBaba && (
-            <HeroBabaCard baba={nextBaba} onClick={() => openBaba(nextBaba)} />
-          )}
+        {/* ── Topo compacto ── */}
+        <div className="flex items-center justify-between">
+          <Logo size="small" />
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden"
+          >
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
+            ) : (
+              <span className="text-cyan-electric font-black text-sm">{initials}</span>
+            )}
+          </button>
+        </div>
 
-          {/* ── Demais babas (a partir do 2º) ── */}
-          {restBabas.length > 0 && (
+        {/* ── Estado vazio OR conteúdo ── */}
+        {!hasBabas ? (
+          <EmptyState onCreateClick={() => navigate('/create')} onJoinFocus={focusJoinBox} />
+        ) : (
+          <>
+            {/* ── Hero: próximo baba ── */}
+            {nextBaba && (
+              <HeroBabaCard baba={nextBaba} onClick={() => openBaba(nextBaba)} />
+            )}
+
+            {/* ── Demais babas (a partir do 2º) ── */}
+            {restBabas.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1">
+                  Meus Babas ({myBabas.length})
+                </h3>
+                {myBabas.map((baba) => (
+                  <BabaListItem
+                    key={baba.id}
+                    baba={baba}
+                    onClick={() => openBaba(baba)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Torneios standalone (sem baba) ── */}
+        <div className="space-y-3">
+          <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1 flex items-center gap-2">
+            <Trophy size={12} className="text-yellow-400" /> Meus Torneios
+          </h3>
+
+          {tournaments.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1">
-                Meus Babas ({myBabas.length})
-              </h3>
-              {myBabas.map((baba) => (
-                <BabaListItem
-                  key={baba.id}
-                  baba={baba}
-                  onClick={() => openBaba(baba)}
-                />
+              {tournaments.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => navigate(`/torneio/${t.id}`)}
+                  className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-border-mid flex items-center justify-between transition-all active:scale-[0.99]"
+                >
+                  <div className="text-left">
+                    <p className="font-black text-sm">{t.name}</p>
+                    <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
+                      {t.sport} · {t.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {t.status === 'finished' && (
+                      <span className="text-[8px] bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-0.5 rounded-lg font-black uppercase">
+                        Finalizado
+                      </span>
+                    )}
+                    <ChevronRight size={14} className="text-text-muted" />
+                  </div>
+                </button>
               ))}
             </div>
+          ) : (
+            <div className="w-full p-5 rounded-2xl border border-dashed border-border-mid text-center">
+              <Trophy size={24} className="mx-auto mb-2 text-yellow-400/40" />
+              <p className="text-[11px] font-black uppercase text-text-low">Nenhum torneio ainda</p>
+              <p className="text-[10px] text-text-muted mt-1">Toque no + para criar um torneio avulso</p>
+            </div>
           )}
-        </>
-      )}
+        </div>
 
-      {/* ── Torneios standalone (sem baba) ── */}
-      <div className="space-y-3">
-        <h3 className="text-[10px] text-text-low font-black uppercase tracking-widest px-1 flex items-center gap-2">
-          <Trophy size={12} className="text-yellow-400" /> Meus Torneios
-        </h3>
-
-        {tournaments.length > 0 ? (
-          <div className="space-y-2">
-            {tournaments.map(t => (
-              <button
-                key={t.id}
-                onClick={() => navigate(`/torneio/${t.id}`)}
-                className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-border-mid flex items-center justify-between transition-all active:scale-[0.99]"
-              >
-                <div className="text-left">
-                  <p className="font-black text-sm">{t.name}</p>
-                  <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
-                    {t.sport} · {t.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {t.status === 'finished' && (
-                    <span className="text-[8px] bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-0.5 rounded-lg font-black uppercase">
-                      Finalizado
-                    </span>
-                  )}
-                  <ChevronRight size={14} className="text-text-muted" />
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="w-full p-5 rounded-2xl border border-dashed border-border-mid text-center">
-            <Trophy size={24} className="mx-auto mb-2 text-yellow-400/40" />
-            <p className="text-[11px] font-black uppercase text-text-low">Nenhum torneio ainda</p>
-            <p className="text-[10px] text-text-muted mt-1">Toque no + para criar um torneio avulso</p>
-          </div>
-        )}
+        {/* ── Join Box — sempre no final ── */}
+        <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-border-subtle">
+          <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
+            Entrar com código
+          </p>
+          <input
+            value={invite}
+            onChange={e => setInvite(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            placeholder="AB12CD"
+            maxLength={6}
+            className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl text-center tracking-widest font-black text-lg focus:border-cyan-electric/50 outline-none transition-colors"
+          />
+          <button
+            onClick={handleJoin}
+            disabled={invite.length !== 6 || joining}
+            className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+          >
+            {joining ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Entrando...
+              </>
+            ) : 'Entrar no Baba'}
+          </button>
+        </div>
       </div>
+      {/* ── Fim do container scrollável ── */}
 
-      {/* ── Join Box — sempre no final ── */}
-      <div ref={joinBoxRef} className="card-glass p-5 rounded-3xl space-y-3 border border-border-subtle">
-        <p className="text-[10px] text-text-low uppercase font-black tracking-widest">
-          Entrar com código
-        </p>
-        <input
-          value={invite}
-          onChange={e => setInvite(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-          placeholder="AB12CD"
-          maxLength={6}
-          className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl text-center tracking-widest font-black text-lg focus:border-cyan-electric/50 outline-none transition-colors"
-        />
-        <button
-          onClick={handleJoin}
-          disabled={invite.length !== 6 || joining}
-          className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
-        >
-          {joining ? (
-            <>
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              Entrando...
-            </>
-          ) : 'Entrar no Baba'}
-        </button>
-      </div>
-
-      {/* ── FAB — sempre visível ── */}
+      {/* ── FAB e Menu fora do container — position: fixed funciona corretamente ── */}
       {fabOpen && (
         <FABMenu
           onClose={() => setFabOpen(false)}
@@ -480,7 +476,7 @@ const HomePage = () => {
           navigate(`/torneio/${t.id}`);
         }}
       />
-    </div>
+    </>
   );
 };
 
