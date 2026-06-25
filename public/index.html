@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Draft Play - Gestão de Baba</title>
+
+    <!-- PWA Essencial -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#00f2ff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Apple PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Draft Play" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96x96.png" />
+    <link rel="shortcut icon" href="/icons/icon-96x96.png" />
+
+    <!-- SEO e Open Graph -->
+    <meta name="description" content="Sistema profissional de gestão de peladas e babas. Sorteio de times, rankings, presenças e financeiro." />
+    <meta name="keywords" content="baba, pelada, futebol, sorteio times, gestão futebol, draft play" />
+    <meta property="og:title" content="Draft Play - Gestão de Baba" />
+    <meta property="og:description" content="Gestão completa de peladas: times, rankings e presenças." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://gestao-baba.vercel.app/icons/icon-512x512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:url" content="https://gestao-baba.vercel.app" />
+    <meta property="og:site_name" content="Draft Play" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Draft Play - Gestão de Baba" />
+    <meta name="twitter:description" content="Gestão completa de peladas: times, rankings e presenças." />
+    <meta name="twitter:image" content="https://gestao-baba.vercel.app/icons/icon-512x512.png" />
+
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- html2canvas para cartões compartilháveis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Plausible Analytics -->
+    <script defer data-domain="gestao-baba.vercel.app" src="https://plausible.io/js/script.js"></script>
+
+    <style>
+      :root { --cyan-electric: #00f2ff; }
+      .font-display { font-family: 'Rajdhani', sans-serif; }
+      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+      body {
+        margin: 0; padding: 0;
+        background-color: #000000;
+        font-family: 'Inter', sans-serif;
+        color: white;
+        overflow-x: hidden;
+        min-height: 100dvh;
+      }
+      #root { min-height: 100dvh; }
+
+      /* Skip link para acessibilidade */
+      .skip-link {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        background: var(--cyan-electric);
+        color: #000;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        font-family: 'Rajdhani', sans-serif;
+        z-index: 9999;
+        border-radius: 0 0 8px 0;
+        text-decoration: none;
+        transition: top 0.15s;
+      }
+      .skip-link:focus { top: 0; }
+
+      /* Foco visível global */
+      :focus-visible {
+        outline: 2px solid var(--cyan-electric);
+        outline-offset: 3px;
+      }
+      :focus:not(:focus-visible) { outline: none; }
+
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #000; }
+      ::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 10px; box-shadow: 0 0 10px #00f2ff; }
+      button { -moz-user-select: none; user-select: none; -webkit-user-select: none; }
+    </style>
+    <script type="module" crossorigin src="/assets/index-Drx79A6H.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-ZZic4_No.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-DQ_83jfp.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-C71HWTlm.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-eI8T2dNf.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <body>
+    <!-- Skip link: pula direto para o conteúdo principal (a11y / teclado) -->
+    <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
+
+    <div id="root">
+      <main id="main-content"></main>
+    </div>
+
+  </body>
+</html>
