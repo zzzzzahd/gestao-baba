@@ -38,7 +38,18 @@ lerna-debug.log*
 
 # Testes
 coverage/
+test-report.html
+test-results/
 
 # PWA
 public/icons/*.png
 supabase/.temp/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+testsprite_tests\tmp\config.json

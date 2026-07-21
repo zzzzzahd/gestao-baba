@@ -72,5 +72,6 @@ export const useFeatures = () => {
 // Helper para verificar feature específica
 export const hasFeature = (baba, feature) => {
   const mode = baba?.mode ?? 'casual';
-  return !!(FEATURES[mode]?.[feature]);
+  const flags = FEATURES[mode] ?? FEATURES.casual;
+  return !!flags[feature];
 };

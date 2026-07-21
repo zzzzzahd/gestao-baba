@@ -1,0 +1,32 @@
+[
+    {
+        "Dir":  "src/__tests__/utils",
+        "Exit":  0,
+        "TestFiles":  "6 passed (6)\r",
+        "Tests":  "198 passed (198)\r"
+    },
+    {
+        "Dir":  "src/__tests__/hooks",
+        "Exit":  1,
+        "TestFiles":  "6 failed | 3 passed (9)\r",
+        "Tests":  "22 failed | 86 passed (108)\r"
+    },
+    {
+        "Dir":  "src/__tests__/services",
+        "Exit":  0,
+        "TestFiles":  "2 passed (2)\r",
+        "Tests":  "42 passed (42)\r"
+    },
+    {
+        "Dir":  "src/__tests__/security",
+        "Exit":  0,
+        "TestFiles":  "1 passed (1)\r",
+        "Tests":  "7 passed (7)\r"
+    },
+    {
+        "Dir":  "src/__tests__/contexts",
+        "Exit":  1,
+        "TestFiles":  "1 failed (1)\r",
+        "Tests":  "5 failed | 8 passed (13)\r"
+    }
+]

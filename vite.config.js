@@ -10,7 +10,6 @@ export default defineConfig(({ mode }) => {
 
 return {
   define: {
-    // Injeta versão do package.json como variável de ambiente
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(
       process.env.npm_package_version ?? '1.3.0'
     ),
@@ -26,8 +25,6 @@ return {
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'logo.png', 'offline.html'],
-
-      // Manifest gerado pelo plugin (substitui public/manifest.json)
       manifest: {
         name:             'Draft Play - Gestão de Baba',
         short_name:       'Draft Play',
@@ -66,18 +63,11 @@ return {
         categories:                  ['sports', 'utilities'],
         prefer_related_applications: false,
       },
-
-      // Workbox: estratégia de cache por tipo de recurso
       workbox: {
-        // Precache todos os assets gerados pelo Vite (com hash no nome)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-
-        // Nunca cacheia chamadas ao Supabase ou APIs externas
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /supabase\.co/],
-
         runtimeCaching: [
-          // Fontes Google: cache por 1 ano
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
             handler:    'CacheFirst',
@@ -86,7 +76,6 @@ return {
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
-          // Font Awesome CDN: cache por 30 dias
           {
             urlPattern: /^https:\/\/cdnjs\.cloudflare\.com/,
             handler:    'CacheFirst',
@@ -95,7 +84,6 @@ return {
               expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
-          // Imagens do Supabase Storage: NetworkFirst com fallback de cache
           {
             urlPattern: /\.supabase\.co\/storage/,
             handler:    'NetworkFirst',
@@ -105,7 +93,6 @@ return {
               networkTimeoutSeconds: 5,
             },
           },
-          // Imagens locais: CacheFirst
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler:    'CacheFirst',
@@ -116,8 +103,6 @@ return {
           },
         ],
       },
-
-      // Modo desenvolvimento: desabilita PWA para não interferir no hot-reload
       devOptions: {
         enabled: false,
       },
@@ -147,13 +132,16 @@ return {
     globals:     true,
     environment: 'jsdom',
     setupFiles:  ['./src/__tests__/setup.js'],
-    include:     ['src/**/*.{test,spec}.{js,jsx}'],
+    include:     ['src/**/*.{test,spec}.{js,jsx}', 'src/__tests__/**/*.{test,spec}.{js,jsx}'],
     exclude:     ['node_modules', 'dist'],
+    testTimeout: 10000,
+    reporters:   process.env.CI ? ['verbose', 'junit'] : ['verbose'],
+    outputFile:  process.env.CI ? 'test-results/junit.xml' : undefined,
     coverage: {
-      provider:   'v8',
-      reporter:   ['text', 'lcov', 'html'],
-      include:    ['src/utils/**', 'src/services/**', 'src/hooks/**'],
-      thresholds: { lines: 60, functions: 60, branches: 50 },
+      provider:  'v8',
+      reporter:  ['text', 'lcov', 'html', 'json-summary', 'json'],
+      include:   ['src/utils/**', 'src/services/**', 'src/hooks/**', 'src/contexts/**', 'src/components/**'],
+      thresholds: { lines: 60, functions: 60, branches: 50, statements: 60 },
     },
   },
 }; });

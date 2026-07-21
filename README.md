@@ -123,8 +123,10 @@ cp .env.example .env
 Edite o arquivo `.env` com suas credenciais:
 ```env
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua-chave-anon
+VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-anon-publica
 ```
+
+> Guia completo do `.env`: veja [`.env.example`](.env.example)
 
 ### 5. Gere os ícones do PWA
 
@@ -169,7 +171,7 @@ git push -u origin main
 - Importe seu repositório do GitHub
 - Configure as variáveis de ambiente:
   - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - Clique em "Deploy"
 
 ### Via CLI do Vercel
@@ -268,13 +270,34 @@ Contribuições são bem-vindas! Para contribuir:
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
+## 🧪 Testes
+
+Configuração fácil (Windows):
+```powershell
+.\setup-tests.ps1
+```
+
+Ou Linux/macOS:
+```bash
+bash setup-tests.sh
+```
+
+Comandos principais:
+```bash
+npm test                 # unitários + integração
+npm run test:e2e         # E2E no navegador
+npm run test:all         # tudo
+npm run test:coverage    # cobertura
+```
+
+📖 **[GUIA-TESTES.md](GUIA-TESTES.md)** — como configurar e rodar  
+✅ **[CHECKLIST-TESTES.md](CHECKLIST-TESTES.md)** — testa **todas** as funções do app (manual)
+
 ## 📚 Documentação Adicional
 
+- 🧪 [GUIA-TESTES.md](GUIA-TESTES.md) - Configurar e rodar testes
+- ✅ [CHECKLIST-TESTES.md](CHECKLIST-TESTES.md) - Checklist de todas as funções
 - 📱 [PWA-GUIDE.md](PWA-GUIDE.md) - Guia completo de PWA e instalação
-- 💰 [CUSTO-ZERO.md](CUSTO-ZERO.md) - Estratégia de MVP gratuito
-- 🚀 [DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) - Deploy passo a passo
-- ✅ [CHECKLIST-TESTES.md](CHECKLIST-TESTES.md) - Testes antes de lançar
-- ⚡ [QUICK-START.md](QUICK-START.md) - Início rápido em 5 minutos
 
 ## 👨‍💻 Autor
 
