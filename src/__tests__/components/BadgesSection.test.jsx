@@ -77,11 +77,13 @@ describe('BadgesSection › carregado', () => {
   });
 
   it('exibe todos os badges na aba "Todas"', async () => {
+    // com b1 conquistada, o nome real aparece; as demais seguem "???" (bloqueadas)
+    makeFrom(badgeDefs, [{ badge_id: 'b1', earned_at: '2026-01-01' }]);
     mk();
 
     await waitFor(() => {
       expect(screen.getByText('Artilheiro')).toBeInTheDocument();
-      expect(screen.getByText('MVP')).toBeInTheDocument();
+      expect(screen.getAllByText('???').length).toBe(2);
     });
   });
 
@@ -132,6 +134,8 @@ describe('BadgesSection › filtros', () => {
   });
 
   it('filtro ativo "Todas" volta a exibir tudo', async () => {
+    // precisa de uma badge earned, senão "Artilheiro" nunca aparece (fica "???")
+    makeFrom(badgeDefs, [{ badge_id: 'b1', earned_at: '2026-01-01' }]);
     mk();
 
     await waitFor(() => screen.getByText('Artilheiro'));
@@ -150,9 +154,12 @@ describe('BadgesSection › filtros', () => {
 
 describe('BadgesSection › empty state', () => {
   it('exibe "Nenhuma conquista ainda" quando earned vazio e filtro=earned', async () => {
-    mk();
+    mk(); // earned=[] (padrão) é o cenário correto para este teste
 
-    await waitFor(() => screen.getByText('Artilheiro'));
+    // espera o carregamento terminar sem depender de nenhuma badge conquistada
+    await waitFor(() =>
+      expect(screen.getByText('Conquistas')).toBeInTheDocument()
+    );
 
     fireEvent.click(
       screen.getByRole('button', { name: /conquistadas/i })

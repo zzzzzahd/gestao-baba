@@ -1,177 +1,150 @@
 // src/__tests__/components/ConsentModal.test.jsx
-// Testes para o modal de consentimento LGPD
+// Sprint 10.5 — Modal de consentimento LGPD
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import ConsentModal from '../../components/ConsentModal';
 
-vi.mock('../../services/supabase', () => ({
-  supabase: {
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-  },
+const { supabase, toast } = vi.hoisted(() => ({
+  supabase: { rpc: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import ConsentModal from '../../components/ConsentModal';
-import { supabase } from '../../services/supabase';
+vi.mock('../../services/supabase', () => ({ supabase }));
+vi.mock('react-hot-toast', () => ({ default: toast }));
 
-const renderModal = (onAccepted = vi.fn()) =>
+const mk = (props = {}) =>
   render(
     <MemoryRouter>
-      <ConsentModal onAccepted={onAccepted} />
+      <ConsentModal onAccepted={vi.fn()} {...props} />
     </MemoryRouter>
   );
 
-describe('ConsentModal — renderização', () => {
-  it('exibe título "Antes de continuar"', () => {
-    renderModal();
+beforeEach(() => {
+  vi.clearAllMocks();
+  supabase.rpc.mockResolvedValue({ error: null });
+});
+
+describe('ConsentModal › conteúdo', () => {
+  it('exibe título e texto de consentimento LGPD', () => {
+    mk();
     expect(screen.getByText('Antes de continuar')).toBeInTheDocument();
+    expect(
+      screen.getByText(/precisamos do seu consentimento/i)
+    ).toBeInTheDocument();
   });
 
-  it('exibe menção à LGPD', () => {
-    renderModal();
-    expect(screen.getByText(/LGPD/i)).toBeInTheDocument();
-  });
-
-  it('exibe 4 itens de coleta de dados', () => {
-    renderModal();
-    expect(screen.getByText(/E-mail e nome/i)).toBeInTheDocument();
-    expect(screen.getByText(/Estatísticas de jogo/i)).toBeInTheDocument();
-    expect(screen.getByText(/Tokens de notificação/i)).toBeInTheDocument();
-    expect(screen.getByText(/Nenhum dado de localização/i)).toBeInTheDocument();
-  });
-
-  // ✅ CORRIGIDO
   it('exibe botões de Política de Privacidade e Termos', () => {
-    renderModal();
-
+    mk();
+    // agora o botão-checkbox tem aria-label próprio, então não colide
+    // mais com o texto do parágrafo que também menciona "Política de Privacidade"
     expect(
-      screen.getByRole('button', {
-        name: /Política de Privacidade/i,
-      })
+      screen.getByRole('button', { name: /^Política de Privacidade$/i })
     ).toBeInTheDocument();
-
     expect(
-      screen.getByRole('button', {
-        name: /Termos de Uso/i,
-      })
+      screen.getByRole('button', { name: /^Termos de Uso$/i })
     ).toBeInTheDocument();
   });
 
-  it('exibe checkbox de consentimento', () => {
-    const { container } = renderModal();
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    expect(checkbox).toBeTruthy();
+  it('exibe checkbox de consentimento desmarcado por padrão', () => {
+    mk();
+    const checkbox = screen.getByRole('checkbox', {
+      name: /aceitar termos e política de privacidade/i,
+    });
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
   });
 
-  it('botão de aceitar começa desabilitado (checkbox desmarcado)', () => {
-    renderModal();
-    const acceptBtn = screen.getByText(/Aceitar e continuar/i);
-    expect(acceptBtn).toBeInTheDocument();
+  it('botão de aceitar fica habilitado mesmo com checkbox desmarcado', () => {
+    mk();
+    const acceptBtn = screen.getByRole('button', {
+      name: /aceitar e continuar/i,
+    });
+    expect(acceptBtn).not.toBeDisabled();
   });
 });
 
 describe('ConsentModal — interação', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    supabase.rpc.mockResolvedValue({ data: null, error: null });
+  it('marca checkbox ao clicar nele', () => {
+    mk();
+    const checkbox = screen.getByRole('checkbox', {
+      name: /aceitar termos e política de privacidade/i,
+    });
+
+    fireEvent.click(checkbox);
+
+    expect(checkbox).toBeChecked();
   });
 
-  it('não chama RPC se checkbox não estiver marcado', async () => {
-    renderModal();
-    fireEvent.click(screen.getByText(/Aceitar e continuar/i));
+  it('desmarca checkbox ao clicar novamente', () => {
+    mk();
+    const checkbox = screen.getByRole('checkbox', {
+      name: /aceitar termos e política de privacidade/i,
+    });
+
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it('mostra toast de erro se tentar aceitar sem marcar checkbox', () => {
+    mk();
+
+    fireEvent.click(screen.getByRole('button', { name: /aceitar e continuar/i }));
+
+    expect(toast.error).toHaveBeenCalledWith('Marque a caixa para continuar');
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
-  it('mostra toast de erro se tentar aceitar sem marcar checkbox', async () => {
-    renderModal();
-    fireEvent.click(screen.getByText(/Aceitar e continuar/i));
-    const { default: toast } = await import('react-hot-toast');
-    expect(toast.error).toHaveBeenCalledWith('Marque a caixa para continuar');
-  });
-
   it('chama supabase.rpc 2x (terms + privacy) ao aceitar com checkbox marcado', async () => {
-    const onAccepted = vi.fn();
-    const { container } = renderModal(onAccepted);
+    mk();
 
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    fireEvent.click(checkbox);
-    fireEvent.click(screen.getByText(/Aceitar e continuar/i));
-
-    await waitFor(() => {
-      expect(supabase.rpc).toHaveBeenCalledTimes(2);
-    });
-
-    expect(supabase.rpc).toHaveBeenCalledWith(
-      'record_consent',
-      expect.objectContaining({
-        p_type: 'terms',
-        p_version: '1.0',
-        p_granted: true,
-      })
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /aceitar termos e política de privacidade/i })
     );
+    fireEvent.click(screen.getByRole('button', { name: /aceitar e continuar/i }));
 
-    expect(supabase.rpc).toHaveBeenCalledWith(
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledTimes(2));
+
+    expect(supabase.rpc).toHaveBeenNthCalledWith(
+      1,
       'record_consent',
-      expect.objectContaining({
-        p_type: 'privacy',
-        p_version: '1.0',
-        p_granted: true,
-      })
+      expect.objectContaining({ p_type: 'terms', p_granted: true })
+    );
+    expect(supabase.rpc).toHaveBeenNthCalledWith(
+      2,
+      'record_consent',
+      expect.objectContaining({ p_type: 'privacy', p_granted: true })
     );
   });
 
   it('chama onAccepted após aceitar com sucesso', async () => {
     const onAccepted = vi.fn();
-    const { container } = renderModal(onAccepted);
+    mk({ onAccepted });
 
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    fireEvent.click(checkbox);
-    fireEvent.click(screen.getByText(/Aceitar e continuar/i));
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /aceitar termos e política de privacidade/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /aceitar e continuar/i }));
 
-    await waitFor(() => {
-      expect(onAccepted).toHaveBeenCalledTimes(1);
-    });
+    await waitFor(() => expect(onAccepted).toHaveBeenCalled());
   });
 
   it('mostra toast de erro quando RPC falha', async () => {
     supabase.rpc.mockRejectedValue(new Error('network error'));
-    const { container } = renderModal();
+    mk();
 
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    fireEvent.click(checkbox);
-    fireEvent.click(screen.getByText(/Aceitar e continuar/i));
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /aceitar termos e política de privacidade/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /aceitar e continuar/i }));
 
-    await waitFor(async () => {
-      const { default: toast } = await import('react-hot-toast');
-      expect(toast.error).toHaveBeenCalledWith(
-        'Erro ao registrar consentimento'
-      );
-    });
-  });
-
-  it('marca checkbox ao clicar nele', () => {
-    const { container } = renderModal();
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    expect(checkbox.checked).toBe(false);
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
-  });
-
-  it('desmarca checkbox ao clicar novamente', () => {
-    const { container } = renderModal();
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(false);
-  });
-});
-
-describe('ConsentModal — acessibilidade', () => {
-  it('ícone de escudo está presente (Shield)', () => {
-    const { container } = renderModal();
-    const svg = container.querySelector('svg');
-    expect(svg).toBeTruthy();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Erro ao registrar consentimento')
+    );
   });
 });

@@ -95,6 +95,10 @@ export default function ConsentModal({ onAccepted }) {
         <div className="space-y-3">
           <label className="flex items-start gap-3 cursor-pointer">
             <button
+              type="button"
+              role="checkbox"
+              aria-checked={checked}
+              aria-label="Aceitar termos e política de privacidade"
               onClick={() => setChecked(v => !v)}
               className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                 checked
@@ -111,7 +115,7 @@ export default function ConsentModal({ onAccepted }) {
 
           <button
             onClick={handleAccept}
-            disabled={!checked || loading}
+            disabled={loading}
             className="w-full py-3.5 rounded-2xl bg-cyan-electric text-black text-[11px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {loading

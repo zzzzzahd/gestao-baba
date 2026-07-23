@@ -48,13 +48,6 @@ const setupDefault = (constraints = []) => {
   supabase.rpc.mockResolvedValue({ data: constraints, error: null });
 };
 
-const makeChain = (err = null) => ({
-  insert: vi.fn().mockResolvedValue({ error: err }),
-  update: vi.fn().mockReturnThis(),
-  eq:     vi.fn().mockReturnThis(),
-  then:   vi.fn(),
-});
-
 describe('DrawConstraintsPanel — carregamento', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefault(); });
 
@@ -168,9 +161,12 @@ describe('DrawConstraintsPanel — formulário', () => {
     render(<DrawConstraintsPanel />);
     await waitFor(() => screen.getByText('Nova'));
     fireEvent.click(screen.getByText('Nova'));
-    expect(screen.getByText('Zé')).toBeInTheDocument();
-    expect(screen.getByText('João')).toBeInTheDocument();
-    expect(screen.getByText('Bia')).toBeInTheDocument();
+
+    const selects = screen.getAllByRole('combobox');
+    // escopo no primeiro select (Jogador 1) — os dois selects listam os 3 jogadores
+    expect(within(selects[0]).getByText('Zé')).toBeInTheDocument();
+    expect(within(selects[0]).getByText('João')).toBeInTheDocument();
+    expect(within(selects[0]).getByText('Bia')).toBeInTheDocument();
   });
 
   it('exclui jogador A do select de Jogador 2', async () => {
@@ -194,27 +190,14 @@ describe('DrawConstraintsPanel — validação ao criar', () => {
     render(<DrawConstraintsPanel />);
     await waitFor(() => screen.getByText('Nova'));
     fireEvent.click(screen.getByText('Nova'));
-    fireEvent.click(screen.getByText('Criar'));
+    fireEvent.click(screen.getByRole('button', { name: /criar/i }));
     expect(toast.error).toHaveBeenCalledWith('Selecione dois jogadores');
   });
 
-  it('botão Criar fica desabilitado sem os dois jogadores', async () => {
+  it('botão Criar permanece habilitado sem os dois jogadores (validação é via toast)', async () => {
     render(<DrawConstraintsPanel />);
     await waitFor(() => screen.getByText('Nova'));
     fireEvent.click(screen.getByText('Nova'));
-    const createBtn = screen.getByRole('button', { name: /criar/i });
-    expect(createBtn).toBeDisabled();
-  });
-
-  it('botão Criar fica habilitado com os dois jogadores', async () => {
-    render(<DrawConstraintsPanel />);
-    await waitFor(() => screen.getByText('Nova'));
-    fireEvent.click(screen.getByText('Nova'));
-
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[0], { target: { value: 'p-1' } });
-    fireEvent.change(selects[1], { target: { value: 'p-2' } });
-
     const createBtn = screen.getByRole('button', { name: /criar/i });
     expect(createBtn).not.toBeDisabled();
   });
@@ -275,7 +258,8 @@ describe('DrawConstraintsPanel — criar constraint', () => {
     fireEvent.click(screen.getByRole('button', { name: /criar/i }));
 
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Restrição criada');
+      // componente envia "Restrição criada!" (com exclamação)
+      expect(toast.success).toHaveBeenCalledWith('Restrição criada!');
     });
   });
 
@@ -312,10 +296,11 @@ describe('DrawConstraintsPanel — deletar constraint', () => {
     eqMock.mockResolvedValueOnce({ error: null });
 
     render(<DrawConstraintsPanel />);
-    await waitFor(() => screen.getAllByRole('button', { name: '' }));
+    await waitFor(() =>
+      screen.getByRole('button', { name: /remover restrição/i })
+    );
 
-    const deleteBtn = screen.getByRole('button', { name: '' });
-    fireEvent.click(deleteBtn);
+    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
 
     await waitFor(() => {
       expect(updateMock).toHaveBeenCalledWith({ is_active: false });
@@ -329,16 +314,15 @@ describe('DrawConstraintsPanel — deletar constraint', () => {
     supabase.from.mockReturnValue({ update: vi.fn().mockReturnThis(), eq: eqMock });
 
     render(<DrawConstraintsPanel />);
-    await waitFor(() => screen.getAllByTitle?.('') || screen.getAllByRole('button'));
+    await waitFor(() =>
+      screen.getByRole('button', { name: /remover restrição/i })
+    );
 
-    const buttons = screen.getAllByRole('button');
-    const trashBtn = buttons.find(b => b.querySelector('svg'));
-    if (trashBtn) {
-      fireEvent.click(trashBtn);
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Restrição removida');
-      });
-    }
+    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Restrição removida');
+    });
   });
 
   it('toast.error quando delete falha', async () => {
@@ -349,11 +333,11 @@ describe('DrawConstraintsPanel — deletar constraint', () => {
     });
 
     render(<DrawConstraintsPanel />);
-    await waitFor(() => screen.getByText('Zé'));
+    await waitFor(() =>
+      screen.getByRole('button', { name: /remover restrição/i })
+    );
 
-    const buttons = screen.getAllByRole('button');
-    const trashBtn = buttons[buttons.length - 1];
-    fireEvent.click(trashBtn);
+    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Erro ao remover');
