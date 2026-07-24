@@ -9,7 +9,7 @@ import { MemoryRouter } from 'react-router-dom';
 import TournamentPage from '../../pages/TournamentPage';
 
 // ── React Router ──────────────────────────────────────────────────────────────
-const mockNavigate = vi.fn();
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 let mockParams = { id: 'tour1' };
 
 vi.mock('react-router-dom', async () => {
@@ -28,7 +28,7 @@ vi.mock('../../utils/bracket', () => ({
 }));
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-const mockFrom = vi.fn();
+const { mockFrom } = vi.hoisted(() => ({ mockFrom: vi.fn() }));
 vi.mock('../../services/supabase', () => ({
   supabase: { from: mockFrom },
 }));
