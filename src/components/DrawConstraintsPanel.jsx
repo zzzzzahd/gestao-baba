@@ -253,7 +253,7 @@ export default function DrawConstraintsPanel() {
             </button>
             <button
               onClick={handleCreate}
-              disabled={creating || !playerA || !playerB}
+              disabled={creating}
               className="flex-1 py-2.5 rounded-xl bg-cyan-electric text-black text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
               {creating
@@ -357,6 +357,7 @@ const ConstraintRow = ({ constraint, onDelete }) => {
 
       <button
         onClick={() => onDelete(constraint.player_a_id, constraint.player_b_id, constraint.constraint_type)}
+        aria-label="Remover restrição"
         className="p-2 rounded-xl bg-surface-2 border border-border-mid text-text-muted hover:text-red-400 hover:border-red-500/30 transition-all flex-shrink-0"
       >
         <Trash2 size={12} />

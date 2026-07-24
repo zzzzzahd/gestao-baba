@@ -39,12 +39,10 @@ describe('PushPrompt — visibilidade', () => {
     expect(screen.queryByText('Ativar notificações')).toBeNull();
   });
 
-  it('aparece após 1500ms', async () => {
+  it('aparece após 1500ms', () => {
     render(<PushPrompt />);
     act(() => vi.advanceTimersByTime(1500));
-    await waitFor(() => {
-      expect(screen.getByText('Ativar notificações')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Ativar notificações')).toBeInTheDocument();
   });
 
   it('não renderiza quando permission é "granted"', () => {

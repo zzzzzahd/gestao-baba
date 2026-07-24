@@ -81,7 +81,7 @@ describe('TabOverview', () => {
     vi.clearAllMocks();
     ctxValue = makeCtx();
     try {
-      const m = await import('../../components/TabOverview');
+      const m = await import('../../pages/dashboard/TabOverview');
       TabOverview = m.default;
     } catch {
       TabOverview = null;
@@ -149,7 +149,7 @@ describe('TabManage', () => {
     vi.clearAllMocks();
     ctxValue = makeCtx();
     try {
-      const m = await import('../../components/TabManage');
+      const m = await import('../../pages/dashboard/TabManage');
       TabManage = m.default;
     } catch {
       TabManage = null;
@@ -230,7 +230,7 @@ describe('TabPostGame', () => {
     vi.clearAllMocks();
     ctxValue = makeCtx({ currentMatch: matchData });
     try {
-      const m = await import('../../components/TabPostGame');
+      const m = await import('../../pages/dashboard/TabPostGame');
       TabPostGame = m.default;
     } catch {
       TabPostGame = null;
