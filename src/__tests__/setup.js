@@ -172,6 +172,41 @@ beforeAll(() => {
     requestPermission: vi.fn().mockResolvedValue('granted'),
   };
 
+  // jsdom não implementa os construtores Touch/TouchEvent
+  if (typeof window.Touch === 'undefined') {
+    class Touch {
+      constructor(init) {
+        this.identifier = init.identifier;
+        this.target      = init.target;
+        this.clientX     = init.clientX ?? 0;
+        this.clientY     = init.clientY ?? 0;
+        this.pageX       = init.pageX ?? init.clientX ?? 0;
+        this.pageY       = init.pageY ?? init.clientY ?? 0;
+        this.screenX     = init.screenX ?? init.clientX ?? 0;
+        this.screenY     = init.screenY ?? init.clientY ?? 0;
+        this.radiusX     = init.radiusX ?? 1;
+        this.radiusY     = init.radiusY ?? 1;
+        this.rotationAngle = init.rotationAngle ?? 0;
+        this.force       = init.force ?? 1;
+      }
+    }
+    global.Touch = Touch;
+    window.Touch = Touch;
+  }
+
+  if (typeof window.TouchEvent === 'undefined') {
+    class TouchEvent extends Event {
+      constructor(type, init = {}) {
+        super(type, init);
+        this.touches        = init.touches ?? [];
+        this.targetTouches  = init.targetTouches ?? [];
+        this.changedTouches = init.changedTouches ?? [];
+      }
+    }
+    global.TouchEvent = TouchEvent;
+    window.TouchEvent = TouchEvent;
+  }
+
   // Variáveis de ambiente de teste (sem precisar de .env)
   vi.stubEnv?.('VITE_SUPABASE_URL', 'https://test.supabase.co');
   vi.stubEnv?.('VITE_SUPABASE_PUBLISHABLE_KEY', 'test-anon-key');

@@ -65,18 +65,22 @@ export default function MatchShareButton({ match, babaName, topScorers = [], cla
 
   return (
     <button
-      onClick={handleShare}
-      aria-label="Compartilhar resultado da partida"
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all active:scale-95 ${
-        shared
-          ? 'bg-green-500/10 border-green-500/30 text-green-400'
-          : 'bg-surface-2 border-border-mid text-text-low hover:text-white hover:border-border-strong'
-      } ${className}`}
-    >
-      {shared ? <Check size={15} aria-hidden="true" /> : <Share2 size={15} aria-hidden="true" />}
-      <span className="text-[10px] font-black uppercase tracking-widest">
-        {shared ? 'Compartilhado!' : 'Compartilhar'}
-      </span>
-    </button>
-  );
-}
+      type="button"
+  onClick={handleShare}
+  aria-label={shared ? 'Compartilhado' : 'Compartilhar resultado da partida'}
+  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all active:scale-95 ${
+    shared
+      ? 'bg-green-500/10 border-green-500/30 text-green-400'
+      : 'bg-surface-2 border-border-mid text-text-low hover:text-white hover:border-border-strong'
+  } ${className}`}
+>
+  {shared ? (
+    <Check size={15} aria-hidden="true" />
+  ) : (
+    <Share2 size={15} aria-hidden="true" />
+  )}
+
+  <span className="text-[10px] font-black uppercase tracking-widest">
+    {shared ? 'Compartilhado!' : 'Compartilhar'}
+  </span>
+</button>

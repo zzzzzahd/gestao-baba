@@ -6,6 +6,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import TournamentPage from '../../pages/TournamentPage';
 
 // ── React Router ──────────────────────────────────────────────────────────────
 const mockNavigate = vi.fn();
@@ -78,8 +79,6 @@ const makeFromChain = (tourData = tourKnockout) => {
     return chain;
   });
 };
-
-import TournamentPage from '../../pages/TournamentPage';
 
 const wrap = () => render(<MemoryRouter><TournamentPage /></MemoryRouter>);
 

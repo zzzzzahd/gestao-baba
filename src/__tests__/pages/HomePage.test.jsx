@@ -81,13 +81,13 @@ vi.mock('../../hooks/usePullToRefresh', () => ({
 // Toast
 // -----------------------------------------------------------------------------
 
-const toastError = vi.fn();
-const toastSuccess = vi.fn();
+const mockToastError = vi.fn();
+const mockToastSuccess = vi.fn();
 
 vi.mock('react-hot-toast', () => ({
   default: {
-    error: toastError,
-    success: toastSuccess,
+    error: mockToastError,
+    success: mockToastSuccess,
   },
 }));
 
@@ -95,28 +95,28 @@ vi.mock('react-hot-toast', () => ({
 // Supabase
 // -----------------------------------------------------------------------------
 
-const orderMock = vi.fn(() =>
+const mockOrder = vi.fn(() =>
   Promise.resolve({
     data: [],
     error: null,
   })
 );
 
-const eqMock = vi.fn(() => ({
-  order: orderMock,
+const mockEq = vi.fn(() => ({
+  order: mockOrder,
 }));
 
-const selectMock = vi.fn(() => ({
-  eq: eqMock,
+const mockSelect = vi.fn(() => ({
+  eq: mockEq,
 }));
 
-const fromMock = vi.fn(() => ({
-  select: selectMock,
+const mockFrom = vi.fn(() => ({
+  select: mockSelect,
 }));
 
 vi.mock('../../services/supabase', () => ({
   supabase: {
-    from: fromMock,
+    from: mockFrom,
   },
 }));
 
@@ -220,7 +220,7 @@ beforeEach(() => {
     syncData: vi.fn(),
   };
 
-  orderMock.mockResolvedValue({
+  mockOrder.mockResolvedValue({
     data: [],
     error: null,
   });
@@ -472,14 +472,14 @@ describe('HomePage - torneios', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(fromMock).toHaveBeenCalledWith(
+      expect(mockFrom).toHaveBeenCalledWith(
         'tournaments'
       );
     });
 
-    expect(selectMock).toHaveBeenCalledWith('*');
+    expect(mockSelect).toHaveBeenCalledWith('*');
 
-    expect(eqMock).toHaveBeenCalledWith(
+    expect(mockEq).toHaveBeenCalledWith(
       'user_id',
       'user-1'
     );
@@ -494,7 +494,7 @@ describe('HomePage - torneios', () => {
   });
 
   it('mostra torneios retornados pelo Supabase', async () => {
-    orderMock.mockResolvedValue({
+    mockOrder.mockResolvedValue({
       data: [
         {
           id: 't1',
@@ -515,7 +515,7 @@ describe('HomePage - torneios', () => {
   });
 
   it('abre torneio ao clicar', async () => {
-    orderMock.mockResolvedValue({
+    mockOrder.mockResolvedValue({
       data: [
         {
           id: 't1',
@@ -540,7 +540,7 @@ describe('HomePage - torneios', () => {
   });
 
   it('mostra badge Finalizado', async () => {
-    orderMock.mockResolvedValue({
+    mockOrder.mockResolvedValue({
       data: [
         {
           id: 't2',

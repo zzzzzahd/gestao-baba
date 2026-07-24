@@ -3,6 +3,9 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useRatings } from '../../hooks/useRatings';
+import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
+import { useOfflineQueue } from '../../hooks/useOfflineQueue';
 
 // ─── Mocks globais ────────────────────────────────────────────────────────────
 vi.mock('react-hot-toast', () => ({
@@ -30,8 +33,6 @@ vi.mock('../../services/ratingsService', () => ({
   upsertRating:        (...args) => mockUpsertRating(...args),
   updateManualWeight:  (...args) => mockUpdateManualWeight(...args),
 }));
-
-import { useRatings } from '../../hooks/useRatings';
 
 const currentBaba = { id: 'baba1' };
 const user        = { id: 'user1' };
@@ -119,7 +120,6 @@ describe('useRatings › setManualWeight', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 // useRealtimeMatch
 // ══════════════════════════════════════════════════════════════════════════════
-import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 
 const channelMock = {
   on:          vi.fn().mockReturnThis(),
@@ -188,7 +188,6 @@ describe('useRealtimeMatch', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 // useOfflineQueue
 // ══════════════════════════════════════════════════════════════════════════════
-import { useOfflineQueue } from '../../hooks/useOfflineQueue';
 
 describe('useOfflineQueue', () => {
   beforeEach(() => {

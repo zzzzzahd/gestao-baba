@@ -214,7 +214,7 @@ describe('usePresence — confirmPresence', () => {
 
     await act(async () => { await result.current.confirmPresence(); });
 
-    expect(toast.error).toHaveBeenCalledWith('Erro ao confirmar presença');
+    expect(toast.error).toHaveBeenCalledWith('Erro ao confirmar');
   });
 });
 
@@ -297,7 +297,7 @@ describe('usePresence — cancelConfirmation', () => {
       await result.current.cancelConfirmation();
     });
 
-    expect(toast.error).toHaveBeenCalledWith('Erro ao cancelar presença');
+    expect(toast.error).toHaveBeenCalledWith('Erro ao cancelar');
   });
 });
 

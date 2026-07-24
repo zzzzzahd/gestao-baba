@@ -31,7 +31,7 @@ describe('PrivacyPage — estrutura', () => {
   it('exibe versão e data da política', () => {
     renderPage();
     expect(screen.getByText(/Versão 1\.0/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mai\/2026/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Mai\/2026/i).length).toBeGreaterThan(0);
   });
 
   it('exibe ícone Shield (intro LGPD)', () => {
@@ -42,7 +42,7 @@ describe('PrivacyPage — estrutura', () => {
 
   it('exibe menção à LGPD na introdução', () => {
     renderPage();
-    expect(screen.getByText(/LGPD/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/LGPD/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Lei 13\.709\/2018/i)).toBeInTheDocument();
   });
 });
@@ -109,7 +109,7 @@ describe('PrivacyPage — direitos LGPD', () => {
 
   it('menciona revogação de consentimento', () => {
     renderPage();
-    expect(screen.getByText(/Revogar consentimento/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Revogar consentimento/i).length).toBeGreaterThan(0);
   });
 });
 
@@ -147,12 +147,12 @@ describe('PrivacyPage — compartilhamento', () => {
 
   it('menciona Supabase como parceiro de dados', () => {
     renderPage();
-    expect(screen.getByText(/Supabase/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Supabase/i).length).toBeGreaterThan(0);
   });
 
   it('menciona Sentry como parceiro de monitoramento', () => {
     renderPage();
-    expect(screen.getByText(/Sentry/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Sentry/i).length).toBeGreaterThan(0);
   });
 
   it('menciona Vercel como hospedagem', () => {

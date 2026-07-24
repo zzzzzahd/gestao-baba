@@ -109,7 +109,7 @@ describe('DrawPage — renderização e stepper', () => {
     renderDraw();
     await waitFor(() => screen.getByText('Baba do Zé'));
     expect(screen.getByText('Config')).toBeInTheDocument();
-    expect(screen.getByText('Times')).toBeInTheDocument();
+    expect(screen.getAllByText('Times').length).toBeGreaterThan(0);
     expect(screen.getByText('Partida')).toBeInTheDocument();
   });
 
@@ -167,7 +167,7 @@ describe('DrawPage — StepConfig', () => {
     for (let i = 0; i < 10; i++) {
       fireEvent.click(screen.getByRole('button', { name: '−' }));
     }
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('2', { selector: 'span.text-xl' })).toBeInTheDocument();
   });
 
   it('não aumenta acima de 11', async () => {
@@ -190,22 +190,23 @@ describe('DrawPage — StepConfig', () => {
   it('botão sortear fica desabilitado quando não há confirmados suficientes', async () => {
     setupBaba([]); // sem confirmações
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
-    const drawBtn = screen.getByText('Sortear').closest('button');
+    await waitFor(() => screen.getByText(/Sortear Times/i));
+    const drawBtn = screen.getByText(/Sortear Times/i).closest('button');
     expect(drawBtn).toBeDisabled();
   });
 
   it('botão sortear fica habilitado com confirmados suficientes (≥ 2 × playersPerTeam)', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
-    const drawBtn = screen.getByText('Sortear').closest('button');
+    await waitFor(() => screen.getByText(/Sortear Times/i));
+    const drawBtn = screen.getByText(/Sortear Times/i).closest('button');
     expect(drawBtn).not.toBeDisabled();
   });
 
   it('exibe preview de times e reservas (2 times de 5)', async () => {
     renderDraw();
     await waitFor(() => {
-      expect(screen.getByText(/2 times/i)).toBeInTheDocument();
+      expect(screen.getByText('2', { selector: 'p.text-white' })).toBeInTheDocument();
+      expect(screen.getAllByText('Times').length).toBeGreaterThan(0);
     });
   });
 
@@ -222,10 +223,10 @@ describe('DrawPage — fluxo de sorteio', () => {
 
   it('clica em Sortear e avança para step 2 (Times)', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Sortear'));
+      fireEvent.click(screen.getByText(/Sortear Times/i));
     });
 
     await waitFor(() => {
@@ -237,10 +238,10 @@ describe('DrawPage — fluxo de sorteio', () => {
 
   it('step 2 exibe os times sorteados', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Sortear'));
+      fireEvent.click(screen.getByText(/Sortear Times/i));
     });
 
     await waitFor(() => {
@@ -251,10 +252,10 @@ describe('DrawPage — fluxo de sorteio', () => {
 
   it('step 2 exibe total de jogadores nos times', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Sortear'));
+      fireEvent.click(screen.getByText(/Sortear Times/i));
     });
 
     await waitFor(() => {
@@ -264,10 +265,10 @@ describe('DrawPage — fluxo de sorteio', () => {
 
   it('salva draw result no Supabase ao sortear', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Sortear'));
+      fireEvent.click(screen.getByText(/Sortear Times/i));
     });
 
     await waitFor(() => {
@@ -281,10 +282,10 @@ describe('DrawPage — navegação entre steps', () => {
 
   it('botão voltar no step 2 retorna ao step 1', async () => {
     renderDraw();
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
 
     // Avançar para step 2
-    await act(async () => { fireEvent.click(screen.getByText('Sortear')); });
+    await act(async () => { fireEvent.click(screen.getByText(/Sortear Times/i)); });
     await waitFor(() => screen.getByText('Time A'), { timeout: 5000 });
 
     // Voltar
@@ -321,9 +322,9 @@ describe('DrawPage — constraints no sorteio', () => {
     setupBaba();
     renderDraw();
 
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
     await expect(
-      act(async () => { fireEvent.click(screen.getByText('Sortear')); })
+      act(async () => { fireEvent.click(screen.getByText(/Sortear Times/i)); })
     ).resolves.not.toThrow();
   });
 
@@ -337,9 +338,9 @@ describe('DrawPage — constraints no sorteio', () => {
     setupBaba();
     renderDraw();
 
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
     await expect(
-      act(async () => { fireEvent.click(screen.getByText('Sortear')); })
+      act(async () => { fireEvent.click(screen.getByText(/Sortear Times/i)); })
     ).resolves.not.toThrow();
   });
 
@@ -348,9 +349,9 @@ describe('DrawPage — constraints no sorteio', () => {
     setupBaba();
     renderDraw();
 
-    await waitFor(() => screen.getByText('Sortear'));
+    await waitFor(() => screen.getByText(/Sortear Times/i));
     await expect(
-      act(async () => { fireEvent.click(screen.getByText('Sortear')); })
+      act(async () => { fireEvent.click(screen.getByText(/Sortear Times/i)); })
     ).resolves.not.toThrow();
   });
 });

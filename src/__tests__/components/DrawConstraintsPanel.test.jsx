@@ -283,64 +283,116 @@ describe('DrawConstraintsPanel — criar constraint', () => {
 });
 
 describe('DrawConstraintsPanel — deletar constraint', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const createDeleteChain = (result = { error: null }) => {
+    const chain = {};
+
+    chain.update = vi.fn(() => chain);
+    chain.eq = vi.fn();
+
+    // update(...)
+    //   .eq(...)
+    //   .eq(...)
+    //   .eq(...)
+    //   .eq(...)
+    chain.eq
+      .mockReturnValueOnce(chain)
+      .mockReturnValueOnce(chain)
+      .mockReturnValueOnce(chain)
+      .mockResolvedValueOnce(result);
+
+    return chain;
+  };
 
   it('chama supabase.from("draw_constraints").update com is_active=false', async () => {
     setupDefault([makeConstraint()]);
-    const eqMock     = vi.fn().mockReturnThis();
-    const updateMock = vi.fn().mockReturnThis();
+
+    const chain = createDeleteChain();
+
     supabase.from.mockImplementation((table) => {
-      if (table === 'draw_constraints') return { update: updateMock, eq: eqMock };
-      return { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
+      if (table === 'draw_constraints') return chain;
+      return {};
     });
-    eqMock.mockResolvedValueOnce({ error: null });
 
     render(<DrawConstraintsPanel />);
+
     await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /remover restrição/i })
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.click(
       screen.getByRole('button', { name: /remover restrição/i })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
-
     await waitFor(() => {
-      expect(updateMock).toHaveBeenCalledWith({ is_active: false });
+      expect(chain.update).toHaveBeenCalledWith({
+        is_active: false,
+      });
     });
   });
 
   it('toast.success após deletar com sucesso', async () => {
     setupDefault([makeConstraint()]);
-    const eqMock = vi.fn().mockReturnThis();
-    eqMock.mockResolvedValueOnce({ error: null });
-    supabase.from.mockReturnValue({ update: vi.fn().mockReturnThis(), eq: eqMock });
+
+    const chain = createDeleteChain();
+
+    supabase.from.mockImplementation((table) => {
+      if (table === 'draw_constraints') return chain;
+      return {};
+    });
 
     render(<DrawConstraintsPanel />);
+
     await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /remover restrição/i })
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.click(
       screen.getByRole('button', { name: /remover restrição/i })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
-
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Restrição removida');
+      expect(toast.success).toHaveBeenCalledWith(
+        'Restrição removida'
+      );
     });
   });
 
   it('toast.error quando delete falha', async () => {
     setupDefault([makeConstraint()]);
-    supabase.from.mockReturnValue({
-      update: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockResolvedValue({ error: new Error('fail') }),
+
+    const chain = createDeleteChain({
+      error: new Error('fail'),
+    });
+
+    supabase.from.mockImplementation((table) => {
+      if (table === 'draw_constraints') return chain;
+      return {};
     });
 
     render(<DrawConstraintsPanel />);
+
     await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /remover restrição/i })
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.click(
       screen.getByRole('button', { name: /remover restrição/i })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /remover restrição/i }));
-
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Erro ao remover');
+      expect(toast.error).toHaveBeenCalledWith(
+        'Erro ao remover'
+      );
     });
   });
 });

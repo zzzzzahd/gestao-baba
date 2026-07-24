@@ -117,7 +117,11 @@ const renderCtx = (onMount) =>
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
 describe('BabaProvider — inicialização', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupMocks();
+    useAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { name: 'Zé Presidente' } });
+  });
 
   it('começa com loading=true', () => {
     renderCtx();
@@ -139,7 +143,7 @@ describe('BabaProvider — inicialização', () => {
   });
 
   it('baba permanece null quando user é null', async () => {
-    useAuth.mockReturnValueOnce({ user: null, profile: null });
+    useAuth.mockReturnValue({ user: null, profile: null });
     renderCtx();
     await waitFor(() => {
       expect(screen.getByTestId('loading').textContent).toBe('false');
