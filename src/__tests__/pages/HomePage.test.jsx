@@ -81,8 +81,10 @@ vi.mock('../../hooks/usePullToRefresh', () => ({
 // Toast
 // -----------------------------------------------------------------------------
 
-const mockToastError = vi.fn();
-const mockToastSuccess = vi.fn();
+const { mockToastError, mockToastSuccess } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
+}));
 
 vi.mock('react-hot-toast', () => ({
   default: {
@@ -95,24 +97,28 @@ vi.mock('react-hot-toast', () => ({
 // Supabase
 // -----------------------------------------------------------------------------
 
-const mockOrder = vi.fn(() =>
-  Promise.resolve({
-    data: [],
-    error: null,
-  })
-);
+const { mockOrder, mockEq, mockSelect, mockFrom } = vi.hoisted(() => {
+  const mockOrder = vi.fn(() =>
+    Promise.resolve({
+      data: [],
+      error: null,
+    })
+  );
 
-const mockEq = vi.fn(() => ({
-  order: mockOrder,
-}));
+  const mockEq = vi.fn(() => ({
+    order: mockOrder,
+  }));
 
-const mockSelect = vi.fn(() => ({
-  eq: mockEq,
-}));
+  const mockSelect = vi.fn(() => ({
+    eq: mockEq,
+  }));
 
-const mockFrom = vi.fn(() => ({
-  select: mockSelect,
-}));
+  const mockFrom = vi.fn(() => ({
+    select: mockSelect,
+  }));
+
+  return { mockOrder, mockEq, mockSelect, mockFrom };
+});
 
 vi.mock('../../services/supabase', () => ({
   supabase: {
