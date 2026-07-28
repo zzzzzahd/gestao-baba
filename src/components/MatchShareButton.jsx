@@ -84,3 +84,5 @@ export default function MatchShareButton({ match, babaName, topScorers = [], cla
     {shared ? 'Compartilhado!' : 'Compartilhar'}
   </span>
 </button>
+  );
+}
