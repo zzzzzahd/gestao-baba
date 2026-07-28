@@ -279,48 +279,6 @@ const DashboardPage = () => {
       {/* ── Conteúdo ── */}
       <div className="max-w-xl mx-auto px-5 mt-12 space-y-5">
 
-        {/* Atletas */}
-        <button
-          onClick={() => setShowMembers(true)}
-          className="w-full text-left p-5 rounded-3xl bg-surface-2 border border-border-subtle hover:border-border-mid transition-all active:scale-[0.99] group relative overflow-hidden"
-        >
-          <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={tc.bg} />
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ ...tc.bgAlpha(0.12), ...tc.border(0.25) }}>
-                <Users size={15} style={tc.text} />
-              </div>
-              <div>
-                <p className="text-[9px] font-black text-text-low uppercase tracking-widest mb-1">Atletas Ativos</p>
-                <div className="flex items-center gap-3">
-                  <div className="flex -space-x-3">
-                    {playersWithRatings.slice(0, 4).map((p, i) => (
-                      <div key={p.id || i} className="w-8 h-8 rounded-full border-2 border-surface-2 bg-gray-800 flex items-center justify-center text-[9px] font-black overflow-hidden shadow-lg">
-                        {p.avatar_url
-                          ? <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />
-                          : (p.display_name || '?').charAt(0).toUpperCase()}
-                      </div>
-                    ))}
-                    {players.length > 4 && (
-                      <div className="w-8 h-8 rounded-full border-2 border-surface-2 bg-surface-3 flex items-center justify-center text-[8px] font-black text-text-mid shadow-lg">
-                        +{players.length - 4}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-sm font-black text-white">{players?.length || 0} atletas</span>
-                </div>
-              </div>
-            </div>
-            <div
-              className="flex items-center gap-1 text-[9px] font-black uppercase px-3 py-2 rounded-xl flex-shrink-0 group-hover:gap-1.5 transition-all"
-              style={{ ...tc.bgAlpha(0.1), ...tc.border(0.2), color: tc.color }}
-            >
-              Ver todos <ChevronRight size={11} />
-            </div>
-          </div>
-        </button>
-
-
         {/* ── Tabs ── */}
         <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
           <div className="flex gap-1" role="tablist">
@@ -341,6 +299,47 @@ const DashboardPage = () => {
             ))}
           </div>
         </div>
+
+        {/* Lista de Membros */}
+        <button
+          onClick={() => setShowMembers(true)}
+          className="w-full text-left p-6 rounded-3xl bg-surface-2 border border-border-subtle hover:border-border-mid transition-all active:scale-[0.99] group relative overflow-hidden"
+        >
+          <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={tc.bg} />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ ...tc.bgAlpha(0.14), ...tc.border(0.3) }}>
+                <Users size={20} style={tc.text} />
+              </div>
+              <div>
+                <p className="text-base font-black text-white uppercase tracking-tight leading-tight">Lista de Membros</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <div className="flex -space-x-3">
+                    {playersWithRatings.slice(0, 4).map((p, i) => (
+                      <div key={p.id || i} className="w-8 h-8 rounded-full border-2 border-surface-2 bg-gray-800 flex items-center justify-center text-[9px] font-black overflow-hidden shadow-lg">
+                        {p.avatar_url
+                          ? <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />
+                          : (p.display_name || '?').charAt(0).toUpperCase()}
+                      </div>
+                    ))}
+                    {players.length > 4 && (
+                      <div className="w-8 h-8 rounded-full border-2 border-surface-2 bg-surface-3 flex items-center justify-center text-[8px] font-black text-text-mid shadow-lg">
+                        +{players.length - 4}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs font-bold text-text-low">{players?.length || 0} atletas ativos</span>
+                </div>
+              </div>
+            </div>
+            <div
+              className="flex items-center gap-1 text-[10px] font-black uppercase px-3.5 py-2.5 rounded-xl flex-shrink-0 group-hover:gap-1.5 transition-all"
+              style={{ ...tc.bgAlpha(0.1), ...tc.border(0.2), color: tc.color }}
+            >
+              Ver todos <ChevronRight size={12} />
+            </div>
+          </div>
+        </button>
 
         {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
