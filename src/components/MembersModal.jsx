@@ -2,8 +2,8 @@
 // Corrigido: botão de visitar perfil público de cada membro,
 // suspensão inline, nomear coordenador, badge de papel.
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, ChevronDown, AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, MoreVertical, AlertTriangle, RefreshCw, ExternalLink, Search, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { POSITION_LABEL } from '../utils/constants';
 import { supabase } from '../services/supabase';
@@ -122,8 +122,33 @@ const MembersModal = ({
   const [loading,       setLoading]       = useState(false);
   const [roles,         setRoles]         = useState(new Map());
   const [openMenuId,    setOpenMenuId]    = useState(null);
+  const [search,        setSearch]        = useState('');
 
   const isPresident = String(presidentId) === String(user?.id);
+
+  // Ordena: presidente → coordenadores → resto (por avaliação), busca filtra por nome/posição
+  const visiblePlayers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = term
+      ? players.filter(p => {
+          const name = (p.display_name || p.name || '').toLowerCase();
+          const pos  = (POSITION_LABEL[p.position] || p.position || '').toLowerCase();
+          return name.includes(term) || pos.includes(term);
+        })
+      : players;
+
+    const rank = (p) => {
+      if (String(p.user_id) === String(presidentId)) return 0;
+      if (roles.get(p.user_id) === 'admin') return 1;
+      return 2;
+    };
+
+    return [...filtered].sort((a, b) => {
+      const r = rank(a) - rank(b);
+      if (r !== 0) return r;
+      return (b.final_rating || 0) - (a.final_rating || 0);
+    });
+  }, [players, search, roles, presidentId]);
 
   const loadRoles = useCallback(async () => {
     if (!babaId) return;
@@ -203,25 +228,56 @@ const MembersModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
         <div
-          className="w-full max-w-xl bg-[#0a0a0a] border border-border-mid rounded-t-[2.5rem] p-6 max-h-[85vh] flex flex-col shadow-2xl"
+          className="w-full max-w-xl bg-[#0a0a0a] border border-border-mid rounded-t-[2.5rem] p-6 max-h-[88vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300"
           onClick={e => e.stopPropagation()}
         >
+          {/* Handle visual do bottom sheet */}
+          <div className="w-10 h-1 rounded-full bg-border-mid mx-auto mb-4 -mt-1" />
+
           {/* Header */}
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-black uppercase tracking-widest text-white">Atletas</h2>
-              <p className="text-[10px] text-text-low font-bold uppercase">{players.length} membros</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center">
+                <Users size={18} className="text-cyan-electric" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-tight text-white leading-tight">Atletas</h2>
+                <p className="text-[10px] text-text-low font-bold uppercase tracking-widest">
+                  {players.length} {players.length === 1 ? 'membro' : 'membros'}
+                </p>
+              </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-2xl bg-surface-2 text-text-low hover:text-white transition-colors">
-              <X size={20} />
+            <button onClick={onClose} className="p-2.5 rounded-2xl bg-surface-2 text-text-low hover:text-white hover:bg-surface-3 transition-colors">
+              <X size={18} />
             </button>
           </div>
 
+          {/* Busca */}
+          {players.length > 5 && (
+            <div className="relative mb-4">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por nome ou posição..."
+                className="w-full bg-surface-2 border border-border-mid rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 transition-colors"
+              />
+            </div>
+          )}
+
           {/* Lista */}
-          <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
-            {players.map((p, i) => {
+          <div className="overflow-y-auto space-y-2.5 flex-1 pr-1 -mr-1">
+            {visiblePlayers.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-14 gap-2 text-center">
+                <Search size={22} className="text-text-muted" />
+                <p className="text-xs font-black text-text-low uppercase tracking-widest">Nenhum atleta encontrado</p>
+                <p className="text-[10px] text-text-muted font-bold">Tente buscar por outro nome ou posição</p>
+              </div>
+            )}
+            {visiblePlayers.map((p, i) => {
               const susp     = suspensionStatus(p);
               const badge    = getRoleBadge(p);
               const isSelf   = p.user_id === currentUserId;
@@ -229,22 +285,41 @@ const MembersModal = ({
               const isAdmin  = roles.get(p.user_id) === 'admin';
               const menuOpen = openMenuId === p.id;
 
+              const ringColor = badge?.label === 'Presidente'
+                ? 'hover:ring-cyan-electric/50'
+                : badge?.label === 'Coordenador'
+                  ? 'hover:ring-purple-400/50'
+                  : 'hover:ring-cyan-electric/40';
+
               return (
                 <div
                   key={p.id || i}
-                  className={`rounded-2xl border transition-all ${
-                    susp ? 'bg-red-500/5 border-red-500/20' : 'bg-surface-2 border-border-subtle'
+                  className={`group rounded-2xl border transition-all ${
+                    susp
+                      ? 'bg-red-500/[0.04] border-red-500/20'
+                      : 'bg-surface-2 border-border-subtle hover:border-border-mid'
                   }`}
                 >
                   <div className="flex items-center gap-3 p-3">
                     {/* Avatar — clicável para ver perfil */}
                     <button
                       onClick={() => handleVisitProfile(p)}
-                      className="w-11 h-11 rounded-2xl bg-gray-800 border border-border-mid overflow-hidden flex items-center justify-center text-white font-black text-base flex-shrink-0 hover:ring-2 hover:ring-cyan-electric/40 transition-all"
+                      className={`relative w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-base flex-shrink-0 ring-2 ring-transparent hover:ring-offset-2 hover:ring-offset-surface-2 transition-all ${ringColor} ${
+                        badge?.label === 'Presidente'
+                          ? 'bg-gradient-to-br from-cyan-electric/30 to-blue-600/30 border border-cyan-electric/30'
+                          : badge?.label === 'Coordenador'
+                            ? 'bg-gradient-to-br from-purple-400/30 to-purple-700/30 border border-purple-400/30'
+                            : 'bg-gradient-to-br from-surface-3 to-surface-1 border border-border-mid'
+                      }`}
                     >
                       {p.avatar_url
                         ? <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.display_name} />
                         : (p.display_name || p.name || '?').charAt(0).toUpperCase()}
+                      {susp && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Shield size={14} className="text-red-400" />
+                        </div>
+                      )}
                     </button>
 
                     {/* Info */}
@@ -254,24 +329,26 @@ const MembersModal = ({
                           {p.display_name || p.name || 'Sem nome'}
                         </p>
                         {badge && (
-                          <span className={`flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${badge.color}`}>
+                          <span className={`flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border ${badge.color}`}>
                             {badge.icon} {badge.label}
                           </span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        <p className="text-[9px] text-cyan-electric font-bold uppercase tracking-widest">
+                          {POSITION_LABEL[p.position] || p.position || 'Linha'}
+                        </p>
+                        {p.final_rating > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] font-black text-yellow-400">
+                            <Star size={9} fill="currentColor" /> {Number(p.final_rating).toFixed(1)}
+                          </span>
+                        )}
                         {susp && (
-                          <span className="text-[8px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
+                          <span className="text-[8px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-md border border-red-500/20">
                             Suspenso {susp !== 'indefinido' ? `· ${susp}` : ''}
                           </span>
                         )}
-                        {p.final_rating > 0 && (
-                          <span className="flex items-center gap-0.5 text-[9px] font-black text-cyan-electric bg-cyan-electric/10 px-1.5 py-0.5 rounded">
-                            <Star size={8} fill="currentColor" /> {Number(p.final_rating).toFixed(1)}
-                          </span>
-                        )}
                       </div>
-                      <p className="text-[9px] text-cyan-electric font-bold uppercase tracking-widest">
-                        {POSITION_LABEL[p.position] || p.position || 'Linha'}
-                      </p>
                     </div>
 
                     {/* Ações */}
@@ -310,11 +387,11 @@ const MembersModal = ({
                                 : 'bg-surface-3 border-border-mid text-text-muted hover:text-white'
                             }`}
                           >
-                            <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+                            <MoreVertical size={14} />
                           </button>
 
                           {menuOpen && (
-                            <div className="absolute right-0 top-11 z-20 w-52 bg-surface-1 border border-border-mid rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="absolute right-0 top-11 z-20 w-52 bg-surface-1 border border-border-mid rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                               {/* Suspender / Reativar */}
                               <button
                                 onClick={() => {
@@ -360,9 +437,10 @@ const MembersModal = ({
           </div>
 
           {/* Legenda */}
-          <div className="mt-4 pt-3 border-t border-border-subtle">
+          <div className="mt-4 pt-3 border-t border-border-subtle flex items-center justify-center gap-1.5">
+            <ExternalLink size={10} className="text-text-muted" />
             <p className="text-[8px] font-black text-text-muted uppercase tracking-widest text-center">
-              Toque no avatar ou em ↗ para ver o perfil público
+              Toque no avatar ou no ícone para ver o perfil público
             </p>
           </div>
         </div>

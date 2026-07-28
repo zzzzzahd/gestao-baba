@@ -3,10 +3,12 @@
 // e chama updateBaba para sincronizar o estado local (theme_color etc.)
 
 import React, { useState, useEffect } from 'react';
-import { Save, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Save, ChevronDown, ChevronUp, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import { supabase }  from '../services/supabase';
 import { useBaba }   from '../contexts/BabaContext';
 import { useAuth }   from '../contexts/AuthContext';
+import ConfirmModal  from './ConfirmModal';
 import toast         from 'react-hot-toast';
 
 // ── Subcomponentes ────────────────────────────────────────────────────────────
@@ -70,11 +72,15 @@ const Section = ({ title, expanded, onToggle, children }) => (
 // ── BabaSettings ──────────────────────────────────────────────────────────────
 
 export default function BabaSettings() {
-  const { currentBaba, updateBaba } = useBaba();
+  const { currentBaba, updateBaba, deleteBaba } = useBaba();
   const { user }                    = useAuth();
+  const navigate                    = useNavigate();
   const [saving,   setSaving]   = useState(false);
-  const [sections, setSections] = useState({ game: true, draw: false, rating: false, advanced: false });
+  const [sections, setSections] = useState({ game: true, draw: false, rating: false, advanced: false, danger: false });
   const [isCoord,  setIsCoord]  = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm]  = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isPresident = String(currentBaba?.president_id) === String(user?.id);
   const canEditAll  = isPresident;
@@ -200,6 +206,13 @@ export default function BabaSettings() {
     }
   };
 
+  const handleDeleteBaba = async () => {
+    setDeleting(true);
+    const ok = await deleteBaba(currentBaba.id);
+    setDeleting(false);
+    if (ok) navigate('/home');
+  };
+
   if (!currentBaba) return null;
 
   return (
@@ -312,6 +325,63 @@ export default function BabaSettings() {
           />
         </Section>
       )}
+
+      {/* Zona de Perigo — apenas presidente */}
+      {canEditAll && (
+        <div className="rounded-2xl bg-red-500/[0.04] border border-red-500/20 overflow-hidden">
+          <button
+            onClick={() => toggle('danger')}
+            className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-red-500/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={13} className="text-red-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Zona de Perigo</span>
+            </div>
+            {sections.danger
+              ? <ChevronUp   size={13} className="text-red-400/70" />
+              : <ChevronDown size={13} className="text-red-400/70" />}
+          </button>
+          {sections.danger && (
+            <div className="px-4 pb-4 border-t border-red-500/10 space-y-3 pt-3">
+              <p className="text-[10px] text-text-low font-bold leading-relaxed">
+                Excluir o baba apaga permanentemente jogadores, partidas, avaliações, cobranças e todo o histórico do grupo. Essa ação não pode ser desfeita.
+              </p>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+                  Digite <span className="text-red-400">{currentBaba.name}</span> para confirmar
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  placeholder={currentBaba.name}
+                  className="w-full bg-surface-2 border border-red-500/20 rounded-xl px-3 py-2.5 text-xs font-black text-white placeholder:text-text-muted focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleteConfirmText.trim() !== currentBaba.name || deleting}
+                className="w-full py-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {deleting
+                  ? <><RefreshCw size={13} className="animate-spin" /> Excluindo...</>
+                  : <><Trash2 size={13} /> Excluir baba permanentemente</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={showDeleteConfirm}
+        message={`Excluir "${currentBaba.name}"?`}
+        description="Todos os dados do grupo serão apagados para sempre. Não é possível desfazer."
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        danger
+        onConfirm={handleDeleteBaba}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
 
       {/* Aviso coordenador */}
       {!canEditAll && isCoord && (

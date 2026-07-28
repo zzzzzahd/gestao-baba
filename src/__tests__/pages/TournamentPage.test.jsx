@@ -178,18 +178,18 @@ describe('TournamentPage › header', () => {
 
   it('exibe nome do campeão quando champion_team_id definido', async () => {
     const tourWithChamp = { ...tourKnockout, champion_team_id: 't1' };
-    let idx = 0;
-    mockFrom.mockImplementation(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockReturnThis(),
-      order:  vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: tourWithChamp }),
-      then:   vi.fn(cb => {
-        idx++;
-        const data = [tourWithChamp, teams, matches, ranking][Math.min(idx - 1, 3)];
-        return Promise.resolve(cb({ data }));
-      }),
-    }));
+    let callCount = 0;
+    const datasets = [tourWithChamp, teams, matches, ranking];
+    mockFrom.mockImplementation(() => {
+      const idx = callCount++;
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq:     vi.fn().mockReturnThis(),
+        order:  vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: tourWithChamp }),
+        then:   vi.fn(cb => Promise.resolve(cb({ data: datasets[Math.min(idx, 3)] }))),
+      };
+    });
     wrap();
     await waitFor(() =>
       expect(screen.getByText(/Azul/)).toBeInTheDocument()
@@ -306,7 +306,7 @@ describe('TournamentPage › tab ranking', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ranking' }));
     await waitFor(() => {
       expect(screen.getByText('🥇 Artilheiros')).toBeInTheDocument();
-      expect(screen.getByText('Ronaldo')).toBeInTheDocument();
+      expect(screen.getByText(/Ronaldo/)).toBeInTheDocument();
     });
   });
 
@@ -332,18 +332,18 @@ describe('TournamentPage › tab ranking', () => {
   });
 
   it('ranking vazio: seções existem mas listas ficam em branco', async () => {
-    let idx = 0;
-    mockFrom.mockImplementation(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockReturnThis(),
-      order:  vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: tourKnockout }),
-      then:   vi.fn(cb => {
-        idx++;
-        const data = [tourKnockout, teams, matches, []][Math.min(idx - 1, 3)];
-        return Promise.resolve(cb({ data }));
-      }),
-    }));
+    let callCount = 0;
+    const datasets = [tourKnockout, teams, matches, []];
+    mockFrom.mockImplementation(() => {
+      const idx = callCount++;
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq:     vi.fn().mockReturnThis(),
+        order:  vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: tourKnockout }),
+        then:   vi.fn(cb => Promise.resolve(cb({ data: datasets[Math.min(idx, 3)] }))),
+      };
+    });
     wrap();
     await waitFor(() => screen.getByRole('button', { name: 'Ranking' }));
     fireEvent.click(screen.getByRole('button', { name: 'Ranking' }));
@@ -362,18 +362,18 @@ describe('TournamentPage › edge cases', () => {
   });
 
   it('sem matches: bracket fica vazio', async () => {
-    let idx = 0;
-    mockFrom.mockImplementation(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockReturnThis(),
-      order:  vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: tourKnockout }),
-      then:   vi.fn(cb => {
-        idx++;
-        const data = [tourKnockout, teams, [], ranking][Math.min(idx - 1, 3)];
-        return Promise.resolve(cb({ data }));
-      }),
-    }));
+    let callCount = 0;
+    const datasets = [tourKnockout, teams, [], ranking];
+    mockFrom.mockImplementation(() => {
+      const idx = callCount++;
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq:     vi.fn().mockReturnThis(),
+        order:  vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: tourKnockout }),
+        then:   vi.fn(cb => Promise.resolve(cb({ data: datasets[Math.min(idx, 3)] }))),
+      };
+    });
     wrap();
     await waitFor(() => screen.getByText('Copa Draft'));
     // Não explode mesmo sem matches
