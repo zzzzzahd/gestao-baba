@@ -4,12 +4,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, ChevronDown, ChevronUp, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
+import { Save, ChevronDown, ChevronUp, ChevronRight, RefreshCw, Trash2, AlertTriangle, Clock, MapPin } from 'lucide-react';
 import { supabase }  from '../services/supabase';
 import { useBaba }   from '../contexts/BabaContext';
 import { useAuth }   from '../contexts/AuthContext';
 import ConfirmModal  from './ConfirmModal';
 import toast         from 'react-hot-toast';
+
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const DAYS = [
+  { short: 'DOM', label: 'Domingo', value: 0 },
+  { short: 'SEG', label: 'Segunda', value: 1 },
+  { short: 'TER', label: 'Terça',   value: 2 },
+  { short: 'QUA', label: 'Quarta',  value: 3 },
+  { short: 'QUI', label: 'Quinta',  value: 4 },
+  { short: 'SEX', label: 'Sexta',   value: 5 },
+  { short: 'SÁB', label: 'Sábado',  value: 6 },
+];
+
+const DEFAULT_DAY_TIME = '20:00';
 
 // ── Subcomponentes ────────────────────────────────────────────────────────────
 
@@ -76,8 +90,9 @@ export default function BabaSettings() {
   const { user }                    = useAuth();
   const navigate                    = useNavigate();
   const [saving,   setSaving]   = useState(false);
-  const [sections, setSections] = useState({ game: true, draw: false, rating: false, advanced: false, danger: false });
+  const [sections, setSections] = useState({ schedule: true, game: false, draw: false, rating: false, advanced: false, danger: false });
   const [isCoord,  setIsCoord]  = useState(false);
+  const [dayEditing, setDayEditing] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm]  = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -86,6 +101,8 @@ export default function BabaSettings() {
   const canEditAll  = isPresident;
 
   const [form, setForm] = useState({
+    location:               '',
+    selectedDays:           [], // [{ day, time, location }]
     max_players:            '',
     allow_reserves:         false,
     auto_draw_enabled:      false,
@@ -116,7 +133,18 @@ export default function BabaSettings() {
   // Sync form com currentBaba
   useEffect(() => {
     if (!currentBaba) return;
+    const fallbackTime = (currentBaba.game_time || DEFAULT_DAY_TIME).slice(0, 5);
+    const selectedDays = Array.isArray(currentBaba.game_days_config) && currentBaba.game_days_config.length > 0
+      ? currentBaba.game_days_config.map(d => ({
+          day:      d.day,
+          time:     (d.time || fallbackTime).slice(0, 5),
+          location: d.location || '',
+        }))
+      : (currentBaba.game_days || []).map(day => ({ day, time: fallbackTime, location: '' }));
+
     setForm({
+      location:               currentBaba.location               ?? '',
+      selectedDays:           selectedDays.sort((a, b) => a.day - b.day),
       max_players:            currentBaba.max_players            ?? '',
       allow_reserves:         currentBaba.allow_reserves         ?? false,
       auto_draw_enabled:      currentBaba.auto_draw_enabled      ?? false,
@@ -135,8 +163,31 @@ export default function BabaSettings() {
   const set    = (key) => (val) => setForm(prev => ({ ...prev, [key]: val }));
   const toggle = (id)  => setSections(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const toggleDay = (dayValue) => {
+    setForm(prev => {
+      const exists = prev.selectedDays.find(d => d.day === dayValue);
+      return {
+        ...prev,
+        selectedDays: exists
+          ? prev.selectedDays.filter(d => d.day !== dayValue)
+          : [...prev.selectedDays, { day: dayValue, time: DEFAULT_DAY_TIME, location: '' }].sort((a, b) => a.day - b.day),
+      };
+    });
+  };
+
+  const updateDayField = (dayValue, field, val) => {
+    setForm(prev => ({
+      ...prev,
+      selectedDays: prev.selectedDays.map(d => d.day === dayValue ? { ...d, [field]: val } : d),
+    }));
+  };
+
   const handleSave = async () => {
     if (!currentBaba) return;
+    if (canEditAll && form.selectedDays.length === 0) {
+      toast.error('Selecione pelo menos um dia de jogo');
+      return;
+    }
     setSaving(true);
     try {
       // 1. Salvar via RPC (campos avançados)
@@ -162,9 +213,20 @@ export default function BabaSettings() {
       if (rpcErr) throw rpcErr;
 
       // 2. Campos que a RPC não cobre — update direto
+      const cleanDays = [...form.selectedDays].sort((a, b) => a.day - b.day);
       const directUpdate = {
         allow_reserves: form.allow_reserves,
         ...(canEditAll && form.pix_key !== undefined ? { pix_key: form.pix_key || null } : {}),
+        ...(canEditAll ? {
+          location:         form.location.trim() || null,
+          game_days:        cleanDays.map(d => d.day),
+          game_days_config: cleanDays.map(d => ({
+            day:      d.day,
+            time:     d.time || DEFAULT_DAY_TIME,
+            location: d.location?.trim() || form.location?.trim() || null,
+          })),
+          game_time: `${cleanDays[0]?.time || DEFAULT_DAY_TIME}:00`,
+        } : {}),
       };
 
       // 3. ← CORREÇÃO PRINCIPAL: buscar baba atualizado e sincronizar estado local
@@ -217,6 +279,110 @@ export default function BabaSettings() {
 
   return (
     <div className="space-y-3">
+
+      {/* Dias, Horário e Local — apenas presidente */}
+      {canEditAll && (
+        <Section title="Dias, Horário e Local" expanded={sections.schedule} onToggle={() => toggle('schedule')}>
+          <div>
+            <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-2 block">
+              Dias de jogo
+            </label>
+            <div className="grid grid-cols-7 gap-1 mb-3">
+              {DAYS.map(d => {
+                const selected = form.selectedDays.some(s => s.day === d.value);
+                return (
+                  <button
+                    key={d.value}
+                    onClick={() => toggleDay(d.value)}
+                    className={`py-3 rounded-xl text-[9px] font-black uppercase transition-all active:scale-90 ${
+                      selected
+                        ? 'bg-cyan-electric text-black shadow-lg shadow-cyan-electric/20'
+                        : 'bg-surface-3 text-text-low border border-border-mid hover:border-cyan-electric/30'
+                    }`}
+                  >
+                    {d.short}
+                  </button>
+                );
+              })}
+            </div>
+            {form.selectedDays.length === 0 && (
+              <div className="text-center py-6 border border-dashed border-border-mid rounded-2xl mb-3">
+                <p className="text-text-muted text-[10px] font-black uppercase">Selecione pelo menos um dia</p>
+              </div>
+            )}
+          </div>
+
+          <Field
+            label="Local padrão"
+            value={form.location}
+            onChange={set('location')}
+            placeholder="Ex: Quadra do Parque, Society Arena..."
+          />
+
+          {form.selectedDays.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase tracking-widest text-text-low block">
+                Horário e local por dia
+              </label>
+              {form.selectedDays.map(sd => {
+                const dayInfo = DAYS.find(d => d.value === sd.day);
+                const isOpen  = dayEditing === sd.day;
+                return (
+                  <div key={sd.day} className="rounded-2xl border border-border-mid overflow-hidden">
+                    <button
+                      onClick={() => setDayEditing(isOpen ? null : sd.day)}
+                      className="w-full p-3 flex justify-between items-center bg-surface-3 hover:bg-surface-1 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-xl bg-cyan-electric/10 flex items-center justify-center text-cyan-electric text-[9px] font-black border border-cyan-electric/20">
+                          {dayInfo?.short}
+                        </span>
+                        <div className="text-left">
+                          <p className="font-black text-xs text-white">{dayInfo?.label}</p>
+                          <p className="text-[9px] text-text-low">
+                            {sd.time}{sd.location ? ` · ${sd.location}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight
+                        size={13}
+                        className={`text-text-low transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="p-3 space-y-3 bg-black/40 border-t border-border-subtle animate-in slide-in-from-top-1 duration-150">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-text-low uppercase font-black flex items-center gap-1">
+                            <Clock size={8} /> Horário
+                          </label>
+                          <input
+                            type="time"
+                            value={sd.time}
+                            onChange={e => updateDayField(sd.day, 'time', e.target.value)}
+                            className="w-full p-2.5 bg-black/40 border border-border-mid rounded-xl font-black text-xs focus:border-cyan-electric/50 focus:outline-none transition-colors"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-text-low uppercase font-black flex items-center gap-1">
+                            <MapPin size={8} /> Local deste dia (opcional)
+                          </label>
+                          <input
+                            value={sd.location}
+                            onChange={e => updateDayField(sd.day, 'location', e.target.value)}
+                            placeholder={form.location || 'Local específico para este dia'}
+                            maxLength={80}
+                            className="w-full p-2.5 bg-black/40 border border-border-mid rounded-xl font-black text-xs placeholder:text-text-muted focus:border-cyan-electric/50 focus:outline-none transition-colors"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* Jogo e Confirmações */}
       <Section title="Jogo e Confirmações" expanded={sections.game} onToggle={() => toggle('game')}>
