@@ -1,12 +1,8 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "app.vercel.gestao_baba.twa",
-      "sha256_cert_fingerprints": [
-        "SUBSTITUA_PELO_SHA256_DO_SEU_KEYSTORE"
-      ]
-    }
-  }
-]
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.gestao_baba_bkbemn8g2_zzzzzahds_projects.twa",
+        "sha256_cert_fingerprints": ["F8:C7:E4:B8:AC:35:E6:DD:4D:2B:92:E8:CB:7B:F6:BF:B0:35:6B:A8:C3:CE:9A:05:39:CA:3C:29:83:26:91:DB"]
+      }
+    }]
