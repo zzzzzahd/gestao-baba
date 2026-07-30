@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "app.vercel.gestao_baba_bkbemn8g2_zzzzzahds_projects.twa",
-        "sha256_cert_fingerprints": ["F8:C7:E4:B8:AC:35:E6:DD:4D:2B:92:E8:CB:7B:F6:BF:B0:35:6B:A8:C3:CE:9A:05:39:CA:3C:29:83:26:91:DB"]
+        "package_name": "com.zzzzzahd.draftplay",
+        "sha256_cert_fingerprints": ["DD:EE:FE:97:28:E2:C0:3B:69:53:D6:60:87:3E:B2:B6:3F:82:E5:DA:D5:65:A3:E7:30:41:BB:3C:80:46:00:A2"]
       }
     }]
