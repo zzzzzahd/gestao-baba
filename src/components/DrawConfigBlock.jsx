@@ -57,11 +57,11 @@ const DrawConfigBlock = ({
             className={`text-cyan-electric ${isDrawing ? 'animate-spin' : ''}`}
           />
           <span className="text-[10px] font-black text-text-low uppercase tracking-widest">
-            Config do sorteio
+            Sorteio de Hoje
           </span>
           <Tooltip
-            title="Sorteio automático"
-            text="Os times são balanceados pela avaliação técnica dos jogadores (habilidade, físico e compromisso)."
+            title="Sorteio de hoje"
+            text="Ajustes válidos só para a partida de hoje. Para ligar o sorteio automático e definir o horário padrão, use Configurações › Sorteio Automático."
           />
         </div>
         {deadlineStr && (

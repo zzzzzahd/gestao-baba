@@ -13,9 +13,9 @@ import {
   Trophy, Settings, Calendar, Zap, Users,
 } from 'lucide-react';
 
-import QRCodeModal     from '../components/QRCodeModal';
 import RatePlayerModal from '../components/RatePlayerModal';
 import MembersModal    from '../components/MembersModal';
+import NextGameCard    from '../components/NextGameCard';
 import ModeSelector    from '../components/ModeSelector';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
 import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
@@ -27,15 +27,6 @@ const TabManage    = lazy(() => import('./dashboard/TabManage'));
 const TabPostGame  = lazy(() => import('./dashboard/TabPostGame'));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const computeExpiryLabel = (expiresAt) => {
-  if (!expiresAt) return null;
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return 'Expirado';
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  return h > 0 ? `Expira em ${h}h ${m}min` : `Expira em ${m}min`;
-};
 
 const TABS = [
   { id: 'overview', label: 'Visão Geral', icon: <Trophy   size={14} /> },
@@ -59,7 +50,7 @@ const DashboardPage = () => {
   const { profile, signOut, user }      = useAuth();
   const {
     currentBaba, players, loading,
-    generateInviteCode, nextGameDay, uploadBabaImage,
+    nextGameDay, uploadBabaImage,
     countdown, ratePlayer, getAllRatings,
     gameConfirmations, myConfirmation, canConfirm,
     confirmPresence, cancelConfirmation, reloadConfirmations,
@@ -106,11 +97,8 @@ const DashboardPage = () => {
 
   const [showMembers,             setShowMembers]             = useState(false);
   const [selectedPlayerForRating, setSelectedPlayerForRating] = useState(null);
-  const [showQRCode,              setShowQRCode]              = useState(false);
   const [isUploading,             setIsUploading]             = useState(false);
-  const [inviteExpiry,            setInviteExpiry]            = useState(null);
   const [playerRatings,           setPlayerRatings]           = useState([]);
-  const [copied,                  setCopied]                  = useState(false);
 
   useEffect(() => {
     if (!currentBaba?.id) return;
@@ -125,23 +113,6 @@ const DashboardPage = () => {
       return { ...p, final_rating: r?.final_rating || 0, votes_count: r?.votes_count || 0 };
     }),
   [players, playerRatings]);
-
-  useEffect(() => {
-    setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at));
-    const id = setInterval(
-      () => setInviteExpiry(computeExpiryLabel(currentBaba?.invite_expires_at)), 1000,
-    );
-    return () => clearInterval(id);
-  }, [currentBaba?.invite_expires_at]);
-
-  const handleCopyCode = () => {
-    if (!currentBaba?.invite_code) return;
-    navigator.clipboard.writeText(currentBaba.invite_code);
-    if (navigator.vibrate) navigator.vibrate(30);
-    setCopied(true);
-    toast.success('Código copiado!');
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -279,26 +250,8 @@ const DashboardPage = () => {
       {/* ── Conteúdo ── */}
       <div className="max-w-xl mx-auto px-5 mt-12 space-y-5">
 
-        {/* ── Tabs ── */}
-        <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
-          <div className="flex gap-1" role="tablist">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                  activeTab === tab.id ? '' : 'text-text-low hover:text-text-mid hover:bg-surface-2 border-transparent'
-                }`}
-                style={activeTab === tab.id ? { ...tc.bgAlpha(0.1), ...tc.border(0.25), color: tc.color } : {}}
-              >
-                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Próximo Jogo */}
+        <NextGameCard nextGameDay={nextGameDay} countdown={countdown} currentBaba={currentBaba} />
 
         {/* Lista de Membros */}
         <button
@@ -341,6 +294,27 @@ const DashboardPage = () => {
           </div>
         </button>
 
+        {/* ── Tabs ── */}
+        <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md -mx-5 px-5 py-3 border-b border-border-subtle">
+          <div className="flex gap-1" role="tablist">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                  activeTab === tab.id ? '' : 'text-text-low hover:text-text-mid hover:bg-surface-2 border-transparent'
+                }`}
+                style={activeTab === tab.id ? { ...tc.bgAlpha(0.1), ...tc.border(0.25), color: tc.color } : {}}
+              >
+                <span style={activeTab === tab.id ? tc.text : { color: 'var(--color-text-muted)' }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* ── Conteúdo da aba ── */}
         <div className="pt-2">
           <Suspense fallback={<TabLoader />}>
@@ -360,11 +334,6 @@ const DashboardPage = () => {
                   setDrawConfig={setDrawConfig}
                   isDrawing={isDrawing}
                   loading={loading}
-                  inviteExpiry={inviteExpiry}
-                  handleCopyCode={handleCopyCode}
-                  copied={copied}
-                  generateInviteCode={generateInviteCode}
-                  onShowQR={() => setShowQRCode(true)}
                 />
               )}
             </div>
@@ -408,14 +377,6 @@ const DashboardPage = () => {
           onRate={handleRate}
         />
       )}
-      <QRCodeModal
-        isOpen={showQRCode}
-        onClose={() => setShowQRCode(false)}
-        inviteCode={currentBaba?.invite_code}
-        babaName={currentBaba?.name}
-        onRefresh={generateInviteCode}
-      />
-
       {/* Sprint 1 — ModeSelector (presidente pode mudar modo) */}
       {showModeSelector && (
         <ModeSelector onClose={() => setShowModeSelector(false)} />

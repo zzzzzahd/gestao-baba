@@ -113,21 +113,23 @@ const QRCodeModal = ({ isOpen, onClose, inviteCode, babaName, onRefresh }) => {
             <Share2 size={16} /> Compartilhar
           </button>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${onRefresh ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button
               onClick={handleCopyCode}
               className="py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-white/10 transition-colors"
             >
               <Copy size={14} /> Código
             </button>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-40"
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              Renovar
-            </button>
+            {onRefresh && (
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="py-3 bg-white/5 border border-white/10 rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                Renovar
+              </button>
+            )}
           </div>
         </div>
       </div>

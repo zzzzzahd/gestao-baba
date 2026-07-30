@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link2, QrCode, RefreshCw, Copy, Check, Trash2, Plus, Clock, MessageCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import QRCodeModal from './QRCodeModal';
 import toast from 'react-hot-toast';
 
 const BASE_URL = window.location.origin;
@@ -19,12 +20,14 @@ const formatExpiry = (expiresAt) => {
   return 'Expira em breve';
 };
 
-export default function InvitesPanel({ babaId, isPresident }) {
+export default function InvitesPanel({ babaId, babaName, isPresident }) {
   const [invites,   setInvites]   = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [creating,  setCreating]  = useState(false);
+  const [quickCreating, setQuickCreating] = useState(false);
   const [copied,    setCopied]    = useState(null);
   const [showForm,  setShowForm]  = useState(false);
+  const [qrCode,    setQrCode]    = useState(null);
 
   // Form state
   const [maxUses,      setMaxUses]      = useState('');
@@ -47,15 +50,16 @@ export default function InvitesPanel({ babaId, isPresident }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCreate = async () => {
-    setCreating(true);
+  const handleCreate = async (overrides = {}) => {
+    const isQuick = overrides.quick;
+    isQuick ? setQuickCreating(true) : setCreating(true);
     try {
       const { data, error } = await supabase.rpc('create_invite', {
         p_baba_id:     babaId,
         p_type:        'link',
-        p_max_uses:    maxUses ? Number(maxUses) : null,
-        p_expires_hours: Number(expiresHours) || 168,
-        p_note:        note || null,
+        p_max_uses:    overrides.maxUses !== undefined ? overrides.maxUses : (maxUses ? Number(maxUses) : null),
+        p_expires_hours: overrides.expiresHours !== undefined ? overrides.expiresHours : (Number(expiresHours) || 168),
+        p_note:        overrides.note !== undefined ? overrides.note : (note || null),
       });
       if (error) throw error;
       toast.success('Convite criado!');
@@ -67,9 +71,11 @@ export default function InvitesPanel({ babaId, isPresident }) {
       console.error('[InvitesPanel] create:', err);
       toast.error('Erro ao criar convite');
     } finally {
-      setCreating(false);
+      isQuick ? setQuickCreating(false) : setCreating(false);
     }
   };
+
+  const handleQuickCreate = () => handleCreate({ quick: true, maxUses: null, expiresHours: 168, note: null });
 
   const handleCopy = (code) => {
     const url = `${BASE_URL}/join/${code}`;
@@ -96,27 +102,97 @@ export default function InvitesPanel({ babaId, isPresident }) {
     }
   };
 
+  const activeInvites = invites.filter(i => i.is_active);
+  const heroInvite     = activeInvites[0] || null;
+  const otherInvites   = activeInvites.slice(1);
+
   return (
     <div className="space-y-4">
 
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-text-low">Convites</p>
-          <p className="text-xs font-black text-white">{invites.filter(i => i.is_active).length} ativos</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-text-low">Convidar Atletas</p>
+          <p className="text-xs font-black text-white">{activeInvites.length} convite{activeInvites.length !== 1 ? 's' : ''} ativo{activeInvites.length !== 1 ? 's' : ''}</p>
         </div>
-        {isPresident && (
+        {isPresident && heroInvite && (
           <button
             onClick={() => setShowForm(v => !v)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[10px] font-black uppercase tracking-widest hover:bg-cyan-electric/20 transition-all"
           >
             <Plus size={12} />
-            Novo convite
+            Convite específico
           </button>
         )}
       </div>
 
-      {/* Formulário de criação */}
+      {/* Convite principal — código + QR em destaque */}
+      {loading && invites.length === 0 ? (
+        <div className="h-32 rounded-2xl bg-surface-1 border border-border-subtle animate-pulse" />
+      ) : heroInvite ? (
+        <div className="p-4 rounded-2xl bg-cyan-electric/5 border border-cyan-electric/20 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-cyan-electric/70 mb-1">Convite principal</p>
+              <p className="text-2xl font-black tracking-[0.3em] text-white">{heroInvite.code}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] text-text-low font-black">
+                  {heroInvite.uses}{heroInvite.max_uses ? `/${heroInvite.max_uses}` : ''} usos
+                </span>
+                <span className="flex items-center gap-1 text-[9px] text-text-low font-black">
+                  <Clock size={9} /> {formatExpiry(heroInvite.expires_at)}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setQrCode(heroInvite.code)}
+              className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+              title="Mostrar QR Code"
+            >
+              <QrCode size={24} className="text-black" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleWhatsApp(heroInvite.code, babaName)}
+              className="flex-1 py-2.5 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-[10px] font-black uppercase flex items-center justify-center gap-1.5 hover:bg-green-500/20 transition-all"
+            >
+              <MessageCircle size={13} /> WhatsApp
+            </button>
+            <button
+              onClick={() => handleCopy(heroInvite.code)}
+              className={`flex-1 py-2.5 rounded-xl border text-[10px] font-black uppercase flex items-center justify-center gap-1.5 transition-all ${
+                copied === heroInvite.code
+                  ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                  : 'bg-surface-2 border-border-mid text-text-low hover:text-white'
+              }`}
+            >
+              {copied === heroInvite.code ? <Check size={13} /> : <Copy size={13} />}
+              {copied === heroInvite.code ? 'Copiado' : 'Copiar link'}
+            </button>
+          </div>
+        </div>
+      ) : isPresident ? (
+        <button
+          onClick={handleQuickCreate}
+          disabled={quickCreating}
+          className="w-full py-6 rounded-2xl border border-dashed border-cyan-electric/30 bg-cyan-electric/5 text-cyan-electric text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-cyan-electric/10 transition-all disabled:opacity-50"
+        >
+          {quickCreating
+            ? <RefreshCw size={14} className="animate-spin" />
+            : <Link2 size={14} />}
+          {quickCreating ? 'Gerando...' : 'Gerar convite do grupo'}
+        </button>
+      ) : (
+        <div className="py-8 text-center">
+          <Link2 size={24} className="text-text-muted mx-auto mb-2" />
+          <p className="text-[10px] font-black uppercase text-text-low tracking-widest">
+            Nenhum convite ativo
+          </p>
+        </div>
+      )}
+
+      {/* Formulário de criação — convites específicos (limite de usos / validade / observação) */}
       {showForm && (
         <div className="p-4 rounded-2xl bg-surface-1 border border-border-mid space-y-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-text-low">Novo convite</p>
@@ -181,23 +257,15 @@ export default function InvitesPanel({ babaId, isPresident }) {
         </div>
       )}
 
-      {/* Lista de convites */}
-      {loading ? (
-        <div className="space-y-2">
-          {[1, 2].map(i => (
-            <div key={i} className="h-16 rounded-2xl bg-surface-1 border border-border-subtle animate-pulse" />
-          ))}
-        </div>
-      ) : invites.length === 0 ? (
-        <div className="py-8 text-center">
-          <Link2 size={24} className="text-text-muted mx-auto mb-2" />
-          <p className="text-[10px] font-black uppercase text-text-low tracking-widest">
-            Nenhum convite criado
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {invites.map(inv => (
+      {/* Outros convites — específicos e histórico de revogados */}
+      {(() => {
+        const remaining = invites.filter(i => i.invite_id !== heroInvite?.invite_id);
+        if (loading && invites.length === 0) return null;
+        if (remaining.length === 0) return null;
+        return (
+          <div className="space-y-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-text-low px-1">Outros convites</p>
+            {remaining.map(inv => (
             <div
               key={inv.invite_id}
               className={`p-3 rounded-2xl border transition-all ${
@@ -237,7 +305,14 @@ export default function InvitesPanel({ babaId, isPresident }) {
                 {inv.is_active && (
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => handleWhatsApp(inv.code, null)}
+                      onClick={() => setQrCode(inv.code)}
+                      title="QR Code"
+                      className="p-2 rounded-xl bg-surface-2 border border-border-mid text-text-low hover:text-white transition-all"
+                    >
+                      <QrCode size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleWhatsApp(inv.code, babaName)}
                       title="Compartilhar via WhatsApp"
                       className="p-2 rounded-xl bg-surface-2 border border-border-mid text-green-400 hover:bg-green-500/10 hover:border-green-500/30 transition-all"
                     >
@@ -265,9 +340,10 @@ export default function InvitesPanel({ babaId, isPresident }) {
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Refresh */}
       <button
@@ -278,6 +354,13 @@ export default function InvitesPanel({ babaId, isPresident }) {
         <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />
         Atualizar
       </button>
+
+      <QRCodeModal
+        isOpen={!!qrCode}
+        onClose={() => setQrCode(null)}
+        inviteCode={qrCode}
+        babaName={babaName}
+      />
     </div>
   );
 }

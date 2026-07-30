@@ -3,32 +3,12 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Copy, Share2, RefreshCw, CheckCircle2, Link2, Activity } from 'lucide-react';
-import { DAY_FULL } from '../../utils/constants';
+import { Calendar, Link2, RefreshCw, Activity } from 'lucide-react';
 import PresenceBlock       from '../../components/PresenceBlock';
 import DrawConfigBlock     from '../../components/DrawConfigBlock';
 import WaitlistPanel       from '../../components/WaitlistPanel';
 import InvitesPanel        from '../../components/InvitesPanel';
-import CalendarExportButton from '../../components/CalendarExportButton';
 import ActivityFeed        from '../../components/ActivityFeed';
-
-const formatCountdown = (cd) => {
-  if (!cd?.active) return null;
-  const hh = String(cd.h).padStart(2, '0');
-  const mm = String(cd.m).padStart(2, '0');
-  const ss = String(cd.s).padStart(2, '0');
-  return cd.d > 0 ? `${cd.d}d ${hh}h ${mm}m` : `${hh}:${mm}:${ss}`;
-};
-
-const formatGameDays = (baba) => {
-  if (!Array.isArray(baba?.game_days) || baba.game_days.length === 0) return null;
-  const time = baba.game_time ? String(baba.game_time).substring(0, 5) : '';
-  return [...new Set(baba.game_days.map(Number))]
-    .filter(d => d >= 0 && d <= 6)
-    .sort((a, b) => a - b)
-    .map(d => `${['DOM','SEG','TER','QUA','QUI','SEX','SÁB'][d]}${time ? ' ' + time : ''}`)
-    .join(' · ');
-};
 
 const TabOverview = ({
   currentBaba,
@@ -43,85 +23,14 @@ const TabOverview = ({
   isDrawing,
   isPresident,
   loading,
-  inviteExpiry,
-  handleCopyCode,
-  copied,
-  generateInviteCode,
-  onShowQR,
 }) => {
   const navigate        = useNavigate();
-  const gameDaysDisplay = formatGameDays(currentBaba);
-  const cdStr           = formatCountdown(countdown);
-  const [showInvites,  setShowInvites]  = useState(false);
+  const [showInvites,  setShowInvites]  = useState(!nextGameDay);
   const [showActivity, setShowActivity] = useState(true);
 
-  const handleShareJoinLink = () => {
-    if (!currentBaba?.invite_code) return;
-    const url  = `${window.location.origin}/join/${currentBaba.invite_code}`;
-    const text = `Entra no nosso baba "${currentBaba.name}"! 🏟️`;
-    if (navigator.share) {
-      navigator.share({ title: text, url }).catch(() => {});
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
-    }
-  };
 
   return (
     <div className="space-y-5">
-
-      {/* Countdown do próximo baba */}
-      {nextGameDay && (
-        <div className="bg-gradient-to-r from-cyan-electric/20 to-transparent p-[1px] rounded-[2rem] border border-cyan-electric/30">
-          <div className="bg-black/40 backdrop-blur-md rounded-[2rem] p-6">
-            <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-text-low">
-              <span>Próximo Baba em</span>
-              <span className="text-cyan-electric">
-                {nextGameDay.daysAhead === 0 ? 'Hoje'
-                  : nextGameDay.daysAhead === 1 ? 'Amanhã'
-                  : DAY_FULL[nextGameDay.day]}
-              </span>
-            </div>
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-4xl font-black font-mono tabular-nums leading-none tracking-tighter text-white">
-                  {cdStr
-                    ? <span>{cdStr}</span>
-                    : <span className="text-2xl uppercase text-cyan-electric animate-pulse">Em breve...</span>
-                  }
-                </div>
-                <div className="flex items-center gap-2 mt-2 text-[10px] font-black text-text-low uppercase truncate max-w-[200px]">
-                  <MapPin size={12} className="text-cyan-electric flex-shrink-0" />
-                  <span className="truncate">
-                    {nextGameDay.location || currentBaba?.location || 'Arena Principal'}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xl font-black text-cyan-electric italic uppercase">PARTIDA</span>
-                <p className="text-[10px] font-black text-text-low uppercase tracking-widest mt-1">
-                  {nextGameDay.time?.substring(0, 5)}
-                </p>
-              </div>
-            </div>
-            {gameDaysDisplay && (
-              <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-[10px] font-black text-text-low uppercase">
-                  <Calendar size={12} className="text-text-muted" />
-                  <span>{gameDaysDisplay}</span>
-                </div>
-                <CalendarExportButton
-                  baba={currentBaba}
-                  nextDates={nextGameDay ? [{
-                    date:     new Date(nextGameDay.fullDate ?? Date.now()),
-                    time:     nextGameDay.time?.substring(0, 5) ?? '18:00',
-                    location: nextGameDay.location || currentBaba?.location,
-                  }] : []}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Presença + Waitlist + Sorteio */}
       {nextGameDay ? (
@@ -145,34 +54,6 @@ const TabOverview = ({
                 isPresident={isPresident}
                 onUpdate={reloadConfirmations}
               />
-            </div>
-          )}
-
-          {isPresident && canConfirm && currentBaba?.invite_code && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-surface-2 border border-border-subtle">
-              <span className="text-[9px] text-text-muted font-black uppercase tracking-widest shrink-0">Convite</span>
-              <span className="flex-1 text-sm font-black tracking-[0.3em] text-white text-center">
-                {currentBaba.invite_code}
-              </span>
-              <button onClick={handleCopyCode} className={`p-2 rounded-xl border transition-all duration-300 ${
-                copied
-                  ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                  : 'bg-cyan-electric/10 border-cyan-electric/20 text-cyan-electric hover:bg-cyan-electric hover:text-black'
-              }`}>
-                {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-              </button>
-              <button
-                onClick={handleShareJoinLink}
-                className="p-2 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 hover:bg-green-500/20 transition-all"
-              >
-                <Share2 size={13} />
-              </button>
-              <button onClick={onShowQR} className="p-2 bg-surface-2 border border-border-subtle rounded-xl text-text-low hover:text-white transition-all">
-                <Share2 size={13} />
-              </button>
-              <button onClick={generateInviteCode} className="p-2 bg-surface-2 border border-border-subtle rounded-xl text-text-muted hover:text-white transition-all">
-                <RefreshCw size={13} />
-              </button>
             </div>
           )}
 
@@ -232,52 +113,7 @@ const TabOverview = ({
         )}
       </div>
 
-      {/* Convite sem jogo agendado */}
-      {isPresident && !nextGameDay && (
-        <div className="p-6 rounded-[2.5rem] border border-cyan-electric/20 bg-cyan-electric/5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">Convite do Grupo</h3>
-              <p className="text-[9px] text-text-low font-bold uppercase">
-                {inviteExpiry || 'Gere um novo código'}
-              </p>
-            </div>
-            <button className="p-2 bg-cyan-electric/10 rounded-xl" onClick={onShowQR}>
-              <Share2 size={16} className="text-cyan-electric" />
-            </button>
-          </div>
-          {currentBaba?.invite_code ? (
-            <>
-              <div className="flex gap-2">
-                <div className="flex-1 bg-black/60 border border-border-mid rounded-2xl p-4 flex items-center justify-center">
-                  <span className="text-2xl font-black tracking-[0.4em] text-white">{currentBaba.invite_code}</span>
-                </div>
-                <button onClick={handleCopyCode} className="px-6 bg-cyan-electric text-black rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 active:scale-95 transition-all">
-                  <Copy size={14} /> Copiar
-                </button>
-              </div>
-              <button
-                onClick={handleShareJoinLink}
-                className="w-full py-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-400 font-black uppercase text-[10px] flex items-center justify-center gap-2 hover:bg-green-500/20 transition-all"
-              >
-                <Share2 size={14} />
-                Compartilhar link de entrada
-              </button>
-              <div className="flex justify-center">
-                <button onClick={generateInviteCode} className="text-[9px] font-black uppercase text-text-muted hover:text-cyan-electric transition-colors flex items-center gap-2">
-                  <RefreshCw size={10} /> Atualizar Código
-                </button>
-              </div>
-            </>
-          ) : (
-            <button onClick={generateInviteCode} className="w-full py-5 bg-surface-2 border border-dashed border-border-strong rounded-2xl text-[10px] font-black uppercase hover:border-cyan-electric/50 transition-all flex items-center justify-center gap-2">
-              <RefreshCw size={14} className="animate-pulse" /> Gerar Código de Convite
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Sprint 13 — Painel de Convites (presidente) */}
+      {/* Convidar Atletas — único ponto de convite (código principal + QR + convites específicos) */}
       {isPresident && (
         <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
           <button
@@ -286,7 +122,7 @@ const TabOverview = ({
           >
             <div className="flex items-center gap-2">
               <Link2 size={14} className="text-cyan-electric" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">Gerenciar Convites</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">Convidar Atletas</span>
             </div>
             <span className="text-[9px] font-black text-text-low uppercase">
               {showInvites ? 'Fechar' : 'Abrir'}
@@ -295,7 +131,7 @@ const TabOverview = ({
           {showInvites && (
             <div className="px-5 pb-5 border-t border-border-subtle">
               <div className="pt-4">
-                <InvitesPanel babaId={currentBaba?.id} isPresident={isPresident} />
+                <InvitesPanel babaId={currentBaba?.id} babaName={currentBaba?.name} isPresident={isPresident} />
               </div>
             </div>
           )}

@@ -430,6 +430,9 @@ export default function BabaSettings() {
 
       {/* Sorteio Automático */}
       <Section title="Sorteio Automático" expanded={sections.draw} onToggle={() => toggle('draw')}>
+        <p className="text-[10px] text-text-low font-bold leading-relaxed -mt-1">
+          Define se e quando o sorteio roda sozinho. Jogadores por time e estratégia de suplentes ficam no card "Sorteio de Hoje", na Visão Geral, e valem só para a partida do dia.
+        </p>
         <Toggle
           label="Sorteio automático"
           sub="Sortear times automaticamente no horário definido"
