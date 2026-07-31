@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
@@ -201,14 +202,10 @@ const BabaListItem = ({ baba, onClick }) => {
 const FAB = ({ onClick }) => (
   <button
     onClick={onClick}
-    className="fixed bottom-24 right-5 w-14 h-14 rounded-full flex items-center justify-center z-[60] active:scale-90 transition-transform"
-    style={{
-      background: 'linear-gradient(135deg, #00f2ff, #0066ff)',
-      boxShadow: '0 8px 32px rgba(0,242,255,0.35)',
-    }}
+    className="fixed bottom-44 right-4 z-50 w-10 h-10 rounded-full bg-surface-2 border border-border-mid text-text-low hover:text-cyan-electric hover:border-cyan-electric/30 transition-all shadow-glass flex items-center justify-center active:scale-90"
     aria-label="Criar baba, torneio ou entrar com código"
   >
-    <Plus size={24} className="text-black" strokeWidth={3} />
+    <Plus size={18} strokeWidth={3} />
   </button>
 );
 
@@ -219,7 +216,7 @@ const FABMenu = ({ onClose, onCreateBaba, onCreateTournament, onJoin }) => (
       className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     />
-    <div className="fixed bottom-44 right-5 z-[60] flex flex-col items-end gap-3">
+    <div className="fixed bottom-56 right-4 z-[60] flex flex-col items-end gap-3">
       <div className="flex items-center gap-3">
         <span className="text-[11px] text-text-mid font-black uppercase tracking-widest bg-black/80 px-3 py-1.5 rounded-xl border border-border-mid">
           Entrar com código
@@ -509,16 +506,22 @@ const HomePage = () => {
       </div>
       {/* ── Fim do container scrollável ── */}
 
-      {/* ── FAB e Menu fora do container — position: fixed funciona corretamente ── */}
-      {fabOpen && (
-        <FABMenu
-          onClose={() => setFabOpen(false)}
-          onCreateBaba={() => { setFabOpen(false); navigate('/create'); }}
-          onCreateTournament={() => { setFabOpen(false); setShowTournament(true); }}
-          onJoin={focusJoinBox}
-        />
+      {/* ── FAB e Menu via portal — escapam do transform do PageWrapper (animate-page-in),
+             que quebraria o position:fixed deles se ficassem dentro do <main> ── */}
+      {createPortal(
+        <>
+          {fabOpen && (
+            <FABMenu
+              onClose={() => setFabOpen(false)}
+              onCreateBaba={() => { setFabOpen(false); navigate('/create'); }}
+              onCreateTournament={() => { setFabOpen(false); setShowTournament(true); }}
+              onJoin={focusJoinBox}
+            />
+          )}
+          <FAB onClick={() => setFabOpen(v => !v)} />
+        </>,
+        document.body,
       )}
-      <FAB onClick={() => setFabOpen(v => !v)} />
 
       <CreateTournamentModal
         open={showTournament}
