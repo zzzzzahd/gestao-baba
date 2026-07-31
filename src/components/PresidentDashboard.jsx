@@ -2,8 +2,9 @@
 // Sprint 17 — Dashboard do presidente com KPIs e relatório mensal.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { BarChart2, Users, Target, Zap, TrendingUp, RefreshCw, CalendarCheck } from 'lucide-react';
+import { BarChart2, Users, Target, Zap, TrendingUp, RefreshCw, CalendarCheck, UserX, Clock3 } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { fetchAttendanceSummary } from '../services/attendanceService';
 
 const KpiCard = ({ icon: Icon, label, value, sub, color = 'text-cyan-electric' }) => (
   <div className="p-4 rounded-2xl bg-surface-1 border border-border-mid flex items-start gap-3">
@@ -25,21 +26,24 @@ const KpiCard = ({ icon: Icon, label, value, sub, color = 'text-cyan-electric' }
 );
 
 export default function PresidentDashboard({ babaId }) {
-  const [data,    setData]    = useState(null);
-  const [monthly, setMonthly] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState('kpis');
+  const [data,       setData]       = useState(null);
+  const [monthly,    setMonthly]    = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [tab,        setTab]        = useState('kpis');
 
   const load = useCallback(async () => {
     if (!babaId) return;
     setLoading(true);
     try {
-      const [{ data: dash }, { data: mon }] = await Promise.all([
+      const [{ data: dash }, { data: mon }, attSummary] = await Promise.all([
         supabase.rpc('get_president_dashboard', { p_baba_id: babaId }),
         supabase.from('v_baba_monthly_summary').select('*').eq('baba_id', babaId).order('month_label', { ascending: false }).limit(6),
+        fetchAttendanceSummary(babaId),
       ]);
       setData(dash);
       setMonthly(mon || []);
+      setAttendance(attSummary || []);
     } catch (err) {
       console.error('[PresidentDashboard]', err);
     } finally {
@@ -67,8 +71,9 @@ export default function PresidentDashboard({ babaId }) {
       {/* Tabs */}
       <div className="flex gap-1.5 p-1 bg-surface-2 rounded-xl border border-border-mid">
         {[
-          { id: 'kpis',    label: 'KPIs'     },
-          { id: 'monthly', label: 'Mensal'   },
+          { id: 'kpis',       label: 'KPIs'    },
+          { id: 'monthly',    label: 'Mensal'  },
+          { id: 'attendance', label: 'Faltas'  },
         ].map(t => (
           <button
             key={t.id}
@@ -157,6 +162,33 @@ export default function PresidentDashboard({ babaId }) {
                     className="h-full bg-yellow-400 rounded-full transition-all duration-700"
                     style={{ width: `${(Number(m.total_goals) / maxGoals) * 100}%` }}
                   />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'attendance' && (
+        <div className="space-y-2">
+          {attendance.length === 0 ? (
+            <div className="py-8 text-center">
+              <UserX size={24} className="text-text-muted mx-auto mb-2" />
+              <p className="text-[10px] font-black uppercase text-text-muted tracking-widest">Nenhuma falta ou atraso registrado</p>
+            </div>
+          ) : (
+            attendance.map(a => (
+              <div key={a.player_id} className="flex items-center justify-between p-3 rounded-2xl bg-surface-1 border border-border-mid">
+                <span className="text-[11px] font-black uppercase truncate flex-1 text-text-mid">{a.name}</span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-1" title="Faltas">
+                    <UserX size={12} className="text-red-400" />
+                    <span className="text-xs font-black tabular-nums text-red-400">{a.no_show_count}</span>
+                  </div>
+                  <div className="flex items-center gap-1" title="Atrasos">
+                    <Clock3 size={12} className="text-yellow-400" />
+                    <span className="text-xs font-black tabular-nums text-yellow-400">{a.late_count}</span>
+                  </div>
                 </div>
               </div>
             ))

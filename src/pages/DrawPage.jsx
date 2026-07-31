@@ -119,6 +119,7 @@ const DrawPage = () => {
               drawResult={drawResult}
               onNext={() => setStep(3)}
               onBack={() => setStep(1)}
+              onUpdateDrawResult={(partial) => setDrawResult({ ...drawResult, ...partial })}
             />
           )}
           {step === 3 && (

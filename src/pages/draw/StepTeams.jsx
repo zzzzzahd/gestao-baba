@@ -4,11 +4,12 @@
 // Exibe os times balanceados + reservas + CTA para iniciar partida.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Trophy, Users, Play, RefreshCw, ChevronLeft } from 'lucide-react';
 import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { POSITION_LABEL } from '../../utils/constants';
+import PresenceCheckModal from '../../components/PresenceCheckModal';
 
 const COLORS = [
   { border: 'border-cyan-electric/30',  text: 'text-cyan-electric', bg: 'bg-cyan-electric/10'  },
@@ -18,14 +19,22 @@ const COLORS = [
   { border: 'border-pink-500/30',       text: 'text-pink-500',      bg: 'bg-pink-500/10'       },
 ];
 
-const StepTeams = ({ drawResult, onNext, onBack }) => {
+const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
   const { currentBaba } = useBaba();
   const { profile }     = useAuth();
+  const [showPresenceCheck, setShowPresenceCheck] = useState(false);
 
   const teams    = drawResult?.teams    || [];
   const reserves = drawResult?.reserves || [];
   const isPresident = String(currentBaba?.president_id) === String(profile?.id);
   const totalPlayers = teams.reduce((s, t) => s + (t.players?.length || 0), 0);
+  const gameDate = new Date().toISOString().split('T')[0];
+
+  const handlePresenceConfirmed = ({ teams: newTeams, reserves: newReserves }) => {
+    setShowPresenceCheck(false);
+    onUpdateDrawResult?.({ teams: newTeams, reserves: newReserves });
+    onNext();
+  };
 
   if (!drawResult || teams.length === 0) {
     return (
@@ -119,7 +128,7 @@ const StepTeams = ({ drawResult, onNext, onBack }) => {
       <div className="space-y-3 pt-2">
         {isPresident ? (
           <button
-            onClick={onNext}
+            onClick={() => setShowPresenceCheck(true)}
             className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
           >
@@ -139,6 +148,17 @@ const StepTeams = ({ drawResult, onNext, onBack }) => {
           <ChevronLeft size={14} /> Reconfigurar sorteio
         </button>
       </div>
+
+      {showPresenceCheck && (
+        <PresenceCheckModal
+          babaId={currentBaba?.id}
+          gameDate={gameDate}
+          teams={teams}
+          reserves={reserves}
+          onCancel={() => setShowPresenceCheck(false)}
+          onConfirmed={handlePresenceConfirmed}
+        />
+      )}
     </div>
   );
 };

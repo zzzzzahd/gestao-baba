@@ -3,11 +3,12 @@
 // suspensão inline, nomear coordenador, badge de papel.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, MoreVertical, AlertTriangle, RefreshCw, ExternalLink, Search, Users } from 'lucide-react';
+import { X, Star, Shield, ShieldOff, ShieldCheck, Crown, MoreVertical, AlertTriangle, RefreshCw, ExternalLink, Search, Users, Trash2, ListFilter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { POSITION_LABEL } from '../utils/constants';
 import { supabase } from '../services/supabase';
 import { useAuth }  from '../contexts/AuthContext';
+import ConfirmModal from './ConfirmModal';
 import toast        from 'react-hot-toast';
 
 // ── Modal de suspensão ────────────────────────────────────────────────────────
@@ -119,23 +120,31 @@ const MembersModal = ({
   const navigate   = useNavigate();
 
   const [suspendTarget, setSuspendTarget] = useState(null);
+  const [removeTarget,  setRemoveTarget]  = useState(null);
   const [loading,       setLoading]       = useState(false);
   const [roles,         setRoles]         = useState(new Map());
   const [openMenuId,    setOpenMenuId]    = useState(null);
   const [search,        setSearch]        = useState('');
+  const [filterMode,    setFilterMode]    = useState('all'); // 'all' | 'suspended'
 
   const isPresident = String(presidentId) === String(user?.id);
+
+  const suspendedCount = useMemo(
+    () => players.filter(p => suspensionStatus(p)).length,
+    [players],
+  );
 
   // Ordena: presidente → coordenadores → resto (por avaliação), busca filtra por nome/posição
   const visiblePlayers = useMemo(() => {
     const term = search.trim().toLowerCase();
+    let base = filterMode === 'suspended' ? players.filter(p => suspensionStatus(p)) : players;
     const filtered = term
-      ? players.filter(p => {
+      ? base.filter(p => {
           const name = (p.display_name || p.name || '').toLowerCase();
           const pos  = (POSITION_LABEL[p.position] || p.position || '').toLowerCase();
           return name.includes(term) || pos.includes(term);
         })
-      : players;
+      : base;
 
     const rank = (p) => {
       if (String(p.user_id) === String(presidentId)) return 0;
@@ -148,7 +157,7 @@ const MembersModal = ({
       if (r !== 0) return r;
       return (b.final_rating || 0) - (a.final_rating || 0);
     });
-  }, [players, search, roles, presidentId]);
+  }, [players, search, roles, presidentId, filterMode]);
 
   const loadRoles = useCallback(async () => {
     if (!babaId) return;
@@ -175,6 +184,22 @@ const MembersModal = ({
       toast.error('Erro ao atualizar suspensão');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRemovePlayer = async (player) => {
+    try {
+      const { error } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', player.id);
+      if (error) throw error;
+      toast.success('Jogador removido do baba');
+      setRemoveTarget(null);
+      setOpenMenuId(null);
+      onPlayersUpdated?.();
+    } catch {
+      toast.error('Erro ao remover jogador');
     }
   };
 
@@ -256,7 +281,7 @@ const MembersModal = ({
 
           {/* Busca */}
           {players.length > 5 && (
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
@@ -268,13 +293,45 @@ const MembersModal = ({
             </div>
           )}
 
+          {/* Filtro: Todos / Suspensos */}
+          {suspendedCount > 0 && (
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setFilterMode('all')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  filterMode === 'all'
+                    ? 'bg-cyan-electric/10 border-cyan-electric/30 text-cyan-electric'
+                    : 'bg-surface-2 border-border-mid text-text-low hover:text-white'
+                }`}
+              >
+                <ListFilter size={11} /> Todos
+              </button>
+              <button
+                onClick={() => setFilterMode('suspended')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  filterMode === 'suspended'
+                    ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                    : 'bg-surface-2 border-border-mid text-text-low hover:text-white'
+                }`}
+              >
+                <Shield size={11} /> Suspensos ({suspendedCount})
+              </button>
+            </div>
+          )}
+
           {/* Lista */}
           <div className="overflow-y-auto space-y-2.5 flex-1 pr-1 -mr-1">
             {visiblePlayers.length === 0 && (
               <div className="flex flex-col items-center justify-center py-14 gap-2 text-center">
-                <Search size={22} className="text-text-muted" />
-                <p className="text-xs font-black text-text-low uppercase tracking-widest">Nenhum atleta encontrado</p>
-                <p className="text-[10px] text-text-muted font-bold">Tente buscar por outro nome ou posição</p>
+                {filterMode === 'suspended'
+                  ? <ShieldOff size={22} className="text-text-muted" />
+                  : <Search size={22} className="text-text-muted" />}
+                <p className="text-xs font-black text-text-low uppercase tracking-widest">
+                  {filterMode === 'suspended' ? 'Nenhum jogador suspenso' : 'Nenhum atleta encontrado'}
+                </p>
+                {filterMode !== 'suspended' && (
+                  <p className="text-[10px] text-text-muted font-bold">Tente buscar por outro nome ou posição</p>
+                )}
               </div>
             )}
             {visiblePlayers.map((p, i) => {
@@ -425,6 +482,15 @@ const MembersModal = ({
                                   : <ShieldCheck size={13} />}
                                 {isAdmin ? 'Remover coordenador' : 'Nomear coordenador'}
                               </button>
+
+                              {/* Excluir do baba */}
+                              <button
+                                onClick={() => { setOpenMenuId(null); setRemoveTarget(p); }}
+                                className="w-full flex items-center gap-2.5 px-4 py-3 text-[10px] font-black uppercase border-t border-border-subtle text-red-400 hover:bg-red-500/10 transition-colors"
+                              >
+                                <Trash2 size={13} />
+                                Excluir do baba
+                              </button>
                             </div>
                           )}
                         </div>
@@ -453,6 +519,17 @@ const MembersModal = ({
           onConfirm={handleSuspend}
         />
       )}
+
+      <ConfirmModal
+        open={!!removeTarget}
+        message={`Excluir ${removeTarget?.display_name || removeTarget?.name || 'jogador'}?`}
+        description="Remove o jogador do baba e apaga permanentemente seu histórico de partidas, avaliações e estatísticas. Não é possível desfazer."
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        danger
+        onConfirm={() => handleRemovePlayer(removeTarget)}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </>
   );
 };
