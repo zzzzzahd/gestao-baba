@@ -5,10 +5,11 @@ import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import {
   Plus, LogIn, Trophy, User,
-  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight
+  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight, Trash2
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import CreateTournamentModal from '../components/CreateTournamentModal';
+import { deleteTournament } from '../services/tournamentService';
 import toast from 'react-hot-toast';
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
@@ -271,6 +272,8 @@ const HomePage = () => {
   const [joining, setJoining]   = useState(false);
   const [showTournament, setShowTournament] = useState(false);
   const [tournaments, setTournaments] = useState([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
   const restBabas = useMemo(() => myBabas?.slice(1) || [], [myBabas]);
@@ -317,6 +320,21 @@ const HomePage = () => {
   const openBaba = (baba) => {
     setCurrentBaba(baba);
     navigate('/dashboard');
+  };
+
+  const handleDeleteTournament = async (tournamentId) => {
+    setDeletingId(tournamentId);
+    try {
+      await deleteTournament(tournamentId);
+      setTournaments(prev => prev.filter(t => t.id !== tournamentId));
+      toast.success('Torneio excluído');
+    } catch (err) {
+      console.error('[HomePage] deleteTournament:', err);
+      toast.error('Erro ao excluir torneio');
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
   };
 
   const focusJoinBox = () => {
@@ -393,26 +411,61 @@ const HomePage = () => {
           {tournaments.length > 0 ? (
             <div className="space-y-2">
               {tournaments.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => navigate(`/torneio/${t.id}`)}
-                  className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-border-mid flex items-center justify-between transition-all active:scale-[0.99]"
-                >
-                  <div className="text-left">
-                    <p className="font-black text-sm">{t.name}</p>
-                    <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
-                      {t.sport} · {t.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'}
+                confirmDeleteId === t.id ? (
+                  <div
+                    key={t.id}
+                    className="w-full p-4 rounded-2xl bg-red-500/5 border border-red-500/30 flex items-center justify-between gap-3"
+                  >
+                    <p className="text-[11px] font-black uppercase text-red-400 flex-1">
+                      Excluir "{t.name}"? Não dá pra desfazer.
                     </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-3 py-2 rounded-xl bg-surface-2 border border-border-mid text-text-low font-black uppercase text-[9px]"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTournament(t.id)}
+                        disabled={deletingId === t.id}
+                        className="px-3 py-2 rounded-xl bg-red-500 text-white font-black uppercase text-[9px] disabled:opacity-50"
+                      >
+                        {deletingId === t.id ? '...' : 'Excluir'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {t.status === 'finished' && (
-                      <span className="text-[8px] bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-0.5 rounded-lg font-black uppercase">
-                        Finalizado
-                      </span>
-                    )}
-                    <ChevronRight size={14} className="text-text-muted" />
+                ) : (
+                  <div
+                    key={t.id}
+                    className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-border-mid flex items-center justify-between transition-all"
+                  >
+                    <button
+                      onClick={() => navigate(`/torneio/${t.id}`)}
+                      className="flex-1 text-left active:scale-[0.99] transition-all"
+                    >
+                      <p className="font-black text-sm">{t.name}</p>
+                      <p className="text-[9px] text-text-low font-black uppercase mt-0.5">
+                        {t.sport} · {t.format === 'knockout' ? 'Mata-mata' : 'Pontos corridos'}
+                      </p>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {t.status === 'finished' && (
+                        <span className="text-[8px] bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-0.5 rounded-lg font-black uppercase">
+                          Finalizado
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setConfirmDeleteId(t.id)}
+                        aria-label="Excluir torneio"
+                        className="p-1.5 text-text-muted hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <ChevronRight size={14} className="text-text-muted" />
+                    </div>
                   </div>
-                </button>
+                )
               ))}
             </div>
           ) : (

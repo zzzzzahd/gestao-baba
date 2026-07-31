@@ -1,6 +1,12 @@
 // src/services/tournamentService.js
 import { supabase } from './supabase';
 
+/** Exclui um torneio (times, partidas e stats relacionados saem em cascata) */
+export async function deleteTournament(tournamentId) {
+  const { error } = await supabase.from('tournaments').delete().eq('id', tournamentId);
+  if (error) throw error;
+}
+
 /** Mata-mata: avança vencedor para a próxima fase ou marca campeão */
 export async function advanceWinner(tournamentId, match, winnerId) {
   const { data: tour } = await supabase.from('tournaments')
