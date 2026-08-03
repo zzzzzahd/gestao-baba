@@ -3,14 +3,15 @@
 // Integrado na TabOverview (visível para todos os membros).
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Zap, Trophy, UserPlus, Target, RefreshCw } from 'lucide-react';
+import { Zap, Trophy, UserPlus, Target, RefreshCw, DollarSign } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 const TYPE_CONFIG = {
-  goal:    { icon: Zap,      color: 'text-yellow-400', bg: 'bg-yellow-400/10 border-yellow-400/20', label: 'Gol'       },
-  win:     { icon: Trophy,   color: 'text-cyan-electric', bg: 'bg-cyan-electric/10 border-cyan-electric/20', label: 'Vitória' },
-  join:    { icon: UserPlus, color: 'text-green-400',  bg: 'bg-green-400/10 border-green-400/20',  label: 'Novo membro' },
-  assist:  { icon: Target,   color: 'text-purple-400', bg: 'bg-purple-400/10 border-purple-400/20', label: 'Assistência' },
+  goal:    { icon: Zap,        color: 'text-yellow-400',   bg: 'bg-yellow-400/10 border-yellow-400/20',   label: 'Gol'         },
+  win:     { icon: Trophy,     color: 'text-cyan-electric', bg: 'bg-cyan-electric/10 border-cyan-electric/20', label: 'Vitória' },
+  join:    { icon: UserPlus,   color: 'text-green-400',    bg: 'bg-green-400/10 border-green-400/20',    label: 'Novo membro' },
+  assist:  { icon: Target,     color: 'text-purple-400',   bg: 'bg-purple-400/10 border-purple-400/20',  label: 'Assistência' },
+  charge:  { icon: DollarSign, color: 'text-emerald-400',  bg: 'bg-emerald-400/10 border-emerald-400/20', label: 'Cobrança'   },
 };
 
 const timeAgo = (date) => {
@@ -54,6 +55,14 @@ export default function ActivityFeed({ babaId, limit = 10 }) {
         .order('joined_at', { ascending: false })
         .limit(5);
 
+      // Busca cobranças recentes
+      const { data: charges } = await supabase
+        .from('financials')
+        .select('title, created_at')
+        .eq('baba_id', babaId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
       const items = [];
 
       (goals || []).forEach(g => {
@@ -81,6 +90,15 @@ export default function ActivityFeed({ babaId, limit = 10 }) {
           type: 'join',
           text: `${j.name} entrou no baba`,
           date: j.joined_at,
+        });
+      });
+
+      (charges || []).forEach(c => {
+        items.push({
+          id:   `charge-${c.title}-${c.created_at}`,
+          type: 'charge',
+          text: `Nova cobrança lançada: ${c.title}`,
+          date: c.created_at,
         });
       });
 
