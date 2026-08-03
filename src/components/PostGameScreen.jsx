@@ -12,6 +12,7 @@ const PostGameScreen = ({
   matchId,
   babaId,
   babaName,
+  standings = [],
   onClose,
 }) => {
   const [showMVP, setShowMVP] = useState(false);
@@ -75,6 +76,22 @@ const PostGameScreen = ({
               <span className="text-[11px] font-black uppercase text-yellow-500">
                 {winnerTeam?.name} venceu! 🏆
               </span>
+            </div>
+          )}
+
+          {/* Classificação do dia */}
+          {standings.length > 0 && (
+            <div className="p-3 rounded-2xl bg-surface-2 border border-border-mid space-y-1.5">
+              <p className="text-[8px] font-black text-text-muted uppercase tracking-widest text-center mb-1.5">
+                Classificação do dia
+              </p>
+              {standings.slice(0, 4).map((t, i) => (
+                <div key={t.name} className="flex items-center gap-2 text-[10px]">
+                  <span className="w-4 text-text-muted font-black">{i + 1}º</span>
+                  <span className="flex-1 font-black uppercase truncate text-text-mid">{t.name}</span>
+                  <span className="font-black text-cyan-electric tabular-nums">{t.Pts} pts</span>
+                </div>
+              ))}
             </div>
           )}
 

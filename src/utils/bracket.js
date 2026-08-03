@@ -127,3 +127,39 @@ export function computeStandings(teams, matches) {
     .map(r => ({ ...r, SG: r.GP - r.GC }))
     .sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
 }
+
+/**
+ * Classificação do dia para o baba comum (fora do modo torneio), a partir das
+ * partidas já finalizadas na rotação "vencedor fica". Times são identificados
+ * pelo nome (team_a_name/team_b_name), que se mantém estável durante o dia.
+ * Vitória=3, Empate=1, Derrota=0.
+ */
+export function computeDailyTeamStandings(matches = []) {
+  const table = {};
+  const ensure = (name) => {
+    if (!name) return null;
+    if (!table[name]) {
+      table[name] = { name, P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0, SG: 0, Pts: 0 };
+    }
+    return table[name];
+  };
+
+  for (const m of matches) {
+    if (m.status !== 'finished' || m.team_a_score == null || m.team_b_score == null) continue;
+    const A = ensure(m.team_a_name);
+    const B = ensure(m.team_b_name);
+    if (!A || !B) continue;
+
+    A.P++; B.P++;
+    A.GP += m.team_a_score; A.GC += m.team_b_score;
+    B.GP += m.team_b_score; B.GC += m.team_a_score;
+
+    if (m.team_a_score > m.team_b_score) { A.V++; A.Pts += 3; B.D++; }
+    else if (m.team_a_score < m.team_b_score) { B.V++; B.Pts += 3; A.D++; }
+    else { A.E++; B.E++; A.Pts++; B.Pts++; }
+  }
+
+  return Object.values(table)
+    .map(r => ({ ...r, SG: r.GP - r.GC }))
+    .sort((a, b) => b.Pts - a.Pts || b.SG - a.SG || b.GP - a.GP);
+}

@@ -2,7 +2,7 @@
 // Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Target, UserPlus, ChevronLeft } from 'lucide-react';
+import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown } from 'lucide-react';
 import { useBaba }           from '../../contexts/BabaContext';
 import { useAuth }           from '../../contexts/AuthContext';
 import { supabase }          from '../../services/supabase';
@@ -15,6 +15,7 @@ import { useRealtimeMatch }  from '../../hooks/useRealtimeMatch';
 import { Sounds }            from '../../utils/sounds';
 import { fmt, GOAL_MESSAGES } from '../../utils/messages';
 import { useFeatures }       from '../../utils/babaMode';
+import { computeDailyTeamStandings } from '../../utils/bracket';
 import toast                 from 'react-hot-toast';
 
 const formatTime = (s) =>
@@ -42,6 +43,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [showPostGame,     setShowPostGame]     = useState(false);
   const [finishedMatch,    setFinishedMatch]    = useState(null);
   const [allMatchPlayers,  setAllMatchPlayers]  = useState([]);
+  const [dailyStandings,   setDailyStandings]   = useState([]);
+  const [showStandings,    setShowStandings]    = useState(false);
 
   // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
@@ -93,6 +96,25 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       handleMatchEnd();
     }
   }, [currentMatch?.scoreA, currentMatch?.scoreB]);
+
+  const loadDailyStandings = useCallback(async () => {
+    if (!currentBaba) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase.from('matches')
+        .select('team_a_name, team_b_name, team_a_score, team_b_score, status')
+        .eq('baba_id', currentBaba.id)
+        .eq('status', 'finished')
+        .gte('match_date', `${today}T00:00:00`)
+        .lte('match_date', `${today}T23:59:59`);
+      if (error) throw error;
+      setDailyStandings(computeDailyTeamStandings(data || []));
+    } catch (err) {
+      console.error('[StepMatch] loadDailyStandings:', err);
+    }
+  }, [currentBaba]);
+
+  useEffect(() => { loadDailyStandings(); }, [loadDailyStandings]);
 
   const loadOrCreateMatch = useCallback(async (teamA, teamB) => {
     if (!currentBaba) return;
@@ -200,6 +222,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         team_b_score: scoreB,
         finished_at:  new Date().toISOString(),
       }).eq('id', matchId);
+      loadDailyStandings();
     }
 
     // Mostrar tela pós-jogo
@@ -210,7 +233,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     if (winnerName && matchId) {
       setWinnerInfo({ name: winnerName, matchId });
     }
-  }, [currentMatch, allTeams, matchId]);
+  }, [currentMatch, allTeams, matchId, loadDailyStandings]);
 
   const continueAfterMatch = useCallback(async (queue) => {
     setShowPostGame(false);
@@ -262,6 +285,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           matchId={matchId}
           babaId={currentBaba?.id}
           babaName={currentBaba?.name}
+          standings={dailyStandings}
           onClose={() => continueAfterMatch(pendingQueue)}
         />
       )}
@@ -326,6 +350,40 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
             Finalizar Partida
           </button>
         </div>
+
+        {/* Classificação do dia */}
+        {dailyStandings.length > 0 && (
+          <div className="rounded-2xl bg-surface-1 border border-border-subtle overflow-hidden">
+            <button
+              onClick={() => setShowStandings(v => !v)}
+              className="w-full p-4 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <Trophy size={14} className="text-yellow-500" />
+                <div className="text-left">
+                  <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Líder do dia</p>
+                  <p className="text-sm font-black uppercase italic text-yellow-500">
+                    {dailyStandings[0].name} · {dailyStandings[0].Pts} pts
+                  </p>
+                </div>
+              </div>
+              <ChevronDown size={16} className={`text-text-muted transition-transform ${showStandings ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showStandings && (
+              <div className="px-4 pb-4 space-y-1.5">
+                {dailyStandings.map((t, i) => (
+                  <div key={t.name} className="flex items-center gap-2 text-[10px]">
+                    <span className="w-4 text-text-muted font-black">{i + 1}º</span>
+                    <span className="flex-1 font-black uppercase truncate">{t.name}</span>
+                    <span className="text-text-muted">{t.V}V {t.E}E {t.D}D</span>
+                    <span className="w-10 text-right font-black text-cyan-electric tabular-nums">{t.Pts} pts</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Reações — apenas se feature habilitada */}
         {features.reactions && matchId && (

@@ -9,6 +9,7 @@ import DrawConfigBlock     from '../../components/DrawConfigBlock';
 import WaitlistPanel       from '../../components/WaitlistPanel';
 import InvitesPanel        from '../../components/InvitesPanel';
 import ActivityFeed        from '../../components/ActivityFeed';
+import DailyRecapPanel     from '../../components/DailyRecapPanel';
 
 const TabOverview = ({
   currentBaba,
@@ -107,7 +108,8 @@ const TabOverview = ({
           </span>
         </button>
         {showActivity && (
-          <div className="px-5 pb-5 border-t border-border-subtle pt-4">
+          <div className="px-5 pb-5 border-t border-border-subtle pt-4 space-y-4">
+            <DailyRecapPanel babaId={currentBaba?.id} isPresident={isPresident} />
             <ActivityFeed babaId={currentBaba?.id} limit={8} />
           </div>
         )}
