@@ -39,7 +39,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
   };
 
   const handleSubmit = async () => {
-    if (!text.trim()) { toast.error('Descreva o problema ou sugestão'); return; }
+    if (!text.trim()) return;
     setLoading(true);
     try {
       const payload = {
@@ -59,7 +59,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
         console.warn('[FeedbackModal] tabela feedback não encontrada:', error.message);
       }
 
-      toast.success('Obrigado pelo feedback! 🙏');
+      toast.success('Obrigado pelo feedback 🙏');
       setText('');
       setScreenshot(null);
       onClose?.();

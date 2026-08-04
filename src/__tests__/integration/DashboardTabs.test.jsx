@@ -20,7 +20,7 @@ import { MemoryRouter } from 'react-router-dom';
 // filhos: PresenceBlock, ActivityFeed, InvitesPanel, TabPostGame etc.).
 function makeQueryBuilder(resolved = { data: [], error: null }) {
   const builder = {};
-  const chainMethods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'order', 'limit', 'in', 'gte', 'lte'];
+  const chainMethods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'order', 'limit', 'in', 'gte', 'lte', 'gt', 'lt'];
   chainMethods.forEach(m => { builder[m] = vi.fn(() => builder); });
   builder.single      = vi.fn().mockResolvedValue(resolved);
   builder.maybeSingle = vi.fn().mockResolvedValue(resolved);
@@ -336,7 +336,7 @@ describe('DashboardPage › navegação de tabs', () => {
     await waitFor(() => screen.getByText('Pelada do Zé'));
     fireEvent.click(screen.getByRole('tab', { name: /pós-jogo/i }));
     await waitFor(() => expect(screen.getByRole('tab', { name: /pós-jogo/i })).toHaveAttribute('aria-selected', 'true'));
-    await waitFor(() => expect(screen.getByText(/nenhuma partida ainda|últimas partidas/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/últimas partidas/i)).toBeInTheDocument());
   });
 
   it('loading state: exibe o skeleton do cabeçalho', () => {

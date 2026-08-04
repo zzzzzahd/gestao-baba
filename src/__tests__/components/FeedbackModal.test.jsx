@@ -129,13 +129,6 @@ describe('FeedbackModal — submit', () => {
     supabase.from.mockReturnValue(makeChain());
   });
 
-  it('bloqueia envio quando textarea está vazio — toast.error', async () => {
-    renderModal();
-    fireEvent.click(screen.getByText('Enviar feedback'));
-    expect(toast.error).toHaveBeenCalledWith('Descreva o problema ou sugestão');
-    expect(supabase.from).not.toHaveBeenCalled();
-  });
-
   it('botão enviar está desabilitado quando texto está vazio', () => {
     renderModal();
     const btn = screen.getByText('Enviar feedback').closest('button');
