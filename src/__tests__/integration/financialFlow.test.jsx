@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const mockNavigate = vi.fn();
@@ -87,6 +87,17 @@ const setupMocks = ({ financials = [], user = USER_PRESIDENT } = {}) => {
 const renderPage = () =>
   render(<MemoryRouter><FinancialPage /></MemoryRouter>);
 
+// O título "Financeiro." é renderizado como `Financeiro<span>.</span>` — o
+// texto fica dividido entre o nó de texto e o <span>, então getByText com uma
+// string simples nunca casa (o matcher padrão só olha os filhos diretos que
+// são nós de texto). Usamos um matcher de função que concatena o textContent.
+const findTitle = () =>
+  waitFor(() =>
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'H1' && el.textContent === 'Financeiro.')
+    ).toBeInTheDocument()
+  );
+
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
 describe('FinancialPage — carregamento', () => {
@@ -114,13 +125,13 @@ describe('FinancialPage — carregamento', () => {
   it('exibe título "Financeiro"', async () => {
     setupMocks();
     renderPage();
-    await waitFor(() => expect(screen.getByText('Financeiro.')).toBeInTheDocument());
+    await findTitle();
   });
 
   it('exibe lista vazia quando não há cobranças', async () => {
     setupMocks({ financials: [] });
     renderPage();
-    await waitFor(() => expect(screen.getByText('Financeiro.')).toBeInTheDocument());
+    await findTitle();
     expect(screen.queryByText('MENSALIDADE JUNHO')).toBeNull();
   });
 
@@ -223,7 +234,7 @@ describe('FinancialPage — presidente: criar cobrança', () => {
   it('não exibe botão "Nova Cobrança" para membro', async () => {
     setupMocks({ user: USER_MEMBER });
     renderPage();
-    await waitFor(() => screen.getByText('Financeiro.'));
+    await findTitle();
     expect(screen.queryByText('Nova Cobrança')).toBeNull();
   });
 
@@ -299,10 +310,11 @@ describe('FinancialPage — presidente: criar cobrança', () => {
 
     fireEvent.change(screen.getByPlaceholderText('TÍTULO (EX: MENSALIDADE)'), { target: { value: 'TAXA' } });
     fireEvent.change(screen.getByPlaceholderText('VALOR R$'), { target: { value: '50' } });
+    fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2025-07-31' } }); // due_date
     fireEvent.change(screen.getByPlaceholderText('CHAVE PIX'), { target: { value: '123' } });
     fireEvent.click(screen.getByText('Lançar Agora'));
 
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cobrança lançada'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cobrança lançada!'));
   });
 
   it('toast.error ao criar cobrança com falha', async () => {
@@ -318,6 +330,7 @@ describe('FinancialPage — presidente: criar cobrança', () => {
     fireEvent.click(screen.getByText('Nova Cobrança'));
     fireEvent.change(screen.getByPlaceholderText('TÍTULO (EX: MENSALIDADE)'), { target: { value: 'X' } });
     fireEvent.change(screen.getByPlaceholderText('VALOR R$'), { target: { value: '10' } });
+    fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2025-07-31' } }); // due_date
     fireEvent.change(screen.getByPlaceholderText('CHAVE PIX'), { target: { value: '1' } });
     fireEvent.click(screen.getByText('Lançar Agora'));
 
@@ -360,19 +373,18 @@ describe('FinancialPage — presidente: encerrar/reativar cobrança', () => {
   });
 
   it('toast.error quando toggleStatus falha', async () => {
-    const chain = setupMocks({ financials: [makeFinancial()] });
-    chain.update.mockReturnThis();
-    chain.eq.mockReturnThis();
-    chain.select = vi.fn().mockResolvedValue({ error: new Error('rls fail') });
+    setupMocks({ financials: [makeFinancial()] });
 
     renderPage();
     await waitFor(() => screen.getByText('MENSALIDADE JUNHO'));
 
     supabase.from.mockReturnValue({
-      ...chain,
+      select: vi.fn().mockResolvedValue({ error: new Error('fail') }),
       update: vi.fn().mockReturnThis(),
       eq:     vi.fn().mockReturnThis(),
-      select: vi.fn().mockResolvedValue({ error: new Error('fail') }),
+      order:  vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
     });
 
     const banBtns = screen.getAllByRole('button').filter(b => b.querySelector('svg'));
@@ -475,7 +487,7 @@ describe('FinancialPage — presidente: aprovar pagamento', () => {
     await waitFor(() => screen.getByText('Aprovar'));
     fireEvent.click(screen.getByText('Aprovar'));
 
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Pagamento Confirmado'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Pagamento Confirmado!'));
   });
 
   it('toast.error quando aprovação falha', async () => {
@@ -533,13 +545,11 @@ describe('FinancialPage — modal de pagamento (membro)', () => {
     fireEvent.click(screen.getByText('Pagar Agora'));
     expect(screen.getByText('Pagar Taxa')).toBeInTheDocument();
 
-    const closeBtn = screen.getByRole('button', { name: '' });
-    // Fechar botão X é o primeiro botão sem texto
-    const allBtns = screen.getAllByRole('button');
-    const xBtn = allBtns.find(b => !b.textContent.trim() || b.querySelector('svg'));
-    if (xBtn) {
-      fireEvent.click(xBtn);
-      await waitFor(() => expect(screen.queryByText('Pagar Taxa')).toBeNull());
-    }
+    // O botão de fechar (ícone X) é o único botão dentro do cabeçalho do
+    // modal, ao lado do título "Pagar Taxa".
+    const modalHeader = screen.getByText('Pagar Taxa').closest('div');
+    const closeBtn    = within(modalHeader).getByRole('button');
+    fireEvent.click(closeBtn);
+    await waitFor(() => expect(screen.queryByText('Pagar Taxa')).toBeNull());
   });
 });

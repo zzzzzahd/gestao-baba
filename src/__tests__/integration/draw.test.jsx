@@ -28,7 +28,7 @@ vi.mock('react-hot-toast', () => ({
   default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
 }));
 vi.mock('../../utils/sounds', () => ({
-  Sounds: { click: vi.fn(), draw: vi.fn(), success: vi.fn() },
+  Sounds: { click: vi.fn(), draw: vi.fn(), success: vi.fn(), unlock: vi.fn() },
 }));
 vi.mock('../../components/Tooltip', () => ({ default: ({ children }) => children }));
 vi.mock('../../components/DrawConstraintsPanel', () => ({ default: () => <div>Constraints</div> }));
@@ -82,6 +82,8 @@ const setupSupabase = () => {
     eq:          vi.fn().mockReturnThis(),
     upsert:      vi.fn().mockReturnThis(),
     insert:      vi.fn().mockReturnThis(),
+    limit:       vi.fn().mockReturnThis(),
+    order:       vi.fn().mockReturnThis(),
     single:      vi.fn().mockResolvedValue({ data: { id: 'match-1' }, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   });

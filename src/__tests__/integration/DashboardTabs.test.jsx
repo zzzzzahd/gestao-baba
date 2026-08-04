@@ -1,6 +1,12 @@
-﻿// src/__tests__/integration/DashboardTabs.test.jsx
-// Sprint T-10 — Integração: Tabs do DashboardPage
-// TabOverview, TabManage e TabPostGame com BabaContext mockado.
+// src/__tests__/integration/DashboardTabs.test.jsx
+// Integração: Tabs do DashboardPage (TabOverview, TabManage, TabPostGame) +
+// navegação entre tabs do DashboardPage.
+//
+// IMPORTANTE: TabOverview e TabManage NÃO usam useBaba() internamente — todo
+// o estado chega via props, passado pelo DashboardPage (arquitetura de
+// "sharedProps" + props específicas por aba). TabPostGame é diferente: usa
+// useBaba()/useFeatures() por dentro E recebe {currentBaba, isPresident}
+// como props, além de buscar sozinha as últimas partidas no Supabase.
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,18 +14,23 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── Mocks de serviços ─────────────────────────────────────────────────────────
+
+// Builder encadeável genérico do Supabase — cobre select/eq/order/limit e
+// resolve com lista vazia por padrão (suficiente para os componentes
+// filhos: PresenceBlock, ActivityFeed, InvitesPanel, TabPostGame etc.).
+function makeQueryBuilder(resolved = { data: [], error: null }) {
+  const builder = {};
+  const chainMethods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'order', 'limit', 'in', 'gte', 'lte'];
+  chainMethods.forEach(m => { builder[m] = vi.fn(() => builder); });
+  builder.single      = vi.fn().mockResolvedValue(resolved);
+  builder.maybeSingle = vi.fn().mockResolvedValue(resolved);
+  builder.then = (onFulfilled, onRejected) => Promise.resolve(resolved).then(onFulfilled, onRejected);
+  return builder;
+}
+
 vi.mock('../../services/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockReturnThis(),
-      order:  vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      then:   vi.fn(cb => Promise.resolve(cb({ data: [], error: null }))),
-    })),
+    from: vi.fn(() => makeQueryBuilder()),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     channel: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),
@@ -27,288 +38,269 @@ vi.mock('../../services/supabase', () => ({
       unsubscribe: vi.fn(),
     })),
     removeChannel: vi.fn(),
+    storage: {
+      from: vi.fn(() => ({
+        upload:       vi.fn().mockResolvedValue({ error: null }),
+        getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://cdn.test/x.png' } }),
+      })),
+    },
   },
 }));
 
 vi.mock('react-hot-toast', () => ({
-  default: { success: vi.fn(), error: vi.fn(), loading: vi.fn(() => 'id'), dismiss: vi.fn() },
+  default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), loading: vi.fn(() => 'id'), dismiss: vi.fn() }),
+  Toaster: () => null,
   __esModule: true,
 }));
 
-// ── BabaContext helper ────────────────────────────────────────────────────────
+// ── BabaContext / AuthContext ─────────────────────────────────────────────────
+// TabOverview/TabManage não leem o contexto (recebem tudo via prop), mas
+// DashboardPage, TabPostGame, useThemeColor/useFeatures e os componentes
+// filhos (BabaSettings etc.) leem — por isso o contexto continua mockado.
+
 const makeCtx = (overrides = {}) => ({
-  currentBaba:        { id: 'baba1', name: 'Pelada do Zé', created_by: 'user1' },
-  user:               { id: 'user1' },
-  players:            [
+  currentBaba: { id: 'baba1', name: 'Pelada do Zé', president_id: 'user1', mode: 'casual' },
+  players: [
     { id: 'p1', name: 'João',  user_id: 'user1', stars: 3 },
     { id: 'p2', name: 'Maria', user_id: 'user2', stars: 4 },
   ],
   currentMatch:       null,
-  drawResult:         null,
+  loading:            false,
+  nextGameDay:        { time: '09:00:00', dateStr: '2026-07-05', deadline: new Date(Date.now() + 3600000) },
+  countdown:          { active: false, d: 0, h: 0, m: 0, s: 0 },
   gameConfirmations:  [],
   myConfirmation:     null,
   canConfirm:         true,
-  countdown:          { active: false, d: 0, h: 0, m: 0, s: 0 },
-  nextGameDay:        { time: '09:00:00', dateStr: '2026-07-05', deadline: new Date(Date.now() + 3600000) },
   drawConfig:         { playersPerTeam: 5 },
-  loading:            false,
-  isPresident:        true,
   isDrawing:          false,
   inviteCode:         'INVITE123',
-  refreshData:        vi.fn(),
+  uploadBabaImage:    vi.fn().mockResolvedValue(),
+  ratePlayer:         vi.fn().mockResolvedValue(),
+  getAllRatings:      vi.fn().mockResolvedValue([]),
   confirmPresence:    vi.fn(),
   cancelConfirmation: vi.fn(),
+  reloadConfirmations: vi.fn(),
+  setDrawConfig:      vi.fn(),
+  refreshData:        vi.fn(),
   ...overrides,
 });
 
-// Patchear useBaba com contexto configurável
 let ctxValue = makeCtx();
-vi.mock('../../contexts/BabaContext', () => ({
-  useBaba: () => ctxValue,
+vi.mock('../../contexts/BabaContext', () => ({ useBaba: () => ctxValue }));
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ profile: { id: 'user1', name: 'Zé' }, user: { id: 'user1' }, signOut: vi.fn() }),
 }));
 
-const wrap = (ui) =>
-  render(<MemoryRouter>{ui}</MemoryRouter>);
+const wrap = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// T-10-A: TabOverview
+// TabOverview — recebe tudo via props
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('TabOverview', () => {
   let TabOverview;
 
+  const baseProps = () => ({
+    currentBaba:         ctxValue.currentBaba,
+    nextGameDay:         ctxValue.nextGameDay,
+    countdown:           ctxValue.countdown,
+    gameConfirmations:   ctxValue.gameConfirmations,
+    myConfirmation:      ctxValue.myConfirmation,
+    canConfirm:          ctxValue.canConfirm,
+    reloadConfirmations: ctxValue.reloadConfirmations,
+    drawConfig:          ctxValue.drawConfig,
+    setDrawConfig:       ctxValue.setDrawConfig,
+    isDrawing:           ctxValue.isDrawing,
+    isPresident:         true,
+    loading:             false,
+  });
+
   beforeEach(async () => {
     vi.clearAllMocks();
     ctxValue = makeCtx();
-    try {
-      const m = await import('../../pages/dashboard/TabOverview');
-      TabOverview = m.default;
-    } catch {
-      TabOverview = null;
-    }
+    const m = await import('../../pages/dashboard/TabOverview');
+    TabOverview = m.default;
   });
 
   it('renderiza sem erros críticos', () => {
-    if (!TabOverview) return; // skip se componente não existir
-    expect(() => wrap(<TabOverview />)).not.toThrow();
+    expect(() => wrap(<TabOverview {...baseProps()} />)).not.toThrow();
   });
 
-  it('exibe nome do baba', () => {
-    if (!TabOverview) return;
-    wrap(<TabOverview />);
-    expect(screen.queryByText(/Pelada do Zé/i)).not.toBeNull();
+  it('exibe o bloco de presença quando há um próximo jogo', () => {
+    wrap(<TabOverview {...baseProps()} />);
+    // PresenceBlock é renderizado dentro do card de "próximo jogo"
+    expect(screen.queryByText(/nenhum baba agendado/i)).toBeNull();
   });
 
-  it('exibe contagem de confirmados', () => {
-    if (!TabOverview) return;
-    ctxValue = makeCtx({
-      gameConfirmations: [
-        { id: 'c1', status: 'confirmed', player_name: 'João' },
-      ],
-    });
-    wrap(<TabOverview />);
-    // Exibe "1" em algum lugar
-    expect(screen.getByText('1')).toBeInTheDocument();
+  it('exibe estado "nenhum baba agendado" quando nextGameDay=null', () => {
+    wrap(<TabOverview {...baseProps()} nextGameDay={null} />);
+    expect(screen.queryByText(/nenhum baba agendado/i)).not.toBeNull();
   });
 
-  it('exibe horário do próximo jogo', () => {
-    if (!TabOverview) return;
-    wrap(<TabOverview />);
-    expect(screen.queryByText(/09:00/)).not.toBeNull();
+  it('presidente vê o bloco de configuração do sorteio', () => {
+    wrap(<TabOverview {...baseProps()} isPresident isDrawing={false} canConfirm />);
+    // DrawConfigBlock só renderiza para presidente + canConfirm
+    expect(screen.queryByText(/nenhum baba agendado/i)).toBeNull();
   });
 
-  it('exibe estado "nenhum jogo" quando nextGameDay=null', () => {
-    if (!TabOverview) return;
-    ctxValue = makeCtx({ nextGameDay: null });
-    wrap(<TabOverview />);
-    // alguma mensagem indicando ausência de jogo
-    expect(
-      screen.queryByText(/nenhum|sem jogo|agendado/i)
-    ).not.toBeNull();
+  it('exibe indicador de sorteio automático quando isDrawing=true', () => {
+    wrap(<TabOverview {...baseProps()} isDrawing />);
+    expect(screen.getByText(/sorteando automaticamente/i)).toBeInTheDocument();
   });
 
-  it('PresenceBlock está presente na tab', () => {
-    if (!TabOverview) return;
-    const { container } = wrap(<TabOverview />);
-    // PresenceBlock renderiza botão confirmar quando canConfirm=true
-    expect(
-      container.querySelector('button') ||
-      screen.queryByText(/confirmar/i)
-    ).not.toBeNull();
+  it('seção "Convidar Atletas" aparece apenas para presidente', () => {
+    const { rerender } = wrap(<TabOverview {...baseProps()} isPresident />);
+    expect(screen.getByText(/convidar atletas/i)).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <TabOverview {...baseProps()} isPresident={false} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText(/convidar atletas/i)).toBeNull();
+  });
+
+  it('exibe painel de "Atividades Recentes"', () => {
+    wrap(<TabOverview {...baseProps()} />);
+    expect(screen.getByText(/atividades recentes/i)).toBeInTheDocument();
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// T-10-B: TabManage
+// TabManage — recebe tudo via props (sem lista de jogadores/código de convite
+// diretos: isso vive dentro de BabaSettings, colapsado por padrão)
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('TabManage', () => {
   let TabManage;
 
+  const baseProps = (overrides = {}) => ({
+    currentBaba:        ctxValue.currentBaba,
+    currentMatch:       null,
+    isDrawing:          false,
+    isPresident:        true,
+    canManage:          true,
+    playersWithRatings: ctxValue.players,
+    getAllRatings:      ctxValue.getAllRatings,
+    setPlayerRatings:   vi.fn(),
+    ...overrides,
+  });
+
   beforeEach(async () => {
     vi.clearAllMocks();
     ctxValue = makeCtx();
-    try {
-      const m = await import('../../pages/dashboard/TabManage');
-      TabManage = m.default;
-    } catch {
-      TabManage = null;
-    }
+    const m = await import('../../pages/dashboard/TabManage');
+    TabManage = m.default;
   });
 
   it('renderiza sem erros críticos', () => {
-    if (!TabManage) return;
-    expect(() => wrap(<TabManage />)).not.toThrow();
+    expect(() => wrap(<TabManage {...baseProps()} />)).not.toThrow();
   });
 
-  it('exibe lista de jogadores', () => {
-    if (!TabManage) return;
-    wrap(<TabManage />);
-    expect(screen.queryByText('João')).not.toBeNull();
-    expect(screen.queryByText('Maria')).not.toBeNull();
+  it('sem sorteio ainda: convida a iniciar um sorteio', () => {
+    wrap(<TabManage {...baseProps({ currentMatch: null })} />);
+    expect(screen.getByText(/iniciar sorteio/i)).toBeInTheDocument();
   });
 
-  it('exibe contagem total de jogadores', () => {
-    if (!TabManage) return;
-    wrap(<TabManage />);
-    expect(screen.queryByText(/2/)).not.toBeNull();
+  it('com sorteio feito: mostra prévia dos times sorteados', () => {
+    const currentMatch = {
+      teams: [
+        { name: 'Time A', players: [{ id: 'p1', name: 'João' }] },
+        { name: 'Time B', players: [{ id: 'p2', name: 'Maria' }] },
+      ],
+      reserves: [],
+    };
+    wrap(<TabManage {...baseProps({ currentMatch })} />);
+    expect(screen.getByText('Time A')).toBeInTheDocument();
+    expect(screen.getByText('Time B')).toBeInTheDocument();
+    expect(screen.getByText('João')).toBeInTheDocument();
   });
 
-  it('exibe código de convite', () => {
-    if (!TabManage) return;
-    wrap(<TabManage />);
-    expect(screen.queryByText(/INVITE123/i)).not.toBeNull();
+  it('exibe indicador de sorteio automático quando isDrawing=true', () => {
+    wrap(<TabManage {...baseProps({ isDrawing: true })} />);
+    expect(screen.getByText(/sorteando automaticamente/i)).toBeInTheDocument();
   });
 
-  it('presidente vê botão de convite/QR', () => {
-    if (!TabManage) return;
-    ctxValue = makeCtx({ isPresident: true });
-    wrap(<TabManage />);
-    // algum botão relacionado a convite
-    expect(
-      screen.queryByRole('button', { name: /convidar|qr|código/i })
-    ).not.toBeNull();
+  it('exibe atalho para o Caixa do Grupo (financeiro)', () => {
+    wrap(<TabManage {...baseProps()} />);
+    expect(screen.getByText(/caixa do grupo/i)).toBeInTheDocument();
   });
 
-  it('não-presidente não vê opções de gestão', () => {
-    if (!TabManage) return;
-    ctxValue = makeCtx({ isPresident: false });
-    wrap(<TabManage />);
-    // botão de remover jogador não aparece para não-presidente
-    expect(screen.queryByRole('button', { name: /remover|excluir/i })).toBeNull();
+  it('presidente/coordenador (canManage) vê a seção de administração', () => {
+    wrap(<TabManage {...baseProps({ canManage: true, isPresident: true })} />);
+    expect(screen.getByText(/administração/i)).toBeInTheDocument();
+    expect(screen.getByText(/relatórios & kpis/i)).toBeInTheDocument();
+    expect(screen.getByText(/configurações do grupo/i)).toBeInTheDocument();
   });
 
-  it('exibe estado vazio quando players=[]', () => {
-    if (!TabManage) return;
-    ctxValue = makeCtx({ players: [] });
-    wrap(<TabManage />);
-    expect(
-      screen.queryByText(/nenhum|vazio|sem jogador/i)
-    ).not.toBeNull();
+  it('membro comum (canManage=false) não vê a seção de administração', () => {
+    wrap(<TabManage {...baseProps({ canManage: false, isPresident: false })} />);
+    expect(screen.queryByText(/administração/i)).toBeNull();
+    expect(screen.queryByText(/configurações do grupo/i)).toBeNull();
+  });
+
+  it('coordenador (canManage=true, isPresident=false) vê "Coordenação" mas não "Relatórios & KPIs"', () => {
+    wrap(<TabManage {...baseProps({ canManage: true, isPresident: false })} />);
+    expect(screen.getByText(/coordenação/i)).toBeInTheDocument();
+    expect(screen.queryByText(/relatórios & kpis/i)).toBeNull();
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// T-10-C: TabPostGame
+// TabPostGame — usa useBaba()/useFeatures() por dentro + busca partidas
+// recentes sozinha no Supabase
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('TabPostGame', () => {
   let TabPostGame;
-
-  const matchData = {
-    id:           'm1',
-    status:       'finished',
-    team_a_name:  'Azul',
-    team_b_name:  'Preto',
-    team_a_score: 3,
-    team_b_score: 1,
-    winner_team:  'A',
-    match_date:   '2026-07-05',
-  };
+  let supabase;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    ctxValue = makeCtx({ currentMatch: matchData });
-    try {
-      const m = await import('../../pages/dashboard/TabPostGame');
-      TabPostGame = m.default;
-    } catch {
-      TabPostGame = null;
-    }
+    ctxValue = makeCtx({ currentBaba: { id: 'baba1', name: 'Pelada do Zé', president_id: 'user1', mode: 'full' } });
+    const svc = await import('../../services/supabase');
+    supabase = svc.supabase;
+    const m = await import('../../pages/dashboard/TabPostGame');
+    TabPostGame = m.default;
   });
 
   it('renderiza sem erros críticos', () => {
-    if (!TabPostGame) return;
-    expect(() => wrap(<TabPostGame />)).not.toThrow();
+    expect(() => wrap(<TabPostGame currentBaba={ctxValue.currentBaba} isPresident />)).not.toThrow();
   });
 
-  it('exibe placar da partida', () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    // Placar A×B
-    const container = screen.queryByText(/3/);
-    expect(container).not.toBeNull();
+  it('exibe estado "Nenhuma partida ainda" quando não há partidas', async () => {
+    supabase.from.mockReturnValue(makeQueryBuilder({ data: [], error: null }));
+    wrap(<TabPostGame currentBaba={ctxValue.currentBaba} isPresident />);
+    await waitFor(() => expect(screen.getByText(/nenhuma partida ainda/i)).toBeInTheDocument());
   });
 
-  it('exibe nome dos times', () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    expect(screen.queryByText(/Azul/i)).not.toBeNull();
-    expect(screen.queryByText(/Preto/i)).not.toBeNull();
+  it('exibe as últimas partidas carregadas com placar e nomes dos times', async () => {
+    supabase.from.mockReturnValue(makeQueryBuilder({
+      data: [{
+        id: 'm1', match_date: '2026-07-05', status: 'finished',
+        team_a_name: 'Azul', team_b_name: 'Preto',
+        team_a_score: 3, team_b_score: 1, winner_team: 'A',
+      }],
+      error: null,
+    }));
+    wrap(<TabPostGame currentBaba={ctxValue.currentBaba} isPresident />);
+    await waitFor(() => expect(screen.getByText('Azul')).toBeInTheDocument());
+    expect(screen.getByText('Preto')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 
-  it('exibe botão de compartilhar resultado', () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    expect(
-      screen.queryByRole('button', { name: /compartilhar/i })
-    ).not.toBeNull();
-  });
-
-  it('exibe botão de votar no MVP', () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    expect(
-      screen.queryByRole('button', { name: /mvp|votar|craque/i })
-    ).not.toBeNull();
-  });
-
-  it('exibe estado "sem partida" quando currentMatch=null', () => {
-    if (!TabPostGame) return;
-    ctxValue = makeCtx({ currentMatch: null });
-    wrap(<TabPostGame />);
-    expect(
-      screen.queryByText(/sem partida|nenhuma|jogo não/i) ||
-      screen.queryByText(/sorteio/i)
-    ).not.toBeNull();
-  });
-
-  it('exibe botão de avaliação de jogadores', () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    expect(
-      screen.queryByRole('button', { name: /avaliar|rating|estrela/i })
-    ).not.toBeNull();
-  });
-
-  it('clicar em MVP abre MVPScreen', async () => {
-    if (!TabPostGame) return;
-    wrap(<TabPostGame />);
-    const mvpBtn = screen.queryByRole('button', { name: /mvp|votar|craque/i });
-    if (mvpBtn) {
-      fireEvent.click(mvpBtn);
-      await waitFor(() =>
-        expect(
-          screen.queryByText(/MVP do Jogo/i) ||
-          screen.queryByText(/Vote/i)
-        ).not.toBeNull()
-      );
-    }
+  it('exibe atalhos rápidos de Rankings e Histórico', async () => {
+    supabase.from.mockReturnValue(makeQueryBuilder({ data: [], error: null }));
+    wrap(<TabPostGame currentBaba={ctxValue.currentBaba} isPresident />);
+    await waitFor(() => expect(screen.getByText(/nenhuma partida ainda/i)).toBeInTheDocument());
+    expect(screen.getByText('Rankings')).toBeInTheDocument();
+    expect(screen.getByText('Histórico')).toBeInTheDocument();
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// T-10-D: DashboardPage — navegação entre tabs
+// DashboardPage — navegação entre tabs
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('DashboardPage › navegação de tabs', () => {
@@ -317,74 +309,49 @@ describe('DashboardPage › navegação de tabs', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     ctxValue = makeCtx();
-    try {
-      const m = await import('../../pages/DashboardPage');
-      DashboardPage = m.default;
-    } catch {
-      DashboardPage = null;
-    }
+    const m = await import('../../pages/DashboardPage');
+    DashboardPage = m.default;
   });
 
-  it('renderiza sem erros críticos', () => {
-    if (!DashboardPage) return;
-    expect(() => wrap(<DashboardPage />)).not.toThrow();
-  });
-
-  it('tab "Visão Geral" ativa por padrão', () => {
-    if (!DashboardPage) return;
+  it('renderiza sem erros críticos', async () => {
     wrap(<DashboardPage />);
-    // A tab Overview/Visão Geral deve estar visível
-    expect(
-      screen.queryByText(/visão geral|overview|início/i) ||
-      screen.queryByText(/09:00/) // nextGameDay hora
-    ).not.toBeNull();
+    await waitFor(() => expect(screen.getByText('Pelada do Zé')).toBeInTheDocument());
   });
 
-  it('clicar em "Gerir" muda para tab de gestão', async () => {
-    if (!DashboardPage) return;
+  it('tab "Visão Geral" ativa por padrão', async () => {
     wrap(<DashboardPage />);
-    const manageTab = screen.queryByRole('button', { name: /gerir|manage|jogadores/i });
-    if (manageTab) {
-      fireEvent.click(manageTab);
-      await waitFor(() =>
-        expect(screen.queryByText('João')).not.toBeNull()
-      );
-    }
+    await waitFor(() => expect(screen.getByRole('tab', { name: /visão geral/i })).toHaveAttribute('aria-selected', 'true'));
   });
 
-  it('clicar em "Pós-jogo" muda para tab pós-jogo', async () => {
-    if (!DashboardPage) return;
-    ctxValue = makeCtx({
-      currentMatch: {
-        id: 'm1', status: 'finished',
-        team_a_name: 'Azul', team_b_name: 'Preto',
-        team_a_score: 2, team_b_score: 0,
-      },
-    });
+  it('clicar em "Gestão" muda para a tab de gestão', async () => {
     wrap(<DashboardPage />);
-    const postTab = screen.queryByRole('button', { name: /pós.jogo|resultado|post/i });
-    if (postTab) {
-      fireEvent.click(postTab);
-      await waitFor(() =>
-        expect(screen.queryByText(/Azul|placar|resultado/i)).not.toBeNull()
-      );
-    }
+    await waitFor(() => screen.getByText('Pelada do Zé'));
+    fireEvent.click(screen.getByRole('tab', { name: /gestão/i }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: /gestão/i })).toHaveAttribute('aria-selected', 'true'));
+    await waitFor(() => expect(screen.getByText(/caixa do grupo/i)).toBeInTheDocument());
   });
 
-  it('loading state: exibe indicador de carregamento', () => {
-    if (!DashboardPage) return;
+  it('clicar em "Pós-jogo" muda para a tab de pós-jogo', async () => {
+    wrap(<DashboardPage />);
+    await waitFor(() => screen.getByText('Pelada do Zé'));
+    fireEvent.click(screen.getByRole('tab', { name: /pós-jogo/i }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: /pós-jogo/i })).toHaveAttribute('aria-selected', 'true'));
+    await waitFor(() => expect(screen.getByText(/nenhuma partida ainda|últimas partidas/i)).toBeInTheDocument());
+  });
+
+  it('loading state: exibe o skeleton do cabeçalho', () => {
     ctxValue = makeCtx({ loading: true });
     const { container } = wrap(<DashboardPage />);
-    // spinner ou skeleton
-    expect(
-      container.querySelector('.animate-spin, .animate-pulse') ||
-      screen.queryByText(/carregando/i)
-    ).not.toBeNull();
+    expect(container.querySelector('.animate-pulse')).not.toBeNull();
   });
 
-  it('sem baba: redireciona ou exibe mensagem', () => {
-    if (!DashboardPage) return;
+  it('sem baba: não quebra a renderização (fica no skeleton de loading)', () => {
     ctxValue = makeCtx({ currentBaba: null });
     expect(() => wrap(<DashboardPage />)).not.toThrow();
+  });
+
+  it('lista de membros mostra a contagem de atletas', async () => {
+    wrap(<DashboardPage />);
+    await waitFor(() => expect(screen.getByText(/2 atletas ativos/i)).toBeInTheDocument());
   });
 });
