@@ -73,12 +73,12 @@ describe('Páginas públicas › smoke', () => {
 
   it('Privacidade menciona LGPD', () => {
     renderAt('/privacidade', <PrivacyPage />);
-    expect(screen.getByText(/privacidade/i)).toBeInTheDocument();
-    expect(screen.getByText(/lgpd/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/privacidade/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/lgpd/i).length).toBeGreaterThan(0);
   });
 
   it('Termos menciona termos de uso', () => {
     renderAt('/termos', <TermsPage />);
-    expect(screen.getByText(/termos/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/termos/i).length).toBeGreaterThan(0);
   });
 });

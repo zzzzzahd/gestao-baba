@@ -13,20 +13,22 @@ vi.mock('react-hot-toast', () => ({
   __esModule: true,
 }));
 
-const mockSupabase = {
+const mockSupabase = vi.hoisted(() => ({
   from:          vi.fn(),
   rpc:           vi.fn(),
   channel:       vi.fn(),
   removeChannel: vi.fn(),
-};
+}));
 vi.mock('../../services/supabase', () => ({ supabase: mockSupabase }));
 
 // ══════════════════════════════════════════════════════════════════════════════
 // useRatings
 // ══════════════════════════════════════════════════════════════════════════════
-const mockFetchRatingsSummary = vi.fn();
-const mockUpsertRating        = vi.fn();
-const mockUpdateManualWeight  = vi.fn();
+const { mockFetchRatingsSummary, mockUpsertRating, mockUpdateManualWeight } = vi.hoisted(() => ({
+  mockFetchRatingsSummary: vi.fn(),
+  mockUpsertRating:        vi.fn(),
+  mockUpdateManualWeight:  vi.fn(),
+}));
 
 vi.mock('../../services/ratingsService', () => ({
   fetchRatingsSummary: (...args) => mockFetchRatingsSummary(...args),

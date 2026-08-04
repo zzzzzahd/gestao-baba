@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach, } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import MatchReactions from '../../components/MatchReactions';
 
 const mockChannel = {
@@ -78,7 +78,8 @@ describe('MatchReactions › envio', () => {
   it('clicar em emoji chama channel.send', async () => {
     mk();
     fireEvent.click(screen.getByRole('button', { name: '⚽' }));
-    await waitFor(() => expect(mockChannel.send).toHaveBeenCalled());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(mockChannel.send).toHaveBeenCalled();
     const payload = mockChannel.send.mock.calls[0][0];
     expect(payload.payload.emoji).toBe('⚽');
   });
@@ -87,7 +88,7 @@ describe('MatchReactions › envio', () => {
     mk();
     fireEvent.click(screen.getByRole('button', { name: '🔥' }));
     fireEvent.click(screen.getByRole('button', { name: '🔥' }));
-    await waitFor(() => {});
+    await act(() => vi.advanceTimersByTimeAsync(0));
     expect(mockChannel.send).toHaveBeenCalledTimes(1);
   });
 
@@ -101,17 +102,16 @@ describe('MatchReactions › envio', () => {
   it('após 1s cooldown, botões voltam habilitados', async () => {
     mk();
     fireEvent.click(screen.getByRole('button', { name: '💪' }));
-    act(() => vi.advanceTimersByTime(1100));
-    await waitFor(() => {
-      const btns = screen.getAllByRole('button');
-      expect(btns.some(b => !b.disabled)).toBe(true);
-    });
+    await act(() => vi.advanceTimersByTimeAsync(1100));
+    const btns = screen.getAllByRole('button');
+    expect(btns.some(b => !b.disabled)).toBe(true);
   });
 
   it('inclui currentUserId no payload', async () => {
     mk({ currentUserId: 'userXYZ' });
     fireEvent.click(screen.getByRole('button', { name: '🎯' }));
-    await waitFor(() => expect(mockChannel.send).toHaveBeenCalled());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(mockChannel.send).toHaveBeenCalled();
     expect(mockChannel.send.mock.calls[0][0].payload.user_id).toBe('userXYZ');
   });
 });

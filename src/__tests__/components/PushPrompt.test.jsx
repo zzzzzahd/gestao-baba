@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 
 const mockUsePush = vi.fn();
 
@@ -80,14 +80,14 @@ describe('PushPrompt — visibilidade', () => {
     expect(screen.queryByText('Ativar notificações')).toBeNull();
   });
 
-  it('renderiza quando dismissal foi há mais de 7 dias', () => {
+  it('renderiza quando dismissal foi há mais de 7 dias', async () => {
     const eightDaysAgo = Date.now() - 8 * 86400000;
     localStorage.setItem(DISMISSED_KEY, String(eightDaysAgo));
     render(<PushPrompt />);
-    act(() => vi.advanceTimersByTime(1500));
-    waitFor(() => {
-      expect(screen.getByText('Ativar notificações')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
     });
+    expect(screen.getByText('Ativar notificações')).toBeInTheDocument();
   });
 
   it('não renderiza quando loading é true', () => {
@@ -109,8 +109,9 @@ describe('PushPrompt — conteúdo', () => {
 
   const showPrompt = async () => {
     render(<PushPrompt />);
-    act(() => vi.advanceTimersByTime(1500));
-    await waitFor(() => screen.getByText('Ativar notificações'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
   };
 
   it('exibe texto descritivo sobre notificações', async () => {
@@ -120,7 +121,7 @@ describe('PushPrompt — conteúdo', () => {
 
   it('exibe botão "Ativar"', async () => {
     await showPrompt();
-    expect(screen.getByText(/Ativar/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Ativar$/i)).toBeInTheDocument();
   });
 
   it('exibe botão "Agora não"', async () => {
@@ -140,8 +141,9 @@ describe('PushPrompt — interação', () => {
 
   const showPrompt = async () => {
     render(<PushPrompt />);
-    act(() => vi.advanceTimersByTime(1500));
-    await waitFor(() => screen.getByText('Ativar notificações'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
   };
 
   it('chama subscribe ao clicar em Ativar', async () => {
@@ -159,9 +161,7 @@ describe('PushPrompt — interação', () => {
     await act(async () => {
       fireEvent.click(screen.getByText(/^Ativar$/i));
     });
-    await waitFor(() => {
-      expect(screen.queryByText('Ativar notificações')).toBeNull();
-    });
+    expect(screen.queryByText('Ativar notificações')).toBeNull();
   });
 
   it('persiste dismissal no localStorage ao clicar "Agora não"', async () => {
@@ -173,9 +173,7 @@ describe('PushPrompt — interação', () => {
   it('esconde o prompt ao clicar "Agora não"', async () => {
     await showPrompt();
     fireEvent.click(screen.getByText('Agora não'));
-    await waitFor(() => {
-      expect(screen.queryByText('Ativar notificações')).toBeNull();
-    });
+    expect(screen.queryByText('Ativar notificações')).toBeNull();
   });
 
   it('limpa o timer ao desmontar antes de 1500ms', () => {
