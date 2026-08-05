@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import TournamentPage from '../../pages/TournamentPage';
 
@@ -192,7 +192,7 @@ describe('TournamentPage › header', () => {
     });
     wrap();
     await waitFor(() =>
-      expect(screen.getByText(/Azul/)).toBeInTheDocument()
+      expect(screen.getByText(/🏆.*Azul/)).toBeInTheDocument()
     );
   });
 });
@@ -306,7 +306,8 @@ describe('TournamentPage › tab ranking', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ranking' }));
     await waitFor(() => {
       expect(screen.getByText('🥇 Artilheiros')).toBeInTheDocument();
-      expect(screen.getByText(/Ronaldo/)).toBeInTheDocument();
+      const artilheirosSection = screen.getByText('🥇 Artilheiros').closest('div');
+      expect(within(artilheirosSection).getByText(/Ronaldo/)).toBeInTheDocument();
     });
   });
 

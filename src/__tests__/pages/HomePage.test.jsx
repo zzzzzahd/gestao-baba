@@ -14,6 +14,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  within,
 } from '@testing-library/react';
 
 import { MemoryRouter } from 'react-router-dom';
@@ -358,8 +359,10 @@ describe('HomePage - com babas', () => {
   it('exibe o hero card do primeiro baba', () => {
     renderPage();
 
+    // "Baba do Zé" aparece tanto no hero card (h2) quanto na lista
+    // "Meus Babas" (p) — escopamos ao heading para pegar só o hero.
     expect(
-      screen.getByText('Baba do Zé')
+      screen.getByRole('heading', { level: 2, name: 'Baba do Zé' })
     ).toBeInTheDocument();
   });
 
@@ -394,8 +397,15 @@ describe('HomePage - com babas', () => {
   it('mostra o horário do jogo', () => {
     renderPage();
 
+    // "09:00" também aparece na lista "Meus Babas" — escopamos a busca
+    // ao hero card (identificado pelo heading "Baba do Zé") para evitar
+    // match duplicado.
+    const heroCard = screen
+      .getByRole('heading', { level: 2, name: 'Baba do Zé' })
+      .closest('button');
+
     expect(
-      screen.getByText(/09:00/)
+      within(heroCard).getByText(/09:00/)
     ).toBeInTheDocument();
   });
 
@@ -787,8 +797,10 @@ describe('HomePage - FAB', () => {
     );
 
     expect(
+      // Regex exata: o estado vazio também tem um botão "Entrar com
+      // código de convite" que bateria com um regex mais amplo.
       screen.getByRole('button', {
-        name: /Entrar com código/i,
+        name: /^Entrar com código$/i,
       })
     ).toBeInTheDocument();
   });

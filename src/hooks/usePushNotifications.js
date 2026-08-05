@@ -31,19 +31,23 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!supported) return;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-      const { data } = await supabase.rpc('get_push_status');
-      if (data?.[0]?.has_subscription) {
-        // Confirmar que o browser também tem a subscription
-        try {
-          const reg = await navigator.serviceWorker.ready;
-          const sub = await reg.pushManager.getSubscription();
-          setSubscribed(!!sub && data[0].has_subscription);
-        } catch {
-          setSubscribed(data[0].has_subscription);
+        const { data } = await supabase.rpc('get_push_status');
+        if (data?.[0]?.has_subscription) {
+          // Confirmar que o browser também tem a subscription
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            setSubscribed(!!sub && data[0].has_subscription);
+          } catch {
+            setSubscribed(data[0].has_subscription);
+          }
         }
+      } catch (err) {
+        console.error('[usePushNotifications] status check:', err);
       }
     })();
   }, [supported]);

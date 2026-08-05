@@ -8,10 +8,19 @@ import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 import { useOfflineQueue } from '../../hooks/useOfflineQueue';
 
 // ─── Mocks globais ────────────────────────────────────────────────────────────
-vi.mock('react-hot-toast', () => ({
-  default: { success: vi.fn(), error: vi.fn() },
-  __esModule: true,
-}));
+vi.mock('react-hot-toast', () => {
+  // O default real de react-hot-toast é uma FUNÇÃO chamável (toast(msg, opts))
+  // que também carrega métodos (toast.success, toast.error, ...). Um objeto
+  // plano aqui quebra qualquer chamada direta a toast(...), como as usadas
+  // em useOfflineQueue.js.
+  const toastFn = vi.fn();
+  toastFn.success = vi.fn();
+  toastFn.error   = vi.fn();
+  return {
+    default: toastFn,
+    __esModule: true,
+  };
+});
 
 const mockSupabase = vi.hoisted(() => ({
   from:          vi.fn(),

@@ -127,7 +127,9 @@ describe('QRCodeModal › com código', () => {
 
   it('exibe rótulo "Código"', () => {
     mk();
-    expect(screen.getByText('Código')).toBeInTheDocument();
+    // O texto "Código" aparece tanto no rótulo <p> quanto no botão de copiar;
+    // aqui restringimos ao <p> para testar especificamente o rótulo.
+    expect(screen.getByText('Código', { selector: 'p' })).toBeInTheDocument();
   });
 });
 

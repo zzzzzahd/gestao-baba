@@ -326,15 +326,18 @@ describe('ProfilePage › erro', () => {
 // ─── Sem baba atual ───────────────────────────────────────────────────────────
 describe('ProfilePage › sem baba', () => {
   it('BadgesSection recebe playerId=undefined quando sem player no baba', async () => {
-    // Forçar myBabas vazio para não chamar RPC
-    vi.mock('../../contexts/BabaContext', () => ({
-      useBaba: () => ({
-        myBabas:     [],
-        currentBaba: null,
-        players:     [],
-      }),
-    }));
-    // Não quebra
-    expect(() => wrap()).not.toThrow();
+    // Forçar myBabas vazio para não chamar RPC.
+    // Não usar vi.mock() aqui dentro: vi.mock só funciona no nível superior
+    // do arquivo (é hoisted); chamado dentro de um it() ele tenta invalidar
+    // o módulo em tempo de execução e trava a suíte. Em vez disso, mutamos
+    // o mesmo objeto mockBabaCtx já mockado no topo do arquivo.
+    const original = { ...mockBabaCtx };
+    Object.assign(mockBabaCtx, { myBabas: [], currentBaba: null, players: [] });
+    try {
+      // Não quebra
+      expect(() => wrap()).not.toThrow();
+    } finally {
+      Object.assign(mockBabaCtx, original);
+    }
   });
 });

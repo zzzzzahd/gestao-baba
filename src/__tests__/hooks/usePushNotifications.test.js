@@ -1,7 +1,7 @@
 // src/__tests__/hooks/usePushNotifications.test.js
 // Testes para o hook de push notifications
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 vi.mock('../../services/supabase', () => ({
@@ -13,8 +13,24 @@ vi.mock('../../services/supabase', () => ({
   },
 }));
 
-import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { supabase } from '../../services/supabase';
+
+// usePushNotifications precisa ser importado DEPOIS de stubar VITE_VAPID_PUBLIC_KEY,
+// porque o hook lê `import.meta.env.VITE_VAPID_PUBLIC_KEY` uma única vez, no topo do
+// módulo, no momento da importação. Se o env estiver vazio nesse instante, `subscribe()`
+// sai antecipadamente (return false) em TODOS os testes, sem chamar requestPermission,
+// RPC ou setar `subscribed` — por isso o import é dinâmico, feito dentro de beforeAll,
+// depois de vi.stubEnv.
+let usePushNotifications;
+
+beforeAll(async () => {
+  vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'test-vapid-public-key');
+  ({ usePushNotifications } = await import('../../hooks/usePushNotifications'));
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // Helpers para simular browser APIs
 const mockServiceWorker = {
@@ -77,11 +93,9 @@ describe('usePushNotifications — estado inicial', () => {
   });
 
   it('não está suportado quando serviceWorker está ausente', async () => {
-    Object.defineProperty(navigator, 'serviceWorker', {
-      value:      undefined,
-      writable:   true,
-      configurable: true,
-    });
+    // `delete`, não `value: undefined` — o hook checa `'serviceWorker' in navigator`,
+    // que continua `true` mesmo com valor undefined, pois a chave ainda existe.
+    delete navigator.serviceWorker;
     const { result } = renderHook(() => usePushNotifications());
     await waitFor(() => {
       expect(result.current.supported).toBe(false);
@@ -139,6 +153,14 @@ describe('usePushNotifications — subscribe', () => {
     Object.defineProperty(window, 'PushManager', {
       value: {}, writable: true, configurable: true,
     });
+    // vi.clearAllMocks() limpa o histórico de chamadas, mas NÃO remove
+    // implementações setadas com mockResolvedValue em describes anteriores
+    // (ex: 'chama get_push_status RPC quando há sessão' deixa getSession
+    // retornando uma sessão válida). Sem este reset explícito, o efeito de
+    // status-check do hook roda achando que há sessão, chama a RPC — e nos
+    // testes que mockam supabase.rpc para rejeitar, isso vira uma unhandled
+    // promise rejection fora do corpo do teste.
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     supabase.rpc.mockResolvedValue({ data: null, error: null });
   });
 

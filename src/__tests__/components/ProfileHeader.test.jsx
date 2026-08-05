@@ -238,7 +238,7 @@ describe('ProfileHeader — upload de avatar', () => {
     fireEvent.change(input, { target: { files: [makeFile()] } });
 
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Foto atualizada');
+      expect(toast.success).toHaveBeenCalledWith('Foto atualizada!');
     });
   });
 

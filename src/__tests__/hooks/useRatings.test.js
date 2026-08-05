@@ -128,7 +128,7 @@ describe('useRatings — ratePlayer', () => {
     mockUpsertRating.mockResolvedValue(undefined);
     const { result } = renderHook(() => useRatings(defaultProps));
     await act(async () => { await result.current.ratePlayer('p-2', makeRatings()); });
-    expect(toast.success).toHaveBeenCalledWith('Avaliação enviada ⭐');
+    expect(toast.success).toHaveBeenCalledWith('Avaliação enviada! ⭐');
   });
 
   it('chama toast.error quando upsertRating falha', async () => {
@@ -176,7 +176,7 @@ describe('useRatings — setManualWeight', () => {
     mockUpdateManualWeight.mockResolvedValue(undefined);
     const { result } = renderHook(() => useRatings(defaultProps));
     await act(async () => { await result.current.setManualWeight('player-1', 4); });
-    expect(toast.success).toHaveBeenCalledWith('Peso manual atualizado');
+    expect(toast.success).toHaveBeenCalledWith('Peso manual atualizado!');
   });
 
   it('chama toast.error quando updateManualWeight falha', async () => {

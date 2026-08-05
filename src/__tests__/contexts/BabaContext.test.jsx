@@ -43,6 +43,15 @@ import toast                     from 'react-hot-toast';
 const BABA    = { id: 'baba-1', name: 'Baba do Zé', president_id: 'user-1', game_days_config: [] };
 const PLAYERS = [{ id: 'p-1', name: 'Zé', baba_id: 'baba-1', user_id: 'user-1', profile: null }];
 
+// Reutilizado em todo describe que precisa do usuário autenticado "padrão".
+// Necessário porque `vi.clearAllMocks()` limpa apenas mock.calls/mock.results —
+// não desfaz um `mockReturnValue` definido em um teste anterior (ex.: o teste
+// "baba permanece null quando user é null" no bloco de inicialização), então
+// sem isso o mock de useAuth vaza entre describes.
+const setupAuthenticatedUser = () => {
+  useAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { name: 'Zé Presidente' } });
+};
+
 const setupMocks = (overrides = {}) => {
   supabase.from.mockImplementation((table) => {
     const base = {
@@ -96,7 +105,11 @@ const setupMocks = (overrides = {}) => {
 // Componente consumidor
 const Consumer = ({ onMount }) => {
   const ctx = useBaba();
-  React.useEffect(() => { onMount?.(ctx); }, []);
+  // Sem array de dependências: roda após todo render, para que o `ctx`
+  // repassado ao teste sempre reflita o estado mais recente do provider
+  // (com deps `[]` ele capturava só o valor da primeira montagem, quando
+  // currentBaba ainda era null).
+  React.useEffect(() => { onMount?.(ctx); });
   return (
     <div>
       <span data-testid="loading">{String(ctx?.loading ?? 'no-ctx')}</span>
@@ -120,7 +133,7 @@ describe('BabaProvider — inicialização', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupMocks();
-    useAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { name: 'Zé Presidente' } });
+    setupAuthenticatedUser();
   });
 
   it('começa com loading=true', () => {
@@ -164,18 +177,19 @@ describe('useBaba fora do BabaProvider', () => {
 });
 
 describe('BabaProvider — createBaba', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setupMocks(); setupAuthenticatedUser(); });
 
   it('retorna null e toast.error quando Supabase falha', async () => {
     let ctx;
     renderCtx((c) => { ctx = c; });
     await waitFor(() => expect(ctx).toBeDefined());
 
-    supabase.from.mockImplementation((table) => ({
-      select:  vi.fn().mockReturnThis(),
-      insert:  vi.fn().mockReturnThis(),
-      single:  vi.fn().mockResolvedValue({ data: null, error: new Error('DB fail') }),
-    }));
+    setupMocks({
+      babas: {
+        insert: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: new Error('DB fail') }),
+      },
+    });
 
     let result;
     await act(async () => {
@@ -193,14 +207,18 @@ describe('BabaProvider — createBaba', () => {
 
     const insertMock = vi.fn().mockReturnThis();
     const singleMock = vi.fn().mockResolvedValue({
-      data:  { id: 'baba-new', name: 'Novo Baba', invite_code: 'ABCD12' },
+      data:  { id: 'baba-new', name: 'Novo Baba', invite_code: 'ABCD12', game_days_config: [] },
       error: null,
     });
-    supabase.from.mockImplementation((table) => ({
-      select: vi.fn().mockReturnThis(),
-      insert: insertMock,
-      single: singleMock,
-    }));
+    // Sobrescreve só o necessário para "babas" e "players" — createBaba dispara
+    // setCurrentBaba(data), o que aciona o useEffect de sincronização e chama
+    // loadPlayers (select().eq().order() na tabela players). Se a cadeia
+    // completa de "players" não ficar preservada, essa chamada quebra com
+    // TypeError fora do fluxo do teste.
+    setupMocks({
+      babas:   { insert: insertMock, single: singleMock },
+      players: { insert: vi.fn().mockReturnThis() },
+    });
 
     await act(async () => {
       await ctx.createBaba({ name: 'Novo Baba', game_days_config: [] });
@@ -215,18 +233,20 @@ describe('BabaProvider — createBaba', () => {
 });
 
 describe('BabaProvider — joinBaba', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setupMocks(); setupAuthenticatedUser(); });
 
   it('retorna null e toast.error para código inválido', async () => {
     let ctx;
     renderCtx((c) => { ctx = c; });
     await waitFor(() => expect(ctx).toBeDefined());
 
-    supabase.from.mockImplementation(() => ({
-      select:      vi.fn().mockReturnThis(),
-      eq:          vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    setupMocks({
+      babas: {
+        select:      vi.fn().mockReturnThis(),
+        eq:          vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      },
+    });
 
     let result;
     await act(async () => {
@@ -243,11 +263,13 @@ describe('BabaProvider — joinBaba', () => {
     await waitFor(() => expect(ctx).toBeDefined());
 
     const expiredBaba = { ...BABA, invite_expires_at: new Date(Date.now() - 1000).toISOString() };
-    supabase.from.mockImplementation(() => ({
-      select:      vi.fn().mockReturnThis(),
-      eq:          vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: expiredBaba, error: null }),
-    }));
+    setupMocks({
+      babas: {
+        select:      vi.fn().mockReturnThis(),
+        eq:          vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: expiredBaba, error: null }),
+      },
+    });
 
     let result;
     await act(async () => {
@@ -260,7 +282,7 @@ describe('BabaProvider — joinBaba', () => {
 });
 
 describe('BabaProvider — updateBaba', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setupMocks(); setupAuthenticatedUser(); });
 
   it('chama toast.success após atualização bem-sucedida', async () => {
     let ctx;
@@ -275,7 +297,7 @@ describe('BabaProvider — updateBaba', () => {
     }));
 
     await act(async () => { await ctx.updateBaba('baba-1', { name: 'Novo Nome' }); });
-    expect(toast.success).toHaveBeenCalledWith('Configurações salvas');
+    expect(toast.success).toHaveBeenCalledWith('Configurações salvas!');
   });
 
   it('chama toast.error quando update falha', async () => {
@@ -296,7 +318,7 @@ describe('BabaProvider — updateBaba', () => {
 });
 
 describe('BabaProvider — deleteBaba', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setupMocks(); setupAuthenticatedUser(); });
 
   it('exibe toast.success após excluir', async () => {
     let ctx;

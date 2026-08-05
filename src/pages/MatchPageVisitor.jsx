@@ -18,6 +18,9 @@ const MatchPageVisitor = () => {
   const [confirmExit,  setConfirmExit]  = useState(false);
   const [reserves,     setReserves]     = useState([]);
 
+  // Empate: aguarda escolha de quem ganhou o par ou ímpar antes de reordenar a fila
+  const [tieChoice, setTieChoice] = useState(null); // { teamA, teamB, rest }
+
   // Sprint 9.3: match_id do localStorage (gravado pelo StepMatch quando presidente inicia)
   const [realtimeMatchId, setRealtimeMatchId] = useState(null);
   const [isRealtime,      setIsRealtime]      = useState(false);
@@ -121,24 +124,8 @@ const MatchPageVisitor = () => {
     }
   }, [currentMatch?.scoreA, currentMatch?.scoreB, isRealtime]);
 
-  const handleMatchEnd = () => {
-    if (!currentMatch) return;
-    const { scoreA, scoreB, teamA, teamB } = currentMatch;
-    let winner = null;
-    let queue  = [...allTeams];
-
-    if (scoreA > scoreB) {
-      winner = 'A'; toast.success(`${teamA.name} VENCEU!`);
-    } else if (scoreB > scoreA) {
-      winner = 'B'; toast.success(`${teamB.name} VENCEU!`);
-    } else {
-      toast.error('EMPATE! Saem os dois times.');
-    }
-
-    if (winner === 'A') { const l = queue.splice(1, 1)[0]; queue.push(l); }
-    else if (winner === 'B') { const l = queue.splice(0, 1)[0]; queue.push(l); }
-    else { const t1 = queue.shift(); const t2 = queue.shift(); queue.push(t1, t2); }
-
+  // Aplica a fila final (já reordenada) e inicia a próxima partida, ou encerra se não houver times suficientes.
+  const finalizeQueue = (queue) => {
     if (queue.length < 2) {
       toast.success('Fim das partidas!');
       localStorage.removeItem('temp_teams');
@@ -152,6 +139,40 @@ const MatchPageVisitor = () => {
     localStorage.setItem('temp_teams', JSON.stringify(queue));
     setTimer(600);
     setCurrentMatch({ teamA: queue[0], teamB: queue[1], scoreA: 0, scoreB: 0 });
+  };
+
+  const handleMatchEnd = () => {
+    if (!currentMatch) return;
+    const { scoreA, scoreB, teamA, teamB } = currentMatch;
+    let queue = [...allTeams];
+
+    if (scoreA > scoreB) {
+      toast.success(`${teamA.name} VENCEU!`);
+      const l = queue.splice(1, 1)[0]; queue.push(l);
+      finalizeQueue(queue);
+    } else if (scoreB > scoreA) {
+      toast.success(`${teamB.name} VENCEU!`);
+      const l = queue.splice(0, 1)[0]; queue.push(l);
+      finalizeQueue(queue);
+    } else {
+      // Empate: os dois times saem. Antes de formar a próxima fila, o coordenador
+      // escolhe quem ganhou o par ou ímpar — só decide a ordem desses dois entre si,
+      // não muda quem entra em campo agora (os próximos 2 da fila já entram normalmente).
+      toast.error('EMPATE! Saem os dois times.');
+      const rest = queue.slice(2);
+      setTieChoice({ teamA, teamB, rest });
+    }
+  };
+
+  // Coordenador escolhe quem ganhou o par ou ímpar entre os dois times que empataram.
+  // O vencedor volta à fila antes do outro, sem alterar a posição dos demais times.
+  const handleParImparChoice = (winnerTeam) => {
+    if (!tieChoice) return;
+    const { teamA, teamB, rest } = tieChoice;
+    const loserTeam = winnerTeam === teamA ? teamB : teamA;
+    const queue = [...rest, winnerTeam, loserTeam];
+    setTieChoice(null);
+    finalizeQueue(queue);
   };
 
   const formatTime = (s) => {
@@ -362,6 +383,37 @@ const MatchPageVisitor = () => {
           <p className="mt-1">Quem Ganha Fica • Empate Sai os Dois</p>
         </div>
       </div>
+
+      {/* Par ou Ímpar: aparece quando dá empate, antes da próxima partida começar */}
+      {tieChoice && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-5">
+          <div className="card-glass max-w-sm w-full p-6 rounded-[2rem] border border-border-mid text-center space-y-5">
+            <p className="text-yellow-500 font-black uppercase text-[10px] tracking-widest">
+              Empate! Saem os dois times.
+            </p>
+            <h3 className="text-white font-black text-sm uppercase tracking-wide">
+              Quem ganhou o par ou ímpar?
+            </h3>
+            <p className="text-[10px] opacity-50 leading-relaxed">
+              O vencedor entra primeiro na fila entre esses dois times, sem mudar quem joga agora.
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                onClick={() => handleParImparChoice(tieChoice.teamA)}
+                className="py-4 rounded-2xl font-black uppercase text-xs bg-cyan-electric text-black active:scale-95 transition-all"
+              >
+                {tieChoice.teamA.name}
+              </button>
+              <button
+                onClick={() => handleParImparChoice(tieChoice.teamB)}
+                className="py-4 rounded-2xl font-black uppercase text-xs bg-yellow-500 text-black active:scale-95 transition-all"
+              >
+                {tieChoice.teamB.name}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={confirmExit}

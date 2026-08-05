@@ -2,7 +2,7 @@
 // Botão de compartilhamento de resultado via Web Share API ou WhatsApp.
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import MatchShareButton from '../../components/MatchShareButton';
 
@@ -25,6 +25,7 @@ const mk = (props = {}) =>
   );
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.useRealTimers());
 
 // ─── Null guard ───────────────────────────────────────────────────────────────
 describe('MatchShareButton › null guard', () => {
@@ -135,11 +136,10 @@ describe('MatchShareButton › estado compartilhado', () => {
     Object.defineProperty(navigator, 'share', { writable: true, value: share });
     mk();
     fireEvent.click(screen.getByRole('button', { name: /compartilhar/i }));
-    await waitFor(() => screen.getByRole('button', { name: /compartilhado/i }));
-    act(() => vi.advanceTimersByTime(3100));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /compartilhar/i })).toBeInTheDocument()
-    );
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole('button', { name: /compartilhado/i })).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(3100));
+    expect(screen.getByRole('button', { name: /compartilhar/i })).toBeInTheDocument();
     vi.useRealTimers();
   });
 
