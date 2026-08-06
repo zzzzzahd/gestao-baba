@@ -303,7 +303,7 @@ describe('BabaProvider — updateBaba', () => {
   it('chama toast.error quando update falha', async () => {
     let ctx;
     renderCtx((c) => { ctx = c; });
-    await waitFor(() => expect(ctx).toBeDefined());
+    await waitFor(() => expect(ctx?.currentBaba?.id).toBe('baba-1'));
 
     supabase.from.mockImplementation(() => ({
       update: vi.fn().mockReturnThis(),
@@ -323,7 +323,7 @@ describe('BabaProvider — deleteBaba', () => {
   it('exibe toast.success após excluir', async () => {
     let ctx;
     renderCtx((c) => { ctx = c; });
-    await waitFor(() => expect(ctx).toBeDefined());
+    await waitFor(() => expect(ctx?.currentBaba?.id).toBe('baba-1'));
 
     supabase.from.mockImplementation(() => ({
       delete: vi.fn().mockReturnThis(),
@@ -337,7 +337,7 @@ describe('BabaProvider — deleteBaba', () => {
   it('retorna false e toast.error quando delete falha', async () => {
     let ctx;
     renderCtx((c) => { ctx = c; });
-    await waitFor(() => expect(ctx).toBeDefined());
+    await waitFor(() => expect(ctx?.currentBaba?.id).toBe('baba-1'));
 
     supabase.from.mockImplementation(() => ({
       delete: vi.fn().mockReturnThis(),

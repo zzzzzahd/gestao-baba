@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
+import TeamsShareButton from '../components/TeamsShareButton';
 import { supabase } from '../services/supabase';
 
 const MatchPageVisitor = () => {
@@ -377,6 +378,8 @@ const MatchPageVisitor = () => {
             ))}
           </div>
         </div>
+
+        <TeamsShareButton teams={allTeams} reserves={reserves} />
 
         <div className="text-center text-[9px] opacity-20 uppercase font-black tracking-wider pt-6 pb-10">
           <p>Regras: 2 Gols ou 10 Minutos</p>

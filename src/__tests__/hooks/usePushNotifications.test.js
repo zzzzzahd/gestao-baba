@@ -24,7 +24,7 @@ import { supabase } from '../../services/supabase';
 let usePushNotifications;
 
 beforeAll(async () => {
-  vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'test-vapid-public-key');
+  vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'test-vapid-public-key-fake');
   ({ usePushNotifications } = await import('../../hooks/usePushNotifications'));
 });
 

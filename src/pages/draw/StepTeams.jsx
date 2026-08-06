@@ -10,6 +10,7 @@ import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { POSITION_LABEL } from '../../utils/constants';
 import PresenceCheckModal from '../../components/PresenceCheckModal';
+import TeamsShareButton from '../../components/TeamsShareButton';
 
 const COLORS = [
   { border: 'border-cyan-electric/30',  text: 'text-cyan-electric', bg: 'bg-cyan-electric/10'  },
@@ -126,6 +127,7 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
 
       {/* Ações */}
       <div className="space-y-3 pt-2">
+        <TeamsShareButton teams={teams} reserves={reserves} babaName={currentBaba?.name} />
         {isPresident ? (
           <button
             onClick={() => setShowPresenceCheck(true)}
