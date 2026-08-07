@@ -1,19 +1,28 @@
 // src/components/BottomNav.jsx
 // Sprint 1 — NAV_ITEMS dinâmicos por modo do baba (useFeatures).
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Shield, Trophy, User, DollarSign } from 'lucide-react';
+import { Home, Shield, Trophy, User, DollarSign, LogOut } from 'lucide-react';
 import { useFeatures } from '../utils/babaMode';
+import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from './ConfirmModal';
 
-const PUBLIC_ROUTES = new Set(['/', '/login', '/visitor', '/visitor-match']);
+const PUBLIC_ROUTES = new Set(['/', '/login', '/redefinir-senha', '/visitor', '/visitor-match']);
 
 const BottomNav = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const features  = useFeatures();
+  const { signOut } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   if (PUBLIC_ROUTES.has(location.pathname)) return null;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const NAV_ITEMS = [
     { icon: Home,   label: 'Início',   path: '/home',      ariaLabel: 'Ir para Início' },
@@ -80,8 +89,33 @@ const BottomNav = () => {
               </button>
             );
           })}
+
+          {/* Sair */}
+          <button
+            onClick={() => setConfirmLogout(true)}
+            aria-label="Sair da conta"
+            className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-all active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-electric focus-visible:outline-offset-2"
+          >
+            <div className="relative p-2 rounded-xl transition-all hover:bg-white/5">
+              <LogOut size={22} className="text-white/30 transition-colors" strokeWidth={1.5} aria-hidden="true" />
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/20 transition-colors">
+              Sair
+            </span>
+          </button>
         </div>
       </nav>
+
+      <ConfirmModal
+        open={confirmLogout}
+        message="Sair da conta?"
+        description="Você precisará entrar novamente para acessar o Draft Play."
+        confirmLabel="Sair"
+        cancelLabel="Cancelar"
+        danger
+        onConfirm={handleLogout}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </>
   );
 };

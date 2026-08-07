@@ -7,9 +7,10 @@ import { supabase } from '../services/supabase';
 import {
   User, Mail, Calendar, Target, Heart,
   Save, X, RefreshCw, Instagram, FileText,
-  Globe, Lock,
+  Globe, Lock, KeyRound,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const POSITION_OPTIONS = [
   // Society / Futebol de campo
@@ -68,6 +69,7 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
     is_public:          profile?.is_public          ?? true,
   });
   const [saving, setSaving] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -196,6 +198,23 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
         />
       </div>
 
+      {/* ── Segurança ────────────────────────────────────────────────── */}
+      <div className="pt-3 border-t border-border-subtle">
+        <p className="text-[9px] font-black uppercase tracking-widest text-text-muted px-1 mb-4">
+          Segurança
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowPasswordModal(true)}
+          className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:bg-surface-2 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-xs font-black text-white">
+            <KeyRound size={14} className="text-cyan-electric" /> Trocar senha
+          </span>
+          <span className="text-[9px] font-black text-text-muted uppercase">Alterar</span>
+        </button>
+      </div>
+
       {/* ── Perfil público (Sprint 19) ────────────────────────────────── */}
       <div className="pt-3 border-t border-border-subtle">
         <p className="text-[9px] font-black uppercase tracking-widest text-text-muted px-1 mb-4">
@@ -301,6 +320,11 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
           }
         </button>
       </div>
+
+      <ChangePasswordModal
+        open={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </div>
   );
 };

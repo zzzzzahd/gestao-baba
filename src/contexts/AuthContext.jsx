@@ -25,6 +25,9 @@ const AUTH_ERROR_MAP = {
   'Unable to validate email address: invalid format': 'Formato de email inválido',
   'Email rate limit exceeded':    'Muitas tentativas. Aguarde alguns minutos',
   'over_email_send_rate_limit':   'Muitas tentativas. Aguarde alguns minutos',
+  'New password should be different from the old password.': 'A nova senha deve ser diferente da senha atual',
+  'Password should be at least 6 characters.': 'A senha precisa ter pelo menos 6 caracteres',
+  'Auth session missing!':        'Sessão expirada. Faça login novamente',
 };
 
 const translateAuthError = (msg) => AUTH_ERROR_MAP[msg] || msg;
@@ -136,6 +139,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Envia o email com o link de recuperação de senha
+  const resetPasswordForEmail = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      });
+      if (error) throw error;
+      toast.success('Enviamos um link de recuperação para o seu email!');
+      return { error: null };
+    } catch (err) {
+      toast.error(translateAuthError(err.message));
+      return { error: err };
+    }
+  };
+
+  // Define uma nova senha (usado tanto no link de recuperação quanto na troca via perfil)
+  const updatePassword = async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success('Senha atualizada com sucesso!');
+      return { error: null };
+    } catch (err) {
+      toast.error(translateAuthError(err.message));
+      return { error: err };
+    }
+  };
+
   const updateProfile = async (updates, { silent = false } = {}) => {
     if (!user) return { error: 'Usuário não autenticado' };
     try {
@@ -164,6 +195,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, profile, loading,
       signUp, signIn, signOut,
+      resetPasswordForEmail, updatePassword,
       updateProfile, refreshProfile, loadProfile,
     }}>
       {!loading && children}

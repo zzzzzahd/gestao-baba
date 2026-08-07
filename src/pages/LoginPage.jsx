@@ -5,15 +5,36 @@ import Logo from '../components/Logo';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, resetPasswordForEmail } = useAuth();
   const [isLogin, setIsLogin]   = useState(true);
   const [loading, setLoading]   = useState(false);
   const [consent, setConsent]   = useState(false); // LGPD
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
 
+  // Recuperação de senha
+  const [showForgot, setShowForgot]     = useState(false);
+  const [forgotEmail, setForgotEmail]   = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent]     = useState(false);
+
   useEffect(() => {
     if (user) navigate('/home');
   }, [user, navigate]);
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    const { error } = await resetPasswordForEmail(forgotEmail);
+    setForgotLoading(false);
+    if (!error) setForgotSent(true);
+  };
+
+  const closeForgot = () => {
+    setShowForgot(false);
+    setForgotSent(false);
+    setForgotEmail('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,6 +91,19 @@ const LoginPage = () => {
             value={formData.password} onChange={handleChange} required minLength={8}
             className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
           />
+
+          {/* Esqueci minha senha — só no login */}
+          {isLogin && (
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                onClick={() => { setForgotEmail(formData.email); setShowForgot(true); }}
+                className="text-cyan-electric text-xs hover:text-cyan-300 transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+          )}
 
           {/* Consentimento LGPD — só no cadastro */}
           {!isLogin && (
@@ -132,6 +166,72 @@ const LoginPage = () => {
           </button>
         </form>
       </div>
+
+      {/* ── Modal: recuperar senha ── */}
+      {showForgot && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
+          onClick={closeForgot}
+        >
+          <div
+            className="w-full max-w-sm bg-[#0a0a0a] border border-border-strong rounded-[2rem] p-7 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!forgotSent ? (
+              <>
+                <p className="text-base font-black text-white text-center uppercase tracking-tight leading-snug mb-1">
+                  Recuperar senha
+                </p>
+                <p className="text-[11px] text-text-low text-center mb-5 leading-relaxed">
+                  Informe seu email e enviaremos um link para você criar uma nova senha.
+                </p>
+                <form onSubmit={handleForgotSubmit} className="space-y-4">
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                    autoFocus
+                    className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={closeForgot}
+                      className="py-4 rounded-2xl bg-surface-2 border border-border-mid text-text-mid font-black uppercase text-[10px] tracking-widest hover:bg-surface-3 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest disabled:opacity-40 transition-all"
+                    >
+                      {forgotLoading ? 'Enviando...' : 'Enviar link'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-black text-white text-center uppercase tracking-tight leading-snug mb-1">
+                  Verifique seu email
+                </p>
+                <p className="text-[11px] text-text-low text-center mb-5 leading-relaxed">
+                  Se {forgotEmail} estiver cadastrado, você vai receber um link para redefinir sua senha em instantes.
+                </p>
+                <button
+                  onClick={closeForgot}
+                  className="w-full py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest transition-all"
+                >
+                  Entendi
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

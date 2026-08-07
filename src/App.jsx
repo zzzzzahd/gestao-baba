@@ -12,6 +12,7 @@ import { useBetaAnalytics } from './hooks/useBetaAnalytics';
 
 import LandingPage        from './pages/LandingPage';
 import LoginPage          from './pages/LoginPage';
+import ResetPasswordPage  from './pages/ResetPasswordPage';
 import HomePage           from './pages/HomePage';
 import ProfilePage        from './pages/ProfilePage';
 import PublicProfilePage  from './pages/PublicProfilePage';
@@ -141,6 +142,7 @@ const AppInner = () => {
       <Routes>
         <Route path="/"              element={<LandingPage />} />
         <Route path="/login"         element={<LoginPage />} />
+        <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
         <Route path="/visitor"       element={<VisitorMode />} />
         <Route path="/visitor-match" element={<MatchPageVisitor />} />
         <Route path="/privacidade"   element={<PrivacyPage />} />
