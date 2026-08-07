@@ -535,103 +535,165 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  const joinBaba = async (inviteCode) => {
-    setLoading(true);
-    try {
-      const rawCode = inviteCode.trim();
-      const upperCode = rawCode.toUpperCase();
-  
-      console.log('[DEBUG joinBaba] Tentando código original:', rawCode, 'e Upper:', upperCode);
-  
-      // 1. Testar busca na tabela invites (Novo sistema)
-      const { data: invite, error: inviteErr } = await supabase
+  // Adicionamos as funções e mantivemos o escopo correto dentro do Provider
+
+const joinBaba = async (inviteCode) => {
+  setLoading(true);
+  try {
+    const rawCode = inviteCode ? inviteCode.trim() : '';
+    const upperCode = rawCode.toUpperCase();
+
+    console.log('[DEBUG joinBaba] Tentando código original:', rawCode, 'e Upper:', upperCode);
+
+    // 1. Testar busca na tabela invites (Novo sistema)
+    const { data: invite, error: inviteErr } = await supabase
+      .from('invites')
+      .select('*')
+      .ilike('code', upperCode)
+      .maybeSingle();
+
+    console.log('[DEBUG invites SELECT]:', { invite, inviteErr });
+
+    // 2. Testar busca na tabela babas (Sistema legado / generateInviteCode)
+    const { data: babaLegacy, error: babaErr } = await supabase
+      .from('babas')
+      .select('*')
+      .ilike('invite_code', upperCode)
+      .maybeSingle();
+
+    console.log('[DEBUG babas SELECT]:', { babaLegacy, babaErr });
+
+    // 3. Se não achou por ilike upper, tentar busca exata com o código original
+    let finalCode = upperCode;
+    if (!invite && !babaLegacy) {
+      const { data: exactInvite } = await supabase
         .from('invites')
         .select('*')
-        .ilike('code', upperCode)
+        .eq('code', rawCode)
         .maybeSingle();
-  
-      console.log('[DEBUG invites SELECT]:', { invite, inviteErr });
-  
-      // 2. Testar busca na tabela babas (Sistema legado / generateInviteCode)
-      const { data: babaLegacy, error: babaErr } = await supabase
+
+      const { data: exactBaba } = await supabase
         .from('babas')
         .select('*')
-        .ilike('invite_code', upperCode)
+        .eq('invite_code', rawCode)
         .maybeSingle();
-  
-      console.log('[DEBUG babas SELECT]:', { babaLegacy, babaErr });
-  
-      // 3. Se não achou por ilike upper, tentar busca exata com o código original (sem toUpperCase)
-      let finalCode = upperCode;
-      if (!invite && !babaLegacy) {
-        const { data: exactInvite } = await supabase
-          .from('invites')
-          .select('*')
-          .eq('code', rawCode)
-          .maybeSingle();
-  
-        const { data: exactBaba } = await supabase
-          .from('babas')
-          .select('*')
-          .eq('invite_code', rawCode)
-          .maybeSingle();
-  
-        console.log('[DEBUG Busca Exata sem toUpperCase]:', { exactInvite, exactBaba });
-  
-        if (exactInvite || exactBaba) {
-          // O código no banco foi salvo com letras minúsculas/mistas!
-          finalCode = rawCode; 
-        }
+
+      console.log('[DEBUG Busca Exata sem toUpperCase]:', { exactInvite, exactBaba });
+
+      if (exactInvite || exactBaba) {
+        finalCode = rawCode; 
       }
-  
-      // 4. Executar RPC com o código correto
-      let babaId = null;
-  
-      // Tenta RPC de Invites
-      const { data: rpcInviteRes, error: rpcInviteErr } = await supabase
-        .rpc('join_baba_by_invite', { p_code: finalCode });
-  
-      console.log('[DEBUG rpc join_baba_by_invite]:', { rpcInviteRes, rpcInviteErr });
-  
-      if (rpcInviteRes && !rpcInviteRes.error && !rpcInviteErr) {
-        babaId = rpcInviteRes.baba_id || rpcInviteRes.id || rpcInviteRes;
-      } else {
-        // Tenta RPC de Babas (Legado)
-        const { data: rpcCodeRes, error: rpcCodeErr } = await supabase
-          .rpc('join_baba_by_code', { p_code: finalCode });
-  
-        console.log('[DEBUG rpc join_baba_by_code]:', { rpcCodeRes, rpcCodeErr });
-  
-        if (rpcCodeRes && !rpcCodeRes.error && !rpcCodeErr) {
-          babaId = rpcCodeRes.baba_id || rpcCodeRes.id || rpcCodeRes;
-        }
-      }
-  
-      if (!babaId) {
-        throw new Error('Código inválido ou não encontrado no banco de dados');
-      }
-  
-      const { data: baba, error: fetchError } = await supabase
-        .from('babas')
-        .select('*')
-        .eq('id', babaId)
-        .single();
-  
-      if (fetchError) throw fetchError;
-  
-      await loadMyBabas();
-      setCurrentBaba(baba);
-      toast.success('Entrou no Baba! 🎉');
-      return baba;
-  
-    } catch (error) {
-      console.error('[joinBaba Full Error]', error);
-      toast.error(error.message || 'Erro ao entrar no baba');
-      return null;
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // 4. Executar RPC com o código correto
+    let babaId = null;
+
+    const { data: rpcInviteRes, error: rpcInviteErr } = await supabase
+      .rpc('join_baba_by_invite', { p_code: finalCode });
+
+    console.log('[DEBUG rpc join_baba_by_invite]:', { rpcInviteRes, rpcInviteErr });
+
+    if (rpcInviteRes && !rpcInviteRes.error && !rpcInviteErr) {
+      babaId = rpcInviteRes.baba_id || rpcInviteRes.id || rpcInviteRes;
+    } else {
+      const { data: rpcCodeRes, error: rpcCodeErr } = await supabase
+        .rpc('join_baba_by_code', { p_code: finalCode });
+
+      console.log('[DEBUG rpc join_baba_by_code]:', { rpcCodeRes, rpcCodeErr });
+
+      if (rpcCodeRes && !rpcCodeRes.error && !rpcCodeErr) {
+        babaId = rpcCodeRes.baba_id || rpcCodeRes.id || rpcCodeRes;
+      }
+    }
+
+    if (!babaId) {
+      throw new Error('Código inválido');
+    }
+
+    const { data: baba, error: fetchError } = await supabase
+      .from('babas')
+      .select('*')
+      .eq('id', babaId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    await loadMyBabas();
+    setCurrentBaba(baba);
+    toast.success('Entrou no Baba! 🎉');
+    return baba;
+
+  } catch (error) {
+    console.error('[joinBaba Full Error]', error);
+    toast.error(error.message || 'Erro ao entrar no baba');
+    return null;
+  } finally {
+    setLoading(false);
+  }
+};
+
+const uploadBabaImage = async (file, type = 'avatar') => {
+  if (!currentBaba || !file) return null;
+  try {
+    const ext  = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const path = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
+    const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+    const field = type === 'avatar' ? 'logo_url' : 'cover_url';
+    const { data: updatedBaba, error: updateError } = await supabase
+      .from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
+    if (updateError) throw updateError;
+    setMyBabas(prev => prev.map(b => b.id === currentBaba.id ? { ...b, ...updatedBaba } : b));
+    setCurrentBaba(prev => ({ ...prev, ...updatedBaba }));
+    toast.success('Imagem atualizada!');
+    return publicUrl;
+  } catch (error) {
+    toast.error('Erro no upload');
+    return null;
+  }
+};
+
+const generateInviteCode = async () => {
+  if (!currentBaba) return null;
+  try {
+    let newCode;
+    let attempts = 0;
+    while (attempts < 10) {
+      newCode = nanoid(6).toUpperCase();
+      const { data: exists } = await supabase
+        .from('babas').select('id').eq('invite_code', newCode).maybeSingle();
+      if (!exists) break;
+      attempts++;
+    }
+
+    if (!newCode) {
+      toast.error('Erro ao gerar código único');
+      return null;
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 6);
+
+    const { data, error } = await supabase
+      .from('babas')
+      .update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() })
+      .eq('id', currentBaba.id).select('*').single();
+
+    if (error) throw error;
+
+    setCurrentBaba(data);
+    setMyBabas(prev => prev.map(b => b.id === data.id ? data : b));
+    toast.success('Novo código gerado!');
+    return data;
+  } catch (error) {
+    console.error('[generateInviteCode]', error);
+    toast.error('Erro ao gerar código');
+    return null;
+  }
+};
 
   const tryAutoDraw = async () => {
     if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
