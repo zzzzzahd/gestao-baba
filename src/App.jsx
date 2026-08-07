@@ -1,7 +1,8 @@
 // src/App.jsx
 // Sprint 9 — BetaFeedback + useBetaAnalytics integrados.
+// + Lazy loading por rota (code-splitting) para reduzir o bundle inicial.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
@@ -10,27 +11,31 @@ import { BabaProvider } from './contexts/BabaContext';
 import { getNewlyUnlocked, UNLOCK_MESSAGES } from './utils/progressiveFeaturesUnlock';
 import { useBetaAnalytics } from './hooks/useBetaAnalytics';
 
+// Rotas de entrada (primeira tela que o usuário vê) ficam eager —
+// não faz sentido lazy-loadear o que já é carregado no primeiro paint.
 import LandingPage        from './pages/LandingPage';
 import LoginPage          from './pages/LoginPage';
 import ResetPasswordPage  from './pages/ResetPasswordPage';
-import HomePage           from './pages/HomePage';
-import ProfilePage        from './pages/ProfilePage';
-import PublicProfilePage  from './pages/PublicProfilePage';
-import MatchPageVisitor   from './pages/MatchPageVisitor';
-import RankingsPage       from './pages/RankingsPage';
-import FinancialPage      from './pages/FinancialPage';
-import VisitorMode        from './pages/VisitorMode';
-import DashboardPage      from './pages/DashboardPage';
-import CreatePage         from './pages/CreatePage';
-import HistoryPage        from './pages/HistoryPage';
-import DrawPage           from './pages/DrawPage';
-import PrivacyPage        from './pages/PrivacyPage';
-import TermsPage          from './pages/TermsPage';
-import FollowersPage      from './pages/FollowersPage';
-import JoinPage           from './pages/JoinPage';
-import ComparisonPage     from './pages/ComparisonPage';
-import TournamentPage       from './pages/TournamentPage';
-import TournamentMatchPage  from './pages/TournamentMatchPage';
+
+// Todo o resto entra sob demanda, um chunk por página.
+const HomePage             = lazy(() => import('./pages/HomePage'));
+const ProfilePage          = lazy(() => import('./pages/ProfilePage'));
+const PublicProfilePage    = lazy(() => import('./pages/PublicProfilePage'));
+const MatchPageVisitor     = lazy(() => import('./pages/MatchPageVisitor'));
+const RankingsPage         = lazy(() => import('./pages/RankingsPage'));
+const FinancialPage        = lazy(() => import('./pages/FinancialPage'));
+const VisitorMode          = lazy(() => import('./pages/VisitorMode'));
+const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
+const CreatePage           = lazy(() => import('./pages/CreatePage'));
+const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
+const DrawPage              = lazy(() => import('./pages/DrawPage'));
+const PrivacyPage          = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage            = lazy(() => import('./pages/TermsPage'));
+const FollowersPage        = lazy(() => import('./pages/FollowersPage'));
+const JoinPage              = lazy(() => import('./pages/JoinPage'));
+const ComparisonPage       = lazy(() => import('./pages/ComparisonPage'));
+const TournamentPage       = lazy(() => import('./pages/TournamentPage'));
+const TournamentMatchPage  = lazy(() => import('./pages/TournamentMatchPage'));
 
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -42,13 +47,16 @@ import ChangelogModal, { shouldShowChangelog }    from './components/ChangelogMo
 import FeedbackModal  from './components/FeedbackModal';
 import BetaFeedback, { shouldShowBetaFeedback }   from './components/BetaFeedback';
 
+// Fallback padrão enquanto o chunk da rota carrega (mesmo spinner já usado no ProtectedRoute).
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-black">
+    <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (loading) return <PageLoader />;
   return user ? children : <Navigate to="/login" />;
 };
 
@@ -130,42 +138,40 @@ const AppInner = () => {
     return () => { delete window.__markPushEligible; };
   }, []);
 
-  if (needsConsent === null && user) return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (needsConsent === null && user) return <PageLoader />;
 
   return (
     <>
       <OfflineBanner />
-      <Routes>
-        <Route path="/"              element={<LandingPage />} />
-        <Route path="/login"         element={<LoginPage />} />
-        <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
-        <Route path="/visitor"       element={<VisitorMode />} />
-        <Route path="/visitor-match" element={<MatchPageVisitor />} />
-        <Route path="/privacidade"   element={<PrivacyPage />} />
-        <Route path="/termos"        element={<TermsPage />} />
-        <Route path="/join/:code"    element={<JoinPage />} />
-        <Route path="/player/:userId"    element={<PublicProfilePage />} />
-        <Route path="/followers/:userId" element={<FollowersPage />} />
-        <Route path="/followers"         element={<FollowersPage />} />
-        <Route path="/home"       element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/dashboard"  element={<ProtectedRoute><PageWrapper><DashboardPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/create"     element={<ProtectedRoute><PageWrapper><CreatePage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/profile"    element={<ProtectedRoute><PageWrapper><ProfilePage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/rankings"   element={<ProtectedRoute><PageWrapper><RankingsPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/financial"  element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/history"    element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/torneio/:id" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
-        <Route path="/tournament" element={<Navigate to="/home" replace />} />
-        <Route path="/teams" element={<Navigate to="/draw" replace />} />
-        <Route path="/match" element={<Navigate to="/draw" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/"              element={<LandingPage />} />
+          <Route path="/login"         element={<LoginPage />} />
+          <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
+          <Route path="/visitor"       element={<VisitorMode />} />
+          <Route path="/visitor-match" element={<MatchPageVisitor />} />
+          <Route path="/privacidade"   element={<PrivacyPage />} />
+          <Route path="/termos"        element={<TermsPage />} />
+          <Route path="/join/:code"    element={<JoinPage />} />
+          <Route path="/player/:userId"    element={<PublicProfilePage />} />
+          <Route path="/followers/:userId" element={<FollowersPage />} />
+          <Route path="/followers"         element={<FollowersPage />} />
+          <Route path="/home"       element={<ProtectedRoute><PageWrapper><HomePage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/dashboard"  element={<ProtectedRoute><PageWrapper><DashboardPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/create"     element={<ProtectedRoute><PageWrapper><CreatePage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/profile"    element={<ProtectedRoute><PageWrapper><ProfilePage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/rankings"   element={<ProtectedRoute><PageWrapper><RankingsPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/financial"  element={<ProtectedRoute><PageWrapper><FinancialPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/history"    element={<ProtectedRoute><PageWrapper><HistoryPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/draw"       element={<ProtectedRoute><PageWrapper><DrawPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/torneio/:id" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/tournament" element={<Navigate to="/home" replace />} />
+          <Route path="/teams" element={<Navigate to="/draw" replace />} />
+          <Route path="/match" element={<Navigate to="/draw" replace />} />
+        </Routes>
+      </Suspense>
       <BottomNav />
       {needsConsent === true && <ConsentModal onAccepted={() => setNeedsConsent(false)} />}
       {showPushPrompt && needsConsent === false && <PushPrompt />}
