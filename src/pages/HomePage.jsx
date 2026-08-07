@@ -88,7 +88,7 @@ const EmptyState = ({ onCreateClick, onJoinFocus }) => (
     <div className="flex items-start gap-3 p-4 bg-surface-1 border border-border-subtle rounded-2xl text-left max-w-xs">
       <Zap size={16} className="text-cyan-electric shrink-0 mt-0.5" />
       <p className="text-[11px] text-text-low leading-relaxed">
-        O presidente do baba gera um código de 6 letras. Peça a ele e entre instantaneamente.
+        O presidente do baba gera um código de convite. Peça a ele e entre instantaneamente.
       </p>
     </div>
   </div>
@@ -301,8 +301,8 @@ const HomePage = () => {
 
   const handleJoin = async () => {
     const code = invite.trim().toUpperCase();
-    if (code.length !== 6) {
-      toast.error('Código deve ter 6 caracteres');
+    if (code.length < 4) {
+      toast.error('Digite um código de convite válido');
       return;
     }
     setJoining(true);
@@ -482,13 +482,13 @@ const HomePage = () => {
           <input
             value={invite}
             onChange={e => setInvite(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            placeholder="AB12CD"
-            maxLength={6}
+            placeholder="AB12CD34"
+            maxLength={10}
             className="w-full p-4 bg-black/40 border border-border-mid rounded-2xl text-center tracking-widest font-black text-lg focus:border-cyan-electric/50 outline-none transition-colors"
           />
           <button
             onClick={handleJoin}
-            disabled={invite.length !== 6 || joining}
+            disabled={invite.trim().length < 4 || joining}
             className="w-full p-4 font-black uppercase rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all text-black flex items-center justify-center gap-2"
             style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
           >

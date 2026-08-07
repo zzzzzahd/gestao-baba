@@ -540,32 +540,63 @@ export const BabaProvider = ({ children }) => {
     try {
       const code = inviteCode.trim().toUpperCase();
 
-      const { data: baba, error: babaError } = await supabase
-        .from('babas')
-        .select('*')
-        .eq('invite_code', code)
+      // 1. Tentar primeiro no sistema de convites novo (tabela `invites`, Sprint 13 —
+      //    mesmos convites gerados pelo InvitesPanel, com códigos de 8 caracteres)
+      const { data: invite, error: inviteError } = await supabase
+        .from('invites')
+        .select('id, baba_id, uses, max_uses, expires_at, is_active')
+        .eq('code', code)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (babaError) throw babaError;
-      if (!baba) throw new Error('Código inválido');
+      if (inviteError) throw inviteError;
 
-      if (baba.invite_expires_at && new Date(baba.invite_expires_at) < new Date()) {
-        throw new Error('Código expirado');
+      let babaId;
+
+      if (invite) {
+        if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+          throw new Error('Código expirado');
+        }
+        if (invite.max_uses && invite.uses >= invite.max_uses) {
+          throw new Error('Convite atingiu o limite de usos');
+        }
+
+        const { data: result, error: rpcError } = await supabase
+          .rpc('join_baba_by_invite', { p_code: code });
+        if (rpcError) throw rpcError;
+        if (result?.error) throw new Error(result.error);
+
+        babaId = invite.baba_id;
+      } else {
+        // 2. Fallback: invite_code legado na tabela babas (código de 6 caracteres,
+        //    gerado ao criar o baba)
+        const { data: babaLegacy, error: babaError } = await supabase
+          .from('babas')
+          .select('id, invite_expires_at')
+          .eq('invite_code', code)
+          .maybeSingle();
+
+        if (babaError) throw babaError;
+        if (!babaLegacy) throw new Error('Código inválido');
+
+        if (babaLegacy.invite_expires_at && new Date(babaLegacy.invite_expires_at) < new Date()) {
+          throw new Error('Código expirado');
+        }
+
+        const { data: result, error: rpcError } = await supabase
+          .rpc('join_baba_by_code', { p_code: code });
+        if (rpcError) throw rpcError;
+        if (result?.error) throw new Error(result.error);
+
+        babaId = babaLegacy.id;
       }
 
-      const { error: insertError } = await supabase
-        .from('players')
-        .upsert(
-          [{
-            baba_id:  baba.id,
-            user_id:  user.id,
-            name:     profile?.name || 'Jogador',
-            position: 'linha',
-          }],
-          { onConflict: 'baba_id,user_id' }
-        );
-
-      if (insertError) throw insertError;
+      const { data: baba, error: fetchError } = await supabase
+        .from('babas')
+        .select('*')
+        .eq('id', babaId)
+        .single();
+      if (fetchError) throw fetchError;
 
       await loadMyBabas();
       setCurrentBaba(baba);

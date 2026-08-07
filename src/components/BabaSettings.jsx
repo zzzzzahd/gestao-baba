@@ -47,7 +47,7 @@ const Toggle = ({ label, sub, value, onChange, disabled }) => (
   </div>
 );
 
-const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, disabled }) => (
+const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, maxLength, disabled }) => (
   <div>
     <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
       {label}
@@ -57,7 +57,7 @@ const Field = ({ label, type = 'text', value, onChange, placeholder, min, max, d
       value={value ?? ''}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      min={min} max={max}
+      min={min} max={max} maxLength={maxLength}
       disabled={disabled}
       className="w-full bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-xs font-black text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 transition-colors disabled:opacity-40"
     />
@@ -101,6 +101,7 @@ export default function BabaSettings() {
   const canEditAll  = isPresident;
 
   const [form, setForm] = useState({
+    name:                    '',
     location:               '',
     selectedDays:           [], // [{ day, time, location }]
     max_players:            '',
@@ -143,6 +144,7 @@ export default function BabaSettings() {
       : (currentBaba.game_days || []).map(day => ({ day, time: fallbackTime, location: '' }));
 
     setForm({
+      name:                    currentBaba.name                   ?? '',
       location:               currentBaba.location               ?? '',
       selectedDays:           selectedDays.sort((a, b) => a.day - b.day),
       max_players:            currentBaba.max_players            ?? '',
@@ -184,6 +186,10 @@ export default function BabaSettings() {
 
   const handleSave = async () => {
     if (!currentBaba) return;
+    if (canEditAll && !form.name.trim()) {
+      toast.error('O nome do baba não pode ficar vazio');
+      return;
+    }
     if (canEditAll && form.selectedDays.length === 0) {
       toast.error('Selecione pelo menos um dia de jogo');
       return;
@@ -218,6 +224,7 @@ export default function BabaSettings() {
         allow_reserves: form.allow_reserves,
         ...(canEditAll && form.pix_key !== undefined ? { pix_key: form.pix_key || null } : {}),
         ...(canEditAll ? {
+          name:             form.name.trim(),
           location:         form.location.trim() || null,
           game_days:        cleanDays.map(d => d.day),
           game_days_config: cleanDays.map(d => ({
@@ -280,9 +287,17 @@ export default function BabaSettings() {
   return (
     <div className="space-y-3">
 
-      {/* Dias, Horário e Local — apenas presidente */}
+      {/* Identidade, Dias e Local — apenas presidente */}
       {canEditAll && (
-        <Section title="Dias, Horário e Local" expanded={sections.schedule} onToggle={() => toggle('schedule')}>
+        <Section title="Identidade, Dias e Local" expanded={sections.schedule} onToggle={() => toggle('schedule')}>
+          <Field
+            label="Nome do baba"
+            value={form.name}
+            onChange={set('name')}
+            placeholder="Ex: Baba do Parque"
+            maxLength={40}
+          />
+
           <div>
             <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-2 block">
               Dias de jogo

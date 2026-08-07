@@ -270,7 +270,7 @@ describe('HomePage - renderização', () => {
     renderPage();
 
     expect(
-      screen.getByPlaceholderText('AB12CD')
+      screen.getByPlaceholderText('AB12CD34')
     ).toBeInTheDocument();
   });
 });
@@ -611,7 +611,7 @@ describe('HomePage - join por código', () => {
   it('input aceita somente letras maiúsculas e números', () => {
     renderPage();
 
-    const input = screen.getByPlaceholderText('AB12CD');
+    const input = screen.getByPlaceholderText('AB12CD34');
 
     fireEvent.change(input, {
       target: {
@@ -635,7 +635,7 @@ describe('HomePage - join por código', () => {
   it('habilita botão com 6 caracteres', () => {
     renderPage();
 
-    const input = screen.getByPlaceholderText('AB12CD');
+    const input = screen.getByPlaceholderText('AB12CD34');
 
     fireEvent.change(input, {
       target: {
@@ -658,7 +658,7 @@ describe('HomePage - join por código', () => {
     renderPage();
 
     fireEvent.change(
-      screen.getByPlaceholderText('AB12CD'),
+      screen.getByPlaceholderText('AB12CD34'),
       {
         target: {
           value: 'ABC123',
@@ -687,7 +687,7 @@ describe('HomePage - join por código', () => {
     renderPage();
 
     fireEvent.change(
-      screen.getByPlaceholderText('AB12CD'),
+      screen.getByPlaceholderText('AB12CD34'),
       {
         target: {
           value: 'ABC123',
@@ -714,7 +714,7 @@ describe('HomePage - join por código', () => {
     renderPage();
 
     fireEvent.change(
-      screen.getByPlaceholderText('AB12CD'),
+      screen.getByPlaceholderText('AB12CD34'),
       {
         target: {
           value: 'ABC123',
