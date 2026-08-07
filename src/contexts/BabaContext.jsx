@@ -535,165 +535,226 @@ export const BabaProvider = ({ children }) => {
     }
   };
 
-  // Adicionamos as funções e mantivemos o escopo correto dentro do Provider
+  const joinBaba = async (inviteCode) => {
+    setLoading(true);
+    try {
+      const code = inviteCode.trim().toUpperCase();
 
-const joinBaba = async (inviteCode) => {
-  setLoading(true);
-  try {
-    const rawCode = inviteCode ? inviteCode.trim() : '';
-    const upperCode = rawCode.toUpperCase();
-
-    console.log('[DEBUG joinBaba] Tentando código original:', rawCode, 'e Upper:', upperCode);
-
-    // 1. Testar busca na tabela invites (Novo sistema)
-    const { data: invite, error: inviteErr } = await supabase
-      .from('invites')
-      .select('*')
-      .ilike('code', upperCode)
-      .maybeSingle();
-
-    console.log('[DEBUG invites SELECT]:', { invite, inviteErr });
-
-    // 2. Testar busca na tabela babas (Sistema legado / generateInviteCode)
-    const { data: babaLegacy, error: babaErr } = await supabase
-      .from('babas')
-      .select('*')
-      .ilike('invite_code', upperCode)
-      .maybeSingle();
-
-    console.log('[DEBUG babas SELECT]:', { babaLegacy, babaErr });
-
-    // 3. Se não achou por ilike upper, tentar busca exata com o código original
-    let finalCode = upperCode;
-    if (!invite && !babaLegacy) {
-      const { data: exactInvite } = await supabase
+      // 1. Tentar primeiro no sistema de convites novo (tabela `invites`, Sprint 13 —
+      //    mesmos convites gerados pelo InvitesPanel, com códigos de 8 caracteres)
+      const { data: invite, error: inviteError } = await supabase
         .from('invites')
-        .select('*')
-        .eq('code', rawCode)
+        .select('id, baba_id, uses, max_uses, expires_at, is_active')
+        .eq('code', code)
+        .eq('is_active', true)
         .maybeSingle();
 
-      const { data: exactBaba } = await supabase
+      if (inviteError) throw inviteError;
+
+      let babaId;
+
+      if (invite) {
+        if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+          throw new Error('Código expirado');
+        }
+        if (invite.max_uses && invite.uses >= invite.max_uses) {
+          throw new Error('Convite atingiu o limite de usos');
+        }
+
+        const { data: result, error: rpcError } = await supabase
+          .rpc('join_baba_by_invite', { p_code: code });
+        if (rpcError) throw rpcError;
+        if (result?.error) throw new Error(result.error);
+
+        babaId = invite.baba_id;
+      } else {
+        // 2. Fallback: invite_code legado na tabela babas (código de 6 caracteres,
+        //    gerado ao criar o baba)
+        const { data: babaLegacy, error: babaError } = await supabase
+          .from('babas')
+          .select('id, invite_expires_at')
+          .eq('invite_code', code)
+          .maybeSingle();
+
+        if (babaError) throw babaError;
+        if (!babaLegacy) throw new Error('Código inválido');
+
+        if (babaLegacy.invite_expires_at && new Date(babaLegacy.invite_expires_at) < new Date()) {
+          throw new Error('Código expirado');
+        }
+
+        const { data: result, error: rpcError } = await supabase
+          .rpc('join_baba_by_code', { p_code: code });
+        if (rpcError) throw rpcError;
+        if (result?.error) throw new Error(result.error);
+
+        babaId = babaLegacy.id;
+      }
+
+      const { data: baba, error: fetchError } = await supabase
         .from('babas')
         .select('*')
-        .eq('invite_code', rawCode)
-        .maybeSingle();
+        .eq('id', babaId)
+        .single();
+      if (fetchError) throw fetchError;
 
-      console.log('[DEBUG Busca Exata sem toUpperCase]:', { exactInvite, exactBaba });
+      await loadMyBabas();
+      setCurrentBaba(baba);
+      toast.success('Entrou no Baba! 🎉');
+      return baba;
 
-      if (exactInvite || exactBaba) {
-        finalCode = rawCode; 
-      }
+    } catch (error) {
+      console.error('[joinBaba]', error);
+      toast.error(error.message || 'Erro ao entrar no baba');
+      return null;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 4. Executar RPC com o código correto
-    let babaId = null;
-
-    const { data: rpcInviteRes, error: rpcInviteErr } = await supabase
-      .rpc('join_baba_by_invite', { p_code: finalCode });
-
-    console.log('[DEBUG rpc join_baba_by_invite]:', { rpcInviteRes, rpcInviteErr });
-
-    if (rpcInviteRes && !rpcInviteRes.error && !rpcInviteErr) {
-      babaId = rpcInviteRes.baba_id || rpcInviteRes.id || rpcInviteRes;
-    } else {
-      const { data: rpcCodeRes, error: rpcCodeErr } = await supabase
-        .rpc('join_baba_by_code', { p_code: finalCode });
-
-      console.log('[DEBUG rpc join_baba_by_code]:', { rpcCodeRes, rpcCodeErr });
-
-      if (rpcCodeRes && !rpcCodeRes.error && !rpcCodeErr) {
-        babaId = rpcCodeRes.baba_id || rpcCodeRes.id || rpcCodeRes;
-      }
-    }
-
-    if (!babaId) {
-      throw new Error('Código inválido');
-    }
-
-    const { data: baba, error: fetchError } = await supabase
-      .from('babas')
-      .select('*')
-      .eq('id', babaId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    await loadMyBabas();
-    setCurrentBaba(baba);
-    toast.success('Entrou no Baba! 🎉');
-    return baba;
-
-  } catch (error) {
-    console.error('[joinBaba Full Error]', error);
-    toast.error(error.message || 'Erro ao entrar no baba');
-    return null;
-  } finally {
-    setLoading(false);
-  }
-};
-
-const uploadBabaImage = async (file, type = 'avatar') => {
-  if (!currentBaba || !file) return null;
-  try {
-    const ext  = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const path = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
-    if (uploadError) throw uploadError;
-    const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
-    const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-    const field = type === 'avatar' ? 'logo_url' : 'cover_url';
-    const { data: updatedBaba, error: updateError } = await supabase
-      .from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
-    if (updateError) throw updateError;
-    setMyBabas(prev => prev.map(b => b.id === currentBaba.id ? { ...b, ...updatedBaba } : b));
-    setCurrentBaba(prev => ({ ...prev, ...updatedBaba }));
-    toast.success('Imagem atualizada!');
-    return publicUrl;
-  } catch (error) {
-    toast.error('Erro no upload');
-    return null;
-  }
-};
-
-const generateInviteCode = async () => {
-  if (!currentBaba) return null;
-  try {
-    let newCode;
-    let attempts = 0;
-    while (attempts < 10) {
-      newCode = nanoid(6).toUpperCase();
-      const { data: exists } = await supabase
-        .from('babas').select('id').eq('invite_code', newCode).maybeSingle();
-      if (!exists) break;
-      attempts++;
-    }
-
-    if (!newCode) {
-      toast.error('Erro ao gerar código único');
+  const uploadBabaImage = async (file, type = 'avatar') => {
+    if (!currentBaba || !file) return null;
+    try {
+      const ext  = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `babas/${currentBaba.id}/${type}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('baba-images').upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('baba-images').getPublicUrl(path);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      const field = type === 'avatar' ? 'logo_url' : 'cover_url';
+      const { data: updatedBaba, error: updateError } = await supabase
+        .from('babas').update({ [field]: publicUrl }).eq('id', currentBaba.id).select('*').single();
+      if (updateError) throw updateError;
+      setMyBabas(prev => prev.map(b => b.id === currentBaba.id ? { ...b, ...updatedBaba } : b));
+      setCurrentBaba(prev => ({ ...prev, ...updatedBaba }));
+      toast.success('Imagem atualizada!');
+      return publicUrl;
+    } catch (error) {
+      toast.error('Erro no upload');
       return null;
     }
+  };
 
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 6);
+  const generateInviteCode = async () => {
+    if (!currentBaba) return null;
+    try {
+      let newCode;
+      let attempts = 0;
+      while (attempts < 10) {
+        newCode = nanoid();
+        const { data: exists } = await supabase
+          .from('babas').select('id').eq('invite_code', newCode).maybeSingle();
+        if (!exists) break;
+        attempts++;
+      }
 
-    const { data, error } = await supabase
-      .from('babas')
-      .update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() })
-      .eq('id', currentBaba.id).select('*').single();
+      if (!newCode) {
+        toast.error('Erro ao gerar código único');
+        return null;
+      }
 
-    if (error) throw error;
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 6);
 
-    setCurrentBaba(data);
-    setMyBabas(prev => prev.map(b => b.id === data.id ? data : b));
-    toast.success('Novo código gerado!');
-    return data;
-  } catch (error) {
-    console.error('[generateInviteCode]', error);
-    toast.error('Erro ao gerar código');
-    return null;
-  }
-};
+      const { data, error } = await supabase
+        .from('babas')
+        .update({ invite_code: newCode, invite_expires_at: expiresAt.toISOString() })
+        .eq('id', currentBaba.id).select('*').single();
+
+      if (error) throw error;
+
+      setCurrentBaba(data);
+      setMyBabas(prev => prev.map(b => b.id === data.id ? data : b));
+      toast.success('Novo código gerado!');
+      return data;
+    } catch (error) {
+      console.error('[generateInviteCode]', error);
+      toast.error('Erro ao gerar código');
+      return null;
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // SORTEIO
+  // ─────────────────────────────────────────────
+
+  const drawTeamsIntelligent = async () => {
+    if (isDrawing || !currentBaba || !nextGameDay) return null;
+    setIsDrawing(true);
+    try {
+      const dateStr   = nextGameDay.dateStr;
+      // Sprint 9: usa apenas confirmados (não waitlist) para o sorteio
+      const confirmed = gameConfirmations
+        .filter(c => c.status === 'confirmed')
+        .map(c => c?.player)
+        .filter(p => p && p.id);
+
+      if (confirmed.length < drawConfig.playersPerTeam * 2) {
+        setDrawStatus('insufficient');
+        return null;
+      }
+
+      const ratingsData = await getAllRatings();
+      const ratingMap   = new Map(ratingsData.map(r => [r.player_id, r.final_rating || 0]));
+
+      const enriched = confirmed.map(p => ({
+        ...p,
+        final_rating: ratingMap.get(p.id) || 0,
+      }));
+
+      const numTeams  = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));
+      const teamsRaw  = generateBalancedTeams(enriched, numTeams);
+      const teams     = teamsRaw.map(({ name, players }) => ({ name, players }));
+      const teamSlots = drawConfig.playersPerTeam;
+      const reserves  = teamsRaw.flatMap(t => t.players.slice(teamSlots));
+      const mainTeams = teams.map(t => ({ ...t, players: t.players.slice(0, teamSlots) }));
+
+      const { data: drawResult } = await supabase
+        .from('draw_results')
+        .upsert({
+          baba_id: currentBaba.id, draw_date: dateStr,
+          teams: mainTeams, reserves, players_per_team: drawConfig.playersPerTeam,
+        })
+        .select().single();
+
+      const { data: existingMatch } = await supabase
+        .from('matches').select('id')
+        .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
+
+      if (!existingMatch) {
+        const gameTimeStr = nextGameDay.time?.substring(0, 5) || '20:00';
+        const matchDatetime = `${dateStr}T${gameTimeStr}:00`;
+
+        const { data: match } = await supabase.from('matches').insert([{
+          baba_id:        currentBaba.id,
+          match_date:     matchDatetime,
+          team_a_name:    mainTeams[0]?.name || 'Time A',
+          team_b_name:    mainTeams[1]?.name || 'Time B',
+          draw_result_id: drawResult.id,
+          status:         'scheduled',
+        }]).select().single();
+
+        const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
+          t.players.map(p => ({
+            match_id:  match.id,
+            player_id: p.id,
+            team:      i === 0 ? 'A' : 'B',
+            position:  p.position || 'linha',
+          }))
+        );
+        await supabase.from('match_players').insert(mPlayers);
+      }
+
+      await loadTodayMatch(currentBaba.id, dateStr);
+      return true;
+    } catch (error) {
+      console.error('[drawTeams]', error);
+      return null;
+    } finally {
+      setIsDrawing(false);
+    }
+  };
 
   const tryAutoDraw = async () => {
     if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
