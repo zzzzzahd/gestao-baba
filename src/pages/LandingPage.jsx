@@ -12,8 +12,8 @@ const steps = [
     key: 'criar',
     label: 'Criar baba',
     icon: Users,
-    title: 'Crie seu baba em segundos',
-    desc: 'Cadastre o grupo, convide os jogadores por link ou código e pronto — seu baba está de pé.',
+    title: 'Crie ou entre em um baba',
+    desc: 'Cadastre seu grupo, ou entre em um já existente com o link/código de convite do coordenador.',
   },
   {
     key: 'sorteio',
@@ -39,7 +39,7 @@ const StepMockup = ({ step }) => {
         <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
         <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
         <div className="h-9 rounded-xl bg-gradient-to-r from-cyan-electric to-blue-500 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-black">
-          Criar baba
+          Entrar / Criar baba
         </div>
       </div>
     );
@@ -98,8 +98,37 @@ const LandingPage = () => {
             Organize o baba sem zap lotado
           </h1>
           <p className="text-xs font-medium opacity-50 px-4 leading-relaxed">
-            Sorteio automático de times, presença confirmada e placar ao vivo — tudo em um só app.
+            Sorteio automático de times, presença confirmada e placar ao vivo — pra quem organiza e pra quem joga.
           </p>
+        </div>
+
+        {/* CTAs — texto neutro: serve tanto pra quem cria/coordena um baba quanto pra quem só entra como jogador */}
+        <div className="space-y-3">
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full py-5 rounded-2xl font-black text-black shadow-[0_10px_30px_rgba(0,242,255,0.25)] transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 uppercase text-sm tracking-widest"
+            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+          >
+            <LogIn size={20} />
+            Começar agora
+          </button>
+
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border-mid" />
+            </div>
+            <div className="relative flex justify-center text-[9px] uppercase font-black tracking-[0.3em]">
+              <span className="bg-black px-4 text-text-muted">ou</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/visitor')}
+            className="w-full py-4 rounded-2xl font-black bg-surface-2 border border-border-mid text-text-mid hover:text-white hover:bg-surface-3 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+          >
+            <Zap size={18} />
+            Modo Visitante (Sem Conta)
+          </button>
         </div>
 
         {/* Showcase do fluxo: criar baba → sorteio → placar ao vivo */}
@@ -139,36 +168,7 @@ const LandingPage = () => {
           </div>
         </div>
 
-        {/* CTAs */}
-        <div className="space-y-3">
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full py-5 rounded-2xl font-black text-black shadow-[0_10px_30px_rgba(0,242,255,0.25)] transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 uppercase text-sm tracking-widest"
-            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
-          >
-            <LogIn size={20} />
-            Criar meu baba grátis
-          </button>
-
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border-mid" />
-            </div>
-            <div className="relative flex justify-center text-[9px] uppercase font-black tracking-[0.3em]">
-              <span className="bg-black px-4 text-text-muted">ou</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => navigate('/visitor')}
-            className="w-full py-4 rounded-2xl font-black bg-surface-2 border border-border-mid text-text-mid hover:text-white hover:bg-surface-3 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
-          >
-            <Zap size={18} />
-            Modo Visitante (Sem Conta)
-          </button>
-        </div>
-
-        {/* Depoimento social — troque pelo relato real de um coordenador de baba */}
+        {/* Depoimento social — troque pelo relato real de um coordenador ou jogador que já usa o app */}
         <div className="card-glass p-5 border border-border-mid rounded-[1.5rem] space-y-3 animate-fade-in">
           <div className="flex gap-0.5 text-cyan-electric">
             {[...Array(5)].map((_, i) => <Star key={i} size={13} fill="currentColor" />)}
