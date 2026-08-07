@@ -538,73 +538,77 @@ export const BabaProvider = ({ children }) => {
   const joinBaba = async (inviteCode) => {
     setLoading(true);
     try {
-      const code = inviteCode.trim().toUpperCase();
+      const rawCode = inviteCode.trim();
+      const upperCode = rawCode.toUpperCase();
   
-      let babaId = null;
+      console.log('[DEBUG joinBaba] Tentando código original:', rawCode, 'e Upper:', upperCode);
   
-      // 1. Tentar primeiro no sistema de convites novo (tabela `invites`)
-      const { data: invite, error: inviteError } = await supabase
+      // 1. Testar busca na tabela invites (Novo sistema)
+      const { data: invite, error: inviteErr } = await supabase
         .from('invites')
-        .select('id, baba_id, uses, max_uses, expires_at, is_active')
-        .ilike('code', code) // ilike ignora maiúsculas e minúsculas no banco
-        .eq('is_active', true)
+        .select('*')
+        .ilike('code', upperCode)
         .maybeSingle();
   
-      if (!inviteError && invite) {
-        if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-          throw new Error('Código expirado');
-        }
-        if (invite.max_uses && invite.uses >= invite.max_uses) {
-          throw new Error('Convite atingiu o limite de usos');
-        }
+      console.log('[DEBUG invites SELECT]:', { invite, inviteErr });
   
-        const { data: result, error: rpcError } = await supabase
-          .rpc('join_baba_by_invite', { p_code: code });
-        if (rpcError) throw rpcError;
-        if (result?.error) throw new Error(result.error);
+      // 2. Testar busca na tabela babas (Sistema legado / generateInviteCode)
+      const { data: babaLegacy, error: babaErr } = await supabase
+        .from('babas')
+        .select('*')
+        .ilike('invite_code', upperCode)
+        .maybeSingle();
   
-        babaId = invite.baba_id;
+      console.log('[DEBUG babas SELECT]:', { babaLegacy, babaErr });
+  
+      // 3. Se não achou por ilike upper, tentar busca exata com o código original (sem toUpperCase)
+      let finalCode = upperCode;
+      if (!invite && !babaLegacy) {
+        const { data: exactInvite } = await supabase
+          .from('invites')
+          .select('*')
+          .eq('code', rawCode)
+          .maybeSingle();
+  
+        const { data: exactBaba } = await supabase
+          .from('babas')
+          .select('*')
+          .eq('invite_code', rawCode)
+          .maybeSingle();
+  
+        console.log('[DEBUG Busca Exata sem toUpperCase]:', { exactInvite, exactBaba });
+  
+        if (exactInvite || exactBaba) {
+          // O código no banco foi salvo com letras minúsculas/mistas!
+          finalCode = rawCode; 
+        }
+      }
+  
+      // 4. Executar RPC com o código correto
+      let babaId = null;
+  
+      // Tenta RPC de Invites
+      const { data: rpcInviteRes, error: rpcInviteErr } = await supabase
+        .rpc('join_baba_by_invite', { p_code: finalCode });
+  
+      console.log('[DEBUG rpc join_baba_by_invite]:', { rpcInviteRes, rpcInviteErr });
+  
+      if (rpcInviteRes && !rpcInviteRes.error && !rpcInviteErr) {
+        babaId = rpcInviteRes.baba_id || rpcInviteRes.id || rpcInviteRes;
       } else {
-        // 2. Tentar via RPC do sistema novo direto (caso o RLS bloqueie o SELECT na tabela invites)
-        const { data: rpcResult, error: rpcError } = await supabase
-          .rpc('join_baba_by_invite', { p_code: code });
+        // Tenta RPC de Babas (Legado)
+        const { data: rpcCodeRes, error: rpcCodeErr } = await supabase
+          .rpc('join_baba_by_code', { p_code: finalCode });
   
-        if (!rpcError && rpcResult && !rpcResult.error) {
-          babaId = rpcResult.baba_id || rpcResult.id;
-        } else {
-          // 3. Fallback: invite_code legado na tabela babas (código de 6 caracteres)
-          const { data: babaLegacy, error: babaError } = await supabase
-            .from('babas')
-            .select('id, invite_expires_at')
-            .ilike('invite_code', code)
-            .maybeSingle();
+        console.log('[DEBUG rpc join_baba_by_code]:', { rpcCodeRes, rpcCodeErr });
   
-          if (babaLegacy) {
-            if (babaLegacy.invite_expires_at && new Date(babaLegacy.invite_expires_at) < new Date()) {
-              throw new Error('Código expirado');
-            }
-  
-            const { data: resultLegacy, error: rpcLegacyError } = await supabase
-              .rpc('join_baba_by_code', { p_code: code });
-            if (rpcLegacyError) throw rpcLegacyError;
-            if (resultLegacy?.error) throw new Error(resultLegacy.error);
-  
-            babaId = babaLegacy.id;
-          } else {
-            // Última tentativa: RPC legado direto
-            const { data: resultLegacy, error: rpcLegacyError } = await supabase
-              .rpc('join_baba_by_code', { p_code: code });
-  
-            if (rpcLegacyError || resultLegacy?.error) {
-              throw new Error(resultLegacy?.error || 'Código inválido');
-            }
-            babaId = resultLegacy.baba_id || resultLegacy.id;
-          }
+        if (rpcCodeRes && !rpcCodeRes.error && !rpcCodeErr) {
+          babaId = rpcCodeRes.baba_id || rpcCodeRes.id || rpcCodeRes;
         }
       }
   
       if (!babaId) {
-        throw new Error('Código inválido');
+        throw new Error('Código inválido ou não encontrado no banco de dados');
       }
   
       const { data: baba, error: fetchError } = await supabase
@@ -612,6 +616,7 @@ export const BabaProvider = ({ children }) => {
         .select('*')
         .eq('id', babaId)
         .single();
+  
       if (fetchError) throw fetchError;
   
       await loadMyBabas();
@@ -620,92 +625,11 @@ export const BabaProvider = ({ children }) => {
       return baba;
   
     } catch (error) {
-      console.error('[joinBaba]', error);
+      console.error('[joinBaba Full Error]', error);
       toast.error(error.message || 'Erro ao entrar no baba');
       return null;
     } finally {
       setLoading(false);
-    }
-  };
-  
-  // ─────────────────────────────────────────────
-  // SORTEIO
-  // ─────────────────────────────────────────────
-
-  const drawTeamsIntelligent = async () => {
-    if (isDrawing || !currentBaba || !nextGameDay) return null;
-    setIsDrawing(true);
-    try {
-      const dateStr   = nextGameDay.dateStr;
-      // Sprint 9: usa apenas confirmados (não waitlist) para o sorteio
-      const confirmed = gameConfirmations
-        .filter(c => c.status === 'confirmed')
-        .map(c => c?.player)
-        .filter(p => p && p.id);
-
-      if (confirmed.length < drawConfig.playersPerTeam * 2) {
-        setDrawStatus('insufficient');
-        return null;
-      }
-
-      const ratingsData = await getAllRatings();
-      const ratingMap   = new Map(ratingsData.map(r => [r.player_id, r.final_rating || 0]));
-
-      const enriched = confirmed.map(p => ({
-        ...p,
-        final_rating: ratingMap.get(p.id) || 0,
-      }));
-
-      const numTeams  = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));
-      const teamsRaw  = generateBalancedTeams(enriched, numTeams);
-      const teams     = teamsRaw.map(({ name, players }) => ({ name, players }));
-      const teamSlots = drawConfig.playersPerTeam;
-      const reserves  = teamsRaw.flatMap(t => t.players.slice(teamSlots));
-      const mainTeams = teams.map(t => ({ ...t, players: t.players.slice(0, teamSlots) }));
-
-      const { data: drawResult } = await supabase
-        .from('draw_results')
-        .upsert({
-          baba_id: currentBaba.id, draw_date: dateStr,
-          teams: mainTeams, reserves, players_per_team: drawConfig.playersPerTeam,
-        })
-        .select().single();
-
-      const { data: existingMatch } = await supabase
-        .from('matches').select('id')
-        .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
-
-      if (!existingMatch) {
-        const gameTimeStr = nextGameDay.time?.substring(0, 5) || '20:00';
-        const matchDatetime = `${dateStr}T${gameTimeStr}:00`;
-
-        const { data: match } = await supabase.from('matches').insert([{
-          baba_id:        currentBaba.id,
-          match_date:     matchDatetime,
-          team_a_name:    mainTeams[0]?.name || 'Time A',
-          team_b_name:    mainTeams[1]?.name || 'Time B',
-          draw_result_id: drawResult.id,
-          status:         'scheduled',
-        }]).select().single();
-
-        const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
-          t.players.map(p => ({
-            match_id:  match.id,
-            player_id: p.id,
-            team:      i === 0 ? 'A' : 'B',
-            position:  p.position || 'linha',
-          }))
-        );
-        await supabase.from('match_players').insert(mPlayers);
-      }
-
-      await loadTodayMatch(currentBaba.id, dateStr);
-      return true;
-    } catch (error) {
-      console.error('[drawTeams]', error);
-      return null;
-    } finally {
-      setIsDrawing(false);
     }
   };
 
