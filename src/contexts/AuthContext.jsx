@@ -30,7 +30,18 @@ const AUTH_ERROR_MAP = {
   'Auth session missing!':        'Sessão expirada. Faça login novamente',
 };
 
-const translateAuthError = (msg) => AUTH_ERROR_MAP[msg] || msg;
+const translateAuthError = (msg) => {
+  if (AUTH_ERROR_MAP[msg]) return AUTH_ERROR_MAP[msg];
+
+  // Erros de rede: o texto varia por navegador ("Load failed" no Safari/iOS,
+  // "Failed to fetch" no Chrome, "NetworkError..." no Firefox) e às vezes vem
+  // com o domínio do Supabase colado no final — tratamos tudo isso aqui.
+  if (/load failed|failed to fetch|networkerror|network request failed/i.test(msg || '')) {
+    return 'Sem conexão com a internet. Verifique sua rede e tente novamente';
+  }
+
+  return msg;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);

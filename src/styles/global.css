@@ -181,7 +181,7 @@
 .animate-slide-up { animation: slideInUp 0.5s ease-out forwards; }
 
 /* Tarefa 4.1 — Transição de rota (250ms, sem dependência externa) */
-.animate-page-in  { animation: pageIn 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+.animate-page-in  { animation: pageIn 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) backwards; }
 
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(10px); }

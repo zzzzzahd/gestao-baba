@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { ArrowLeft, Camera, Edit3, X, RefreshCw, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-const POSITION_LABEL = {
-  goleiro: 'Goleiro', zagueiro: 'Zagueiro', lateral: 'Lateral',
-  meia: 'Meia', atacante: 'Atacante', linha: 'Linha',
-  fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
-};
+import { POSITION_LABEL } from '../constants/positions';
 
 const ProfileHeader = ({ profile, globalRating, tab, onTabChange, onProfileRefresh }) => {
   const navigate    = useNavigate();

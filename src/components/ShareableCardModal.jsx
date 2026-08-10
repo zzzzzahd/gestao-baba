@@ -3,8 +3,9 @@
 // html2canvas já carregado via CDN no index.html.
 
 import React, { useRef, useState } from 'react';
-import { X, Download, Share2, Star } from 'lucide-react';
+import { X, Download, Share2, Star, Instagram, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { POSITION_LABEL } from '../constants/positions';
 
 // ── Label do tipo ─────────────────────────────────────────────────────────────
 const TYPE_LABEL = {
@@ -114,43 +115,27 @@ const RankingCardContent = ({ rankingType, rankingData, babaName, babaLogo, toda
 };
 
 // ── Card de PERFIL INDIVIDUAL ─────────────────────────────────────────────────
-const ProfileCardContent = ({ profileData, babaName, babaLogo, today }) => {
+const ProfileCardContent = ({ profileData, today }) => {
   const {
     name, avatar_url,
     goals = 0, assists = 0, matches = 0,
     rating = 0, position,
+    bio, instagram_handle, favorite_team,
+    babaCount = 0,
   } = profileData ?? {};
 
-  const POSITION_LABEL = {
-    goleiro: 'Goleiro', zagueiro: 'Zagueiro', lateral: 'Lateral',
-    meia: 'Meia', atacante: 'Atacante', linha: 'Linha',
-    fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
-  };
-
   return (
-    <div className="relative z-10 flex flex-col items-center h-full px-6 pt-8 pb-6 gap-4">
+    <div className="relative z-10 flex flex-col items-center h-full px-6 pt-8 pb-6 gap-3">
       {/* Label */}
       <p className="text-cyan-electric font-black italic text-[9px] tracking-[0.4em] uppercase">
         MEU PERFIL
       </p>
 
-      {/* Baba — só exibe se vier do ranking (babaName passado) */}
-      {babaName && (
-        <div className="flex items-center gap-2">
-          {babaLogo && (
-            <img src={babaLogo} alt={babaName} className="w-8 h-8 rounded-xl object-cover border border-cyan-electric/30" />
-          )}
-          <h2 className="text-xl font-black italic text-white uppercase tracking-tighter leading-none">
-            {babaName}
-          </h2>
-        </div>
-      )}
-
-      {/* Avatar + nome */}
-      <div className="flex flex-col items-center gap-3 flex-1 justify-center">
+      {/* Avatar + nome — é o jogador quem é o protagonista do card, não um baba específico */}
+      <div className="flex flex-col items-center gap-2.5 flex-1 justify-center w-full">
         <div className="relative">
           <div className="absolute inset-0 bg-cyan-electric rounded-full blur-xl opacity-20 animate-pulse" />
-          <div className="w-28 h-28 rounded-full border-4 border-cyan-electric p-1 relative z-10 bg-black">
+          <div className="w-24 h-24 rounded-full border-4 border-cyan-electric p-1 relative z-10 bg-black">
             <img
               src={avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name ?? 'J')}&background=111&color=fff&bold=true`}
               className="w-full h-full object-cover rounded-full"
@@ -162,12 +147,34 @@ const ProfileCardContent = ({ profileData, babaName, babaLogo, today }) => {
 
         <div className="text-center">
           <h3 className="text-2xl font-black italic text-white uppercase tracking-tight leading-none">{name}</h3>
-          {position && (
-            <p className="text-[10px] text-cyan-electric font-black uppercase tracking-widest mt-1">
-              {POSITION_LABEL[position] || position}
-            </p>
-          )}
+          <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
+            {position && (
+              <span className="text-[10px] text-cyan-electric font-black uppercase tracking-widest">
+                {POSITION_LABEL[position] || position}
+              </span>
+            )}
+            {position && favorite_team && <span className="text-white/20">·</span>}
+            {favorite_team && (
+              <span className="flex items-center gap-1 text-[10px] text-white/50 font-black uppercase tracking-widest">
+                <Heart size={9} fill="currentColor" /> {favorite_team}
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Bio */}
+        {bio && (
+          <p className="text-[10px] text-white/60 font-bold text-center leading-snug px-2 line-clamp-2">
+            "{bio}"
+          </p>
+        )}
+
+        {/* Instagram */}
+        {instagram_handle && (
+          <div className="flex items-center gap-1 text-[10px] text-white/40 font-black">
+            <Instagram size={10} /> @{instagram_handle}
+          </div>
+        )}
 
         {/* Rating */}
         {rating > 0 && (
@@ -191,6 +198,13 @@ const ProfileCardContent = ({ profileData, babaName, babaLogo, today }) => {
             </div>
           ))}
         </div>
+
+        {/* Babas — mostrado como conquista do jogador, não como identidade de um baba específico */}
+        {babaCount > 0 && (
+          <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">
+            Ativo em {babaCount} {babaCount === 1 ? 'baba' : 'babas'}
+          </p>
+        )}
       </div>
 
       {/* Rodapé */}
@@ -318,8 +332,6 @@ const ShareableCardModal = ({
           {isProfileMode ? (
             <ProfileCardContent
               profileData={profileData}
-              babaName={babaName}
-              babaLogo={babaLogo}
               today={today}
             />
           ) : (

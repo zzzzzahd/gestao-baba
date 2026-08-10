@@ -1,9 +1,9 @@
 // src/pages/ProfilePage.jsx
-// Corrigido: tabs limpas (stats | conquistas | editar), sem duplicação,
-// botão perfil público funcionando, BadgesSection integrada corretamente.
+// Tabs limpas (stats | conquistas | editar), sem duplicação.
+// Cartão de perfil público reorganizado com cara de rede social.
 
 import React, { useState, useEffect, useReducer, useCallback } from 'react';
-import { Share2, ExternalLink, Copy, Check, Shield } from 'lucide-react';
+import { Share2, ExternalLink, Copy, Check, Shield, Globe, Lock, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth }  from '../contexts/AuthContext';
 import { useBaba }  from '../contexts/BabaContext';
@@ -121,13 +121,17 @@ const ProfilePage = () => {
   const totalMatches = state.matchStats.reduce((s, m) => s + (m.matches || 0), 0);
 
   const profileShareData = profile ? {
-    name:       profile.name       || 'Jogador',
-    avatar_url: profile.avatar_url || null,
-    position:   profile.position   || null,
-    rating:     globalRating,
-    goals:      totalGoals,
-    assists:    totalAssists,
-    matches:    totalMatches,
+    name:              profile.name       || 'Jogador',
+    avatar_url:        profile.avatar_url || null,
+    position:          profile.position   || null,
+    rating:            globalRating,
+    goals:             totalGoals,
+    assists:           totalAssists,
+    matches:           totalMatches,
+    bio:               profile.bio               || null,
+    instagram_handle:  profile.instagram_handle  || null,
+    favorite_team:     profile.favorite_team     || null,
+    babaCount:         myBabas?.length || 0,
   } : null;
 
   const publicProfileUrl = user ? `${window.location.origin}/player/${user.id}` : null;
@@ -188,45 +192,71 @@ const ProfilePage = () => {
           )}
         </div>
 
-        {/* ── Banner perfil público ── */}
+        {/* ── Cartão de perfil público ── */}
         {user && tab !== 'edit' && (
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-surface-1 border border-border-subtle">
-            <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-black uppercase text-text-muted tracking-widest mb-0.5">
+          <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <p className="flex items-center gap-1.5 text-[9px] font-black uppercase text-text-muted tracking-widest">
+                {profile?.is_public === false
+                  ? <Lock size={11} className="text-text-muted" />
+                  : <Globe size={11} className="text-cyan-electric" />}
                 Perfil público
               </p>
-              <p className="text-[9px] text-text-muted truncate font-mono">
-                /player/{user.id.slice(0, 16)}...
-              </p>
+              <button
+                onClick={handleCopyPublicLink}
+                className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest transition-colors ${
+                  copied ? 'text-green-400' : 'text-text-muted hover:text-white'
+                }`}
+              >
+                {copied ? <Check size={11} /> : <Copy size={11} />}
+                {copied ? 'Copiado' : 'Copiar link'}
+              </button>
             </div>
-            {/* Seguidores clicável */}
-            <button
-              onClick={() => navigate(`/followers/${user.id}`)}
-              className="flex flex-col items-center px-2 hover:opacity-70 transition-opacity"
-            >
-              <span className="text-xs font-black text-white">
-                {followerCount ?? '—'}
-              </span>
-              <span className="text-[8px] font-black text-text-muted uppercase">seguidores</span>
-            </button>
-            <button
-              onClick={handleCopyPublicLink}
-              className={`p-2 rounded-xl border transition-all ${
-                copied
-                  ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                  : 'bg-surface-2 border-border-mid text-text-low hover:text-white'
-              }`}
-              title="Copiar link"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </button>
-            <button
-              onClick={() => navigate(`/player/${user.id}`)}
-              className="p-2 bg-cyan-electric/10 border border-cyan-electric/20 rounded-xl text-cyan-electric hover:bg-cyan-electric/20 transition-all"
-              title="Ver perfil público"
-            >
-              <ExternalLink size={14} />
-            </button>
+
+            {profile?.is_public === false ? (
+              /* Perfil oculto — direciona pra ativar em Editar em vez de duplicar o toggle aqui */
+              <div className="flex items-center gap-3 px-4 py-4">
+                <p className="flex-1 text-[10px] text-text-muted font-bold leading-relaxed">
+                  Seu perfil está oculto. Ative em <button onClick={() => setTab('edit')} className="text-cyan-electric font-black underline underline-offset-2">Editar</button> para outros jogadores poderem ver.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 px-4 py-4">
+                <button
+                  onClick={() => navigate(`/player/${user.id}`)}
+                  className="flex-1 min-w-0 flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                >
+                  <div className="w-12 h-12 rounded-2xl border-2 border-cyan-electric/30 bg-gray-900 overflow-hidden shrink-0 flex items-center justify-center">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} className="w-full h-full object-cover" alt={profile.name} />
+                    ) : (
+                      <span className="text-sm font-black text-cyan-electric">
+                        {(profile?.name || '?').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white truncate">{profile?.name || 'Jogador'}</p>
+                    <p className="text-[10px] text-text-muted font-bold truncate">
+                      {profile?.bio || 'Toque para ver como outros jogadores veem seu perfil'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => navigate(`/followers/${user.id}`)}
+                  className="flex flex-col items-center px-1 shrink-0 hover:opacity-70 transition-opacity"
+                >
+                  <span className="flex items-center gap-1 text-xs font-black text-white">
+                    <Users size={10} className="text-text-muted" /> {followerCount ?? '—'}
+                  </span>
+                  <span className="text-[8px] font-black text-text-muted uppercase">seguidores</span>
+                </button>
+
+                <ExternalLink size={16} className="text-cyan-electric shrink-0" />
+              </div>
+            )}
           </div>
         )}
 
@@ -298,8 +328,6 @@ const ProfilePage = () => {
         onClose={() => setShowShare(false)}
         rankingType="profile"
         profileData={profileShareData}
-        babaName={currentBaba?.name}
-        babaLogo={currentBaba?.logo_url}
       />
     </div>
   );

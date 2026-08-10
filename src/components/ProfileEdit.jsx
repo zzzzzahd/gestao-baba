@@ -1,6 +1,8 @@
 // src/components/ProfileEdit.jsx
-// Sprint 19 — Campos adicionais: bio, instagram_handle, preferred_position, is_public
-// Mantém todos os campos originais (name, age, position, favorite_team)
+// Campos: bio, instagram_handle, is_public (visibilidade do perfil público)
+// + campos originais (name, age, position, favorite_team).
+// Nota: "position" é a única posição editável — é a mesma exibida no perfil
+// público (o campo duplicado "posição preferida" foi removido).
 
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
@@ -11,20 +13,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ChangePasswordModal from './ChangePasswordModal';
-
-const POSITION_OPTIONS = [
-  // Society / Futebol de campo
-  { value: 'goleiro',  label: 'Goleiro'  },
-  { value: 'zagueiro', label: 'Zagueiro' },
-  { value: 'lateral',  label: 'Lateral'  },
-  { value: 'meia',     label: 'Meia'     },
-  { value: 'atacante', label: 'Atacante' },
-  { value: 'linha',    label: 'Linha'    },
-  // Futsal
-  { value: 'fixo',     label: 'Fixo'     },
-  { value: 'ala',      label: 'Ala'      },
-  { value: 'pivo',     label: 'Pivô'     },
-];
+import { POSITION_OPTIONS } from '../constants/positions';
 
 const INPUT_CLASS =
   'w-full bg-surface-2 border border-border-mid rounded-2xl px-4 py-3.5 text-sm font-bold text-white placeholder:text-text-muted focus:outline-none focus:border-cyan-electric/50 focus:bg-white/[0.07] transition-all disabled:opacity-50';
@@ -60,12 +49,11 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
     // Campos originais
     name:               profile?.name               || '',
     age:                profile?.age                || '',
-    position:           profile?.position           || '',
+    position:           profile?.position || profile?.preferred_position || '',
     favorite_team:      profile?.favorite_team      || '',
     // Campos Sprint 19
     bio:                profile?.bio                || '',
     instagram_handle:   profile?.instagram_handle   || '',
-    preferred_position: profile?.preferred_position || profile?.position || '',
     is_public:          profile?.is_public          ?? true,
   });
   const [saving, setSaving] = useState(false);
@@ -108,10 +96,12 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
           age:                formData.age ? parseInt(formData.age) : null,
           position:           formData.position           || null,
           favorite_team:      formData.favorite_team.trim() || null,
-          // Campos Sprint 19
+          // Campos Sprint 19 — preferred_position mantido em sincronia com
+          // position (mesmo valor) só para compatibilidade com telas antigas
+          // que ainda leem essa coluna; não existe mais campo separado na UI.
           bio:                formData.bio.trim()              || null,
           instagram_handle:   formData.instagram_handle.trim() || null,
-          preferred_position: formData.preferred_position      || null,
+          preferred_position: formData.position                || null,
           is_public:          formData.is_public,
         })
         .eq('id', profile.id);
@@ -185,6 +175,7 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
             <option key={p.value} value={p.value} className="bg-black">{p.label}</option>
           ))}
         </select>
+        <p className="text-[9px] text-text-muted mt-1 ml-1">Essa é a posição exibida no seu perfil público</p>
       </div>
 
       {/* Time do coração */}
@@ -258,23 +249,6 @@ const ProfileEdit = ({ profile, onCancel, onSaved, onProfileRefresh }) => {
               className={`${INPUT_CLASS} pl-8`}
             />
           </div>
-        </div>
-
-        {/* Posição preferida */}
-        <div className="mb-4">
-          <FieldLabel icon={<Target size={12} />}>Posição preferida (exibida no perfil)</FieldLabel>
-          <select
-            name="preferred_position"
-            value={formData.preferred_position}
-            onChange={handleChange}
-            disabled={saving}
-            className={`${INPUT_CLASS} appearance-none`}
-          >
-            <option value="" className="bg-black">Selecione</option>
-            {POSITION_OPTIONS.map(p => (
-              <option key={p.value} value={p.value} className="bg-black">{p.label}</option>
-            ))}
-          </select>
         </div>
 
         {/* Visibilidade do perfil */}

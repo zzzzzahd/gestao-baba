@@ -1,32 +1,16 @@
 // src/pages/PublicProfilePage.jsx
-// Corrigido: baseado no original funcional + campos novos (bio, instagram, follow)
 // Rota: /player/:userId
+// Conquistas vêm só do banco (badge_definitions/player_badges) — mesma fonte
+// que BadgesSection.jsx usa no perfil privado. Antes havia uma segunda lista
+// de conquistas fixa no código rodando em paralelo; removida.
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate }      from 'react-router-dom';
 import { supabase }                    from '../services/supabase';
 import { useAuth }                     from '../contexts/AuthContext';
-import { ArrowLeft, Star, UserPlus, UserMinus, Share2, Instagram } from 'lucide-react';
+import { ArrowLeft, Star, UserPlus, UserMinus, Share2, Instagram, Users, Edit3 } from 'lucide-react';
 import StreakBadge from '../components/StreakBadge';
-
-// ── Badge definitions (mantidas do original) ──────────────────────────────────
-const BADGE_DEFINITIONS = [
-  { id: 'estreante',    icon: '🌱', label: 'Estreante',      condition: ({ matches })   => matches   >= 1  },
-  { id: 'veterano',     icon: '🛡️', label: 'Veterano',       condition: ({ matches })   => matches   >= 10 },
-  { id: 'lenda',        icon: '👑', label: 'Lenda',          condition: ({ matches })   => matches   >= 30 },
-  { id: 'artilheiro',   icon: '⚡', label: 'Artilheiro',     condition: ({ goals })     => goals     >= 10 },
-  { id: 'maquina',      icon: '🔥', label: 'Máquina de Gol', condition: ({ goals })     => goals     >= 30 },
-  { id: 'garcom',       icon: '🎯', label: 'Garçom',         condition: ({ assists })   => assists   >= 10 },
-  { id: 'bem_avaliado', icon: '⭐', label: 'Bem Avaliado',   condition: ({ rating })    => rating    >= 4.0 },
-  { id: 'elite',        icon: '💎', label: 'Elite',          condition: ({ rating })    => rating    >= 4.5 },
-  { id: 'multi_baba',   icon: '🏟️', label: 'Multi-Baba',    condition: ({ babaCount }) => babaCount >= 2  },
-];
-
-const POSITION_LABEL = {
-  goleiro: 'Goleiro', zagueiro: 'Zagueiro', lateral: 'Lateral',
-  meia: 'Meia', atacante: 'Atacante', linha: 'Linha',
-  fixo: 'Fixo', ala: 'Ala', pivo: 'Pivô',
-};
+import { POSITION_LABEL } from '../constants/positions';
 
 const RARITY_COLOR = {
   legendary: 'text-yellow-400',
@@ -209,13 +193,13 @@ export default function PublicProfilePage() {
     </div>
   );
 
-  // Badges locais (original) + badges do banco (Sprint 14)
-  const localBadges   = stats ? BADGE_DEFINITIONS.filter(b => b.condition(stats)) : [];
-  const dbBadgeIds    = new Set(earnedBadges.map(b => b.badge_id));
-  const allBadges     = [
-    ...earnedBadges.map(b => ({ id: b.badge_id, icon: b.badge?.icon, label: b.badge?.name, rarity: b.badge?.rarity, fromDb: true })),
-    ...localBadges.filter(b => !dbBadgeIds.has(b.id)),
-  ];
+  // Conquistas: só o que veio do banco (player_badges) — fonte única, mesma do perfil privado
+  const allBadges = earnedBadges.map(b => ({
+    id:     b.badge_id,
+    icon:   b.badge?.icon,
+    label:  b.badge?.name,
+    rarity: b.badge?.rarity,
+  }));
 
   return (
     <div className="min-h-screen bg-black text-white pb-12">
@@ -240,7 +224,14 @@ export default function PublicProfilePage() {
           >
             <Share2 size={16} />
           </button>
-          {!isOwnProfile && user && (
+          {isOwnProfile ? (
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric hover:bg-cyan-electric/20 transition-all"
+            >
+              <Edit3 size={12} /> Editar
+            </button>
+          ) : user && (
             <button
               onClick={handleFollow}
               disabled={toggling}
@@ -280,9 +271,9 @@ export default function PublicProfilePage() {
 
         {/* Posição + time */}
         <div className="flex items-center justify-center gap-3 mt-2 flex-wrap">
-          {(profile.preferred_position || profile.position) && (
+          {(profile.position || profile.preferred_position) && (
             <span className="text-[10px] font-black uppercase text-cyan-electric">
-              {POSITION_LABEL[profile.preferred_position || profile.position] || profile.position}
+              {POSITION_LABEL[profile.position || profile.preferred_position] || profile.position}
             </span>
           )}
           {profile.favorite_team && (
@@ -314,11 +305,15 @@ export default function PublicProfilePage() {
         )}
 
         {/* Followers */}
-        <div className="flex items-center gap-4 mt-3">
+        <button
+          onClick={() => navigate(`/followers/${userId}`)}
+          className="flex items-center gap-1.5 mt-3 hover:opacity-70 transition-opacity"
+        >
+          <Users size={11} className="text-text-muted" />
           <span className="text-[10px] font-black text-text-low">
             <span className="text-white">{followers}</span> seguidores
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Conteúdo */}

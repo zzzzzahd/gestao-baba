@@ -50,7 +50,7 @@ const BottomNav = () => {
 
         {/* Safe area para iOS */}
         <div
-          className="relative flex items-center justify-around px-2 pt-3"
+          className="relative flex items-stretch justify-between px-1 pt-3"
           style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
         >
           {NAV_ITEMS.map(({ icon: Icon, label, path, ariaLabel }) => {
@@ -61,7 +61,7 @@ const BottomNav = () => {
                 onClick={() => navigate(path)}
                 aria-label={ariaLabel}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-all active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-electric focus-visible:outline-offset-2"
+                className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1 rounded-2xl transition-all active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-electric focus-visible:outline-offset-2"
               >
                 <div className={`relative p-2 rounded-xl transition-all ${
                   isActive
@@ -81,7 +81,7 @@ const BottomNav = () => {
                     />
                   )}
                 </div>
-                <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${
+                <span className={`text-[9px] font-black uppercase tracking-widest truncate max-w-full transition-colors ${
                   isActive ? 'text-cyan-electric' : 'text-white/20'
                 }`}>
                   {label}
@@ -94,7 +94,7 @@ const BottomNav = () => {
           <button
             onClick={() => setConfirmLogout(true)}
             aria-label="Sair da conta"
-            className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-all active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-electric focus-visible:outline-offset-2"
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1 rounded-2xl transition-all active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-electric focus-visible:outline-offset-2"
           >
             <div className="relative p-2 rounded-xl transition-all hover:bg-white/5">
               <LogOut size={22} className="text-white/30 transition-colors" strokeWidth={1.5} aria-hidden="true" />

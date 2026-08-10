@@ -108,23 +108,15 @@ export default function AiInsightsPanel({ babaId, isPresident }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insights`,
-        {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ baba_id: babaId }),
-        }
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        'generate-insights',
+        { body: { baba_id: babaId } },
       );
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result?.error || 'Erro ao gerar insights');
+      if (fnError) {
+        const serverMsg = fnError.context?.error;
+        throw new Error(serverMsg || fnError.message || 'Erro ao gerar insights');
       }
+      if (result?.error) throw new Error(result.error);
 
       toast.success(
         `${result.count} insight${result.count !== 1 ? 's' : ''} gerado${result.count !== 1 ? 's' : ''}! 🎯`,

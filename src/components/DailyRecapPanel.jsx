@@ -47,16 +47,16 @@ export default function DailyRecapPanel({ babaId, isPresident }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-daily-recap`,
-        {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ baba_id: babaId }),
-        }
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        'generate-daily-recap',
+        { body: { baba_id: babaId } },
       );
-      const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || 'Erro ao gerar resumo');
+      if (fnError) {
+        // supabase-js só popula fnError.context quando a function respondeu com erro HTTP
+        const serverMsg = fnError.context?.error;
+        throw new Error(serverMsg || fnError.message || 'Erro ao gerar resumo');
+      }
+      if (result?.error) throw new Error(result.error);
 
       toast.success('Resumo do dia pronto! 🎯', { id: toastId });
       await load();
