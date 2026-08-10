@@ -52,8 +52,13 @@ export default function DailyRecapPanel({ babaId, isPresident }) {
         { body: { baba_id: babaId } },
       );
       if (fnError) {
-        // supabase-js só popula fnError.context quando a function respondeu com erro HTTP
-        const serverMsg = fnError.context?.error;
+        // fnError.context é a Response bruta do fetch — precisa ler o corpo JSON
+        // pra pegar a mensagem amigável que a edge function retorna em { error }
+        let serverMsg = null;
+        try {
+          const body = await fnError.context?.json();
+          serverMsg = body?.error;
+        } catch { /* corpo não era JSON, segue com a mensagem genérica */ }
         throw new Error(serverMsg || fnError.message || 'Erro ao gerar resumo');
       }
       if (result?.error) throw new Error(result.error);

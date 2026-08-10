@@ -113,7 +113,11 @@ export default function AiInsightsPanel({ babaId, isPresident }) {
         { body: { baba_id: babaId } },
       );
       if (fnError) {
-        const serverMsg = fnError.context?.error;
+        let serverMsg = null;
+        try {
+          const body = await fnError.context?.json();
+          serverMsg = body?.error;
+        } catch { /* corpo não era JSON, segue com a mensagem genérica */ }
         throw new Error(serverMsg || fnError.message || 'Erro ao gerar insights');
       }
       if (result?.error) throw new Error(result.error);
