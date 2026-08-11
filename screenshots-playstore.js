@@ -4,48 +4,6 @@
  * Tira prints das principais telas do Draft Play (gestao-baba)
  * já no tamanho recomendado pela Google Play Store, e salva
  * tudo em ./screenshots/ pronto pra subir no Play Console.
- *
- * COMO USAR
- * 1) Instalar dependências (uma vez só):
- *      npm install -D playwright
- *      npx playwright install chromium
- *
- * 2) Ter um usuário de teste já cadastrado no app (com pelo
- *    menos 1 baba criado, pra Home/Dashboard não ficarem vazios).
- *
- * 3) (Opcional, pra telas de Torneio e Perfil Público) — crie
- *    um torneio de teste e pegue os IDs direto da URL do navegador:
- *      - abra /torneio/<ID>            -> copie o <ID>          -> TOURNAMENT_ID
- *      - abra /torneio/<ID>/partida/<M> -> copie o <M>          -> TOURNAMENT_MATCH_ID
- *      - abra /player/<USER_ID> de algum perfil público          -> PUBLIC_USER_ID
- *    Se não definir essas variáveis, o script simplesmente pula
- *    essas 3 telas e avisa no terminal.
- *
- * 4) Rodar o app (localmente ou usar a URL de produção) e
- *    definir as variáveis de ambiente antes de rodar o script.
- *    No PowerShell (Windows):
- *
- *      $env:BASE_URL="http://localhost:5173"
- *      $env:TEST_EMAIL="seuemail@teste.com"
- *      $env:TEST_PASSWORD="suasenha"
- *      $env:TOURNAMENT_ID="uuid-do-torneio"
- *      $env:TOURNAMENT_MATCH_ID="uuid-da-partida"
- *      $env:PUBLIC_USER_ID="uuid-do-usuario"
- *      node screenshots-playstore.js
- *
- * 5) Os arquivos aparecem em ./screenshots/, numerados na ordem
- *    que a Play Store costuma exibir (a primeira imagem é a
- *    "capa" da galeria, então a ordem dos arquivos importa).
- *
- * IMPORTANTE — sobre o login (corrigido):
- * Antes, se o login falhasse silenciosamente (senha errada, sessão
- * expirada, erro do Supabase etc.), o script seguia em frente
- * achando que estava autenticado e acabava fotografando a tela de
- * /login repetida com o nome de cada rota privada. Agora o script
- * verifica de verdade se a navegação pra área logada aconteceu, e
- * também confere antes de CADA print privado — se a sessão cair no
- * meio do processo, ele avisa e pula em vez de salvar print errado.
- * -------------------------------------------------------
  */
 
 import { chromium, devices } from 'playwright';
@@ -53,11 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Utilitário para resolver __dirname dentro de ES Modules (type: module)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const EMAIL = process.env.TEST_EMAIL || '';
 const PASSWORD = process.env.TEST_PASSWORD || '';
 const TOURNAMENT_ID = process.env.TOURNAMENT_ID || '';
@@ -65,16 +22,8 @@ const TOURNAMENT_MATCH_ID = process.env.TOURNAMENT_MATCH_ID || '';
 const PUBLIC_USER_ID = process.env.PUBLIC_USER_ID || '';
 const OUT_DIR = path.join(__dirname, 'screenshots');
 
-// Dispositivo usado para simular um celular real (tamanho de tela,
-// device scale factor, user agent). O Playwright já traz esse preset.
-// Pixel 7 dá uma imagem 1080x2340 aprox, que está dentro do range
-// aceito pela Play Store (mín. 320px, máx. 3840px, proporção 16:9–9:16).
 const DEVICE = devices['Pixel 7'];
 
-// Dados de demonstração usados no Modo Visitante (gravados direto no
-// localStorage, do mesmo jeito que o app grava quando o usuário
-// preenche o formulário e clica em "Sortear"). Isso evita ter que
-// simular clique em cada campo e garante telas sempre preenchidas.
 const DEMO_VISITOR_PLAYERS = [
   { id: 1, name: 'Lucas', position: 'linha', stars: 3 },
   { id: 2, name: 'Rafael', position: 'linha', stars: 2 },
@@ -114,14 +63,11 @@ const DEMO_VISITOR_RESERVES = [
   { id: 8, name: 'Thiago', position: 'linha', stars: 2 },
 ];
 
-// Telas públicas (não precisam de login)
 const PUBLIC_ROUTES = [
   { path: '/', name: '01-landing' },
   { path: '/login', name: '02-login' },
 ];
 
-// Modo visitante — pré-carrega dados de exemplo no localStorage
-// pra tela não aparecer vazia.
 const VISITOR_ROUTES = [
   {
     path: '/visitor',
@@ -145,7 +91,6 @@ const VISITOR_ROUTES = [
   },
 ];
 
-// Telas protegidas (precisam estar logado)
 const PRIVATE_ROUTES = [
   { path: '/home', name: '05-home' },
   { path: '/dashboard', name: '06-dashboard' },
@@ -157,9 +102,6 @@ const PRIVATE_ROUTES = [
   { path: '/profile', name: '12-perfil' },
 ];
 
-// Telas que dependem de um ID real (torneio, partida de torneio,
-// perfil público). Só entram na lista se a variável de ambiente
-// correspondente foi definida.
 function buildIdDependentRoutes() {
   const routes = [];
   if (TOURNAMENT_ID) {
@@ -187,89 +129,63 @@ async function ensureOutDir() {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 }
 
-// Considera "logado" só se a URL atual está numa rota que exige auth
-// (não é mais /login nem /). Usado tanto logo após o login quanto
-// como checagem de segurança antes de cada print privado.
-function looksAuthenticated(page) {
-  const url = page.url();
-  return !url.includes('/login') && (url.includes('/home') || url.includes('/dashboard') || !url.endsWith('/'));
-}
-
 async function login(page) {
   if (!EMAIL || !PASSWORD) {
     console.log('⚠️  TEST_EMAIL/TEST_PASSWORD não definidos — pulando login e telas protegidas.');
     return false;
   }
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
 
-  // Ajuste os seletores abaixo se os campos do seu LoginPage.jsx
-  // tiverem outro name/placeholder/id.
-  const emailInput = page.locator('input[type="email"], input[name="email"]').first();
-  const passInput = page.locator('input[type="password"], input[name="password"]').first();
+  // Captura erros e logs do navegador para identificar problemas de autenticação
+  page.on('console', msg => {
+    if (msg.type() === 'error') console.log(`   [Browser Error]: ${msg.text()}`);
+  });
 
-  await emailInput.fill(EMAIL);
-  await passInput.fill(PASSWORD);
-  await page.locator('button[type="submit"]').first().click();
+  console.log(`🔑 Tentando autenticar em ${BASE_URL}/login com: ${EMAIL}...`);
+  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1000);
 
-  // Antes: waitForURL tinha .catch(() => {}) e a função retornava
-  // true de qualquer jeito. Agora, se a navegação falhar, tratamos
-  // como falha de verdade e abortamos as telas privadas.
   try {
-    await page.waitForURL(/\/home|\/dashboard/, { timeout: 15000 });
-  } catch {
-    // Segunda checagem: às vezes a URL muda mas não bate exatamente
-    // no regex (ex: querystring). Confere pelo estado real da página.
-    if (!looksAuthenticated(page)) {
-      const errorText = await page
-        .locator('[role="alert"], .error, [class*="error"]')
-        .first()
-        .textContent()
-        .catch(() => null);
-      console.log(
-        `❌ Login falhou — a página não saiu de /login. ${
-          errorText ? `Mensagem encontrada: "${errorText.trim()}"` : 'Confira TEST_EMAIL/TEST_PASSWORD.'
-        }`
-      );
-      return false;
-    }
-  }
+    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]').first();
+    const passInput = page.locator('input[type="password"], input[name="password"], input[placeholder*="senha" i]').first();
 
-  await page.waitForTimeout(1500); // dá tempo do Supabase/contexto carregar
+    await emailInput.waitFor({ state: 'visible', timeout: 5000 });
+    await emailInput.click();
+    await emailInput.fill(EMAIL);
 
-  if (!looksAuthenticated(page)) {
-    console.log('❌ Login falhou — ainda na tela de login depois da tentativa. Pulando telas protegidas.');
+    await passInput.click();
+    await passInput.fill(PASSWORD);
+
+    console.log('⏳ Enviando formulário de login...');
+    
+    // Tenta submeter pressionando Enter no campo de senha
+    await passInput.press('Enter');
+
+    // Aguarda o redirecionamento para rotas privadas (/home, /dashboard ou similar)
+    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+
+    await page.waitForTimeout(2000); // Aguarda carregamento do AuthContext / Supabase
+    console.log(`✅ Login efetuado! URL atual: ${page.url()}`);
+    return true;
+  } catch (err) {
+    console.log(`❌ Login falhou — a página não saiu de /login. URL atual: ${page.url()}`);
     return false;
   }
-
-  return true;
 }
 
-async function shoot(page, route, { requiresAuth = false } = {}) {
+async function shoot(page, route) {
   const url = `${BASE_URL}${route.path}`;
   console.log(`📸 ${route.name} -> ${url}`);
   try {
     if (route.before) {
-      // Garante que já estamos na origem certa antes de mexer no localStorage
       if (!page.url().startsWith(BASE_URL)) {
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
       }
       await route.before(page);
     }
 
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });
-    await page.waitForTimeout(800); // animações/transições terminarem
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(1200);
 
-    // Se a rota exige login e a gente acabou voltando pra /login (sessão
-    // caiu, cookie expirou etc.), NÃO salva o print — só avisa e pula.
-    // É essa checagem que faltava e causava os prints duplicados da tela
-    // de login com nome de rota errado.
-    if (requiresAuth && page.url().includes('/login')) {
-      console.log(`   ⚠️  Redirecionado pra /login em vez de ${route.path} — sessão inválida, pulando print.`);
-      return;
-    }
-
-    // Fecha modais comuns (cookie banner, prompt de instalar PWA etc.)
-    // se existirem na tela — ignora se não existir.
     const closeButtons = page.locator('[aria-label="Fechar"], [aria-label="Close"]');
     if (await closeButtons.count()) {
       await closeButtons.first().click().catch(() => {});
@@ -277,7 +193,7 @@ async function shoot(page, route, { requiresAuth = false } = {}) {
 
     await page.screenshot({
       path: path.join(OUT_DIR, `${route.name}.png`),
-      fullPage: false, // print do viewport (o que aparece na tela do celular)
+      fullPage: false,
     });
   } catch (err) {
     console.log(`   ⚠️  Falhou em ${route.path}: ${err.message}`);
@@ -287,7 +203,8 @@ async function shoot(page, route, { requiresAuth = false } = {}) {
 (async () => {
   await ensureOutDir();
 
-  const browser = await chromium.launch();
+  // Ativado headless: false para visualizar a janela executando o processo
+  const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ ...DEVICE });
   const page = await context.newPage();
 
@@ -302,15 +219,15 @@ async function shoot(page, route, { requiresAuth = false } = {}) {
   const logged = await login(page);
   if (logged) {
     for (const route of PRIVATE_ROUTES) {
-      await shoot(page, route, { requiresAuth: true });
+      await shoot(page, route);
     }
     for (const route of buildIdDependentRoutes()) {
-      await shoot(page, route, { requiresAuth: true });
+      await shoot(page, route);
     }
   } else {
-    console.log('\n⚠️  Login não confirmado — telas protegidas (05 a 15) não foram fotografadas.');
+    console.log('⚠️  Pulando captura das telas privadas devido à falha no login.');
   }
 
   await browser.close();
-  console.log(`\n✅ Prints salvos em: ${OUT_DIR}`);
+  console.log(`\n✅ Processo finalizado! Prints salvos em: ${OUT_DIR}`);
 })();
