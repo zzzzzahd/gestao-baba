@@ -36,6 +36,15 @@
  * 5) Os arquivos aparecem em ./screenshots/, numerados na ordem
  *    que a Play Store costuma exibir (a primeira imagem é a
  *    "capa" da galeria, então a ordem dos arquivos importa).
+ *
+ * IMPORTANTE — sobre o login (corrigido):
+ * Antes, se o login falhasse silenciosamente (senha errada, sessão
+ * expirada, erro do Supabase etc.), o script seguia em frente
+ * achando que estava autenticado e acabava fotografando a tela de
+ * /login repetida com o nome de cada rota privada. Agora o script
+ * verifica de verdade se a navegação pra área logada aconteceu, e
+ * também confere antes de CADA print privado — se a sessão cair no
+ * meio do processo, ele avisa e pula em vez de salvar print errado.
  * -------------------------------------------------------
  */
 
@@ -178,6 +187,14 @@ async function ensureOutDir() {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 }
 
+// Considera "logado" só se a URL atual está numa rota que exige auth
+// (não é mais /login nem /). Usado tanto logo após o login quanto
+// como checagem de segurança antes de cada print privado.
+function looksAuthenticated(page) {
+  const url = page.url();
+  return !url.includes('/login') && (url.includes('/home') || url.includes('/dashboard') || !url.endsWith('/'));
+}
+
 async function login(page) {
   if (!EMAIL || !PASSWORD) {
     console.log('⚠️  TEST_EMAIL/TEST_PASSWORD não definidos — pulando login e telas protegidas.');
@@ -192,17 +209,42 @@ async function login(page) {
 
   await emailInput.fill(EMAIL);
   await passInput.fill(PASSWORD);
+  await page.locator('button[type="submit"]').first().click();
 
-  await Promise.all([
-    page.waitForURL(/\/home|\/dashboard/, { timeout: 15000 }).catch(() => {}),
-    page.locator('button[type="submit"]').first().click(),
-  ]);
+  // Antes: waitForURL tinha .catch(() => {}) e a função retornava
+  // true de qualquer jeito. Agora, se a navegação falhar, tratamos
+  // como falha de verdade e abortamos as telas privadas.
+  try {
+    await page.waitForURL(/\/home|\/dashboard/, { timeout: 15000 });
+  } catch {
+    // Segunda checagem: às vezes a URL muda mas não bate exatamente
+    // no regex (ex: querystring). Confere pelo estado real da página.
+    if (!looksAuthenticated(page)) {
+      const errorText = await page
+        .locator('[role="alert"], .error, [class*="error"]')
+        .first()
+        .textContent()
+        .catch(() => null);
+      console.log(
+        `❌ Login falhou — a página não saiu de /login. ${
+          errorText ? `Mensagem encontrada: "${errorText.trim()}"` : 'Confira TEST_EMAIL/TEST_PASSWORD.'
+        }`
+      );
+      return false;
+    }
+  }
 
   await page.waitForTimeout(1500); // dá tempo do Supabase/contexto carregar
+
+  if (!looksAuthenticated(page)) {
+    console.log('❌ Login falhou — ainda na tela de login depois da tentativa. Pulando telas protegidas.');
+    return false;
+  }
+
   return true;
 }
 
-async function shoot(page, route) {
+async function shoot(page, route, { requiresAuth = false } = {}) {
   const url = `${BASE_URL}${route.path}`;
   console.log(`📸 ${route.name} -> ${url}`);
   try {
@@ -216,6 +258,15 @@ async function shoot(page, route) {
 
     await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });
     await page.waitForTimeout(800); // animações/transições terminarem
+
+    // Se a rota exige login e a gente acabou voltando pra /login (sessão
+    // caiu, cookie expirou etc.), NÃO salva o print — só avisa e pula.
+    // É essa checagem que faltava e causava os prints duplicados da tela
+    // de login com nome de rota errado.
+    if (requiresAuth && page.url().includes('/login')) {
+      console.log(`   ⚠️  Redirecionado pra /login em vez de ${route.path} — sessão inválida, pulando print.`);
+      return;
+    }
 
     // Fecha modais comuns (cookie banner, prompt de instalar PWA etc.)
     // se existirem na tela — ignora se não existir.
@@ -251,11 +302,13 @@ async function shoot(page, route) {
   const logged = await login(page);
   if (logged) {
     for (const route of PRIVATE_ROUTES) {
-      await shoot(page, route);
+      await shoot(page, route, { requiresAuth: true });
     }
     for (const route of buildIdDependentRoutes()) {
-      await shoot(page, route);
+      await shoot(page, route, { requiresAuth: true });
     }
+  } else {
+    console.log('\n⚠️  Login não confirmado — telas protegidas (05 a 15) não foram fotografadas.');
   }
 
   await browser.close();

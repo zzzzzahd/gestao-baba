@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { LogIn, Zap, Users, Shuffle, Radio, Star } from 'lucide-react';
+import {
+  LogIn, Zap, Users, Shuffle, Radio, Star,
+  UserCheck, Wallet, Trophy, ShieldCheck, Sparkles, CheckCircle2,
+} from 'lucide-react';
 
 // Passos do fluxo mostrados na landing: criar baba → sorteio → placar ao vivo.
-// Os "mockups" abaixo são miniaturas ilustrativas feitas em CSS (não screenshots reais)
-// para não depender de imagens externas — se quiser, é só trocar <StepMockup> por
-// um <img src="/screenshots/xxx.png" /> apontando pra prints reais do app.
+// "criar" ainda usa um mockup em CSS (não existe print real desse fluxo ainda).
+// "sorteio" e "placar" usam prints reais do Modo Rápido (screenshots/03 e 04),
+// copiados para public/marketing/.
+//
+// Como adicionar um print novo depois que rodar screenshots-playstore.js
+// corrigido: copie o arquivo de screenshots/<nome>.png para
+// public/marketing/<nome-legivel>.png e adicione (ou troque) o campo
+// `image`/`imageAlt` do passo correspondente abaixo. Não precisa mexer em
+// mais nada — se o arquivo em public/marketing/ ainda não existir, o
+// StepMockup cai sozinho pro mockup em CSS (veja o onError logo abaixo).
+// Sugestão de mapeamento com as rotas do script (screenshots/05-home.png,
+// 06-dashboard.png etc. depois de corrigidos): dá pra criar um 4º passo
+// "Gestão" usando 06-dashboard ou 10-financeiro como print, por exemplo.
 const steps = [
   {
     key: 'criar',
@@ -21,6 +34,8 @@ const steps = [
     icon: Shuffle,
     title: 'Sorteio automático e balanceado',
     desc: 'O app monta os times com base na avaliação dos jogadores, sem discussão pra escalar.',
+    image: '/marketing/sorteio-times.png',
+    imageAlt: 'Tela do Draft Play mostrando o Modo Rápido com jogadores cadastrados e configuração de sorteio de times',
   },
   {
     key: 'placar',
@@ -28,55 +43,48 @@ const steps = [
     icon: Radio,
     title: 'Acompanhe o placar em tempo real',
     desc: 'Todo mundo vê o resultado, o tempo de jogo e quem está na fila pra próxima partida.',
+    image: '/marketing/placar-ao-vivo.png',
+    imageAlt: 'Tela do Draft Play mostrando uma partida ao vivo com cronômetro, placar entre Time A e Time B e fila de próximos jogadores',
   },
 ];
 
 const StepMockup = ({ step }) => {
-  if (step.key === 'criar') {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (step.image && !imgFailed) {
     return (
-      <div className="space-y-3">
-        <div className="h-3 w-2/3 rounded-full bg-white/10" />
-        <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
-        <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
-        <div className="h-9 rounded-xl bg-gradient-to-r from-cyan-electric to-blue-500 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-black">
-          Entrar / Criar baba
-        </div>
-      </div>
-    );
-  }
-  if (step.key === 'sorteio') {
-    return (
-      <div className="grid grid-cols-2 gap-3">
-        {[0, 1].map((col) => (
-          <div key={col} className="space-y-2">
-            <div className={`h-2 w-1/2 rounded-full ${col === 0 ? 'bg-cyan-electric/60' : 'bg-white/20'}`} />
-            {[0, 1, 2].map((row) => (
-              <div key={row} className="h-6 rounded-lg bg-surface-3 border border-border-mid flex items-center px-2 gap-2">
-                <div className="w-3 h-3 rounded-full bg-white/20" />
-                <div className="h-1.5 w-10 rounded-full bg-white/10" />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <img
+        src={step.image}
+        alt={step.imageAlt}
+        loading="lazy"
+        decoding="async"
+        // Se o arquivo ainda não existir em public/marketing/ (ex: print
+        // real ainda não gerado), cai pro mockup em CSS abaixo em vez de
+        // mostrar um ícone de imagem quebrada.
+        onError={() => setImgFailed(true)}
+        className="w-full max-h-[320px] object-contain object-top rounded-xl"
+      />
     );
   }
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between px-2">
-        <div className="h-2 w-12 rounded-full bg-white/20" />
-        <span className="text-2xl font-black text-cyan-electric">2 x 1</span>
-        <div className="h-2 w-12 rounded-full bg-white/20" />
-      </div>
-      <div className="h-1 w-full rounded-full bg-surface-3 overflow-hidden">
-        <div className="h-full w-2/3 bg-cyan-electric animate-pulse" />
-      </div>
-      <div className="flex items-center gap-2 justify-center text-[10px] font-bold text-red-400 uppercase tracking-widest">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> Ao vivo · 12'
+      <div className="h-3 w-2/3 rounded-full bg-white/10" />
+      <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
+      <div className="h-9 rounded-xl bg-surface-3 border border-border-mid" />
+      <div className="h-9 rounded-xl bg-gradient-to-r from-cyan-electric to-blue-500 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-black">
+        Entrar / Criar baba
       </div>
     </div>
   );
 };
+
+// Recursos em destaque — visão geral do que o app resolve, além do fluxo de sorteio.
+const features = [
+  { icon: UserCheck, title: 'Presença e falta', desc: 'Confirmação de presença, atraso e substituição automática pela reserva.' },
+  { icon: Trophy, title: 'Conquistas e ranking', desc: 'Avaliação entre jogadores, badges e ranking de quem mais joga e marca.' },
+  { icon: Wallet, title: 'Cobrança via Pix', desc: 'O coordenador cobra a mensalidade ou o rateio da quadra direto pelo app.' },
+  { icon: ShieldCheck, title: 'Sem zap lotado', desc: 'Fila, escalação e resultado ficam registrados — sem depender de mensagem perdida.' },
+];
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -92,13 +100,15 @@ const LandingPage = () => {
           <Logo size="large" />
         </div>
 
-        {/* Título com contexto do produto, pra quem cai direto no link */}
-        <div className="text-center space-y-2 animate-fade-in">
+        {/* Título + contexto mais completo do produto, pra quem cai direto no link */}
+        <div className="text-center space-y-3 animate-fade-in">
           <h1 className="text-3xl font-black uppercase italic tracking-tighter bg-gradient-to-r from-white via-cyan-electric to-white bg-clip-text text-transparent">
             Organize o baba sem zap lotado
           </h1>
-          <p className="text-xs font-medium opacity-50 px-4 leading-relaxed">
-            Sorteio automático de times, presença confirmada e placar ao vivo — pra quem organiza e pra quem joga.
+          <p className="text-xs font-medium opacity-60 px-2 leading-relaxed">
+            O Draft Play é o app de gestão pra quem organiza (ou joga) futebol de várzea, pelada e baba entre amigos.
+            Sorteio automático de times, controle de presença, avaliação dos jogadores, ranking, cobrança via Pix
+            e placar em tempo real — tudo num só lugar, pra quem organiza e pra quem só quer jogar.
           </p>
         </div>
 
@@ -129,6 +139,9 @@ const LandingPage = () => {
             <Zap size={18} />
             Modo Visitante (Sem Conta)
           </button>
+          <p className="text-center text-[10px] opacity-40 leading-relaxed px-4">
+            Sorteie os times agora mesmo, sem cadastro — ideal pra quem só quer resolver o jogo de hoje.
+          </p>
         </div>
 
         {/* Showcase do fluxo: criar baba → sorteio → placar ao vivo */}
@@ -157,7 +170,7 @@ const LandingPage = () => {
               })}
             </div>
 
-            <div className="rounded-2xl bg-surface-2 border border-border-mid p-4 min-h-[140px] flex flex-col justify-center">
+            <div className="rounded-2xl bg-surface-2 border border-border-mid p-4 min-h-[140px] flex flex-col justify-center items-center">
               <StepMockup step={step} />
             </div>
 
@@ -166,6 +179,57 @@ const LandingPage = () => {
               <p className="text-[11px] opacity-50 mt-1 leading-relaxed">{step.desc}</p>
             </div>
           </div>
+        </div>
+
+        {/* Recursos em destaque */}
+        <div className="space-y-4 animate-fade-in">
+          <h2 className="text-center text-lg font-black uppercase italic tracking-tight">
+            Tudo que o baba precisa
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {features.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="card-glass p-4 rounded-2xl border border-border-mid space-y-2">
+                  <Icon size={18} className="text-cyan-electric" />
+                  <p className="text-xs font-bold">{f.title}</p>
+                  <p className="text-[10px] opacity-50 leading-relaxed">{f.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Para quem organiza x para quem joga */}
+        <div className="grid grid-cols-1 gap-3 animate-fade-in">
+          <div className="card-glass p-5 rounded-2xl border border-border-mid space-y-2">
+            <p className="text-xs font-black uppercase tracking-widest text-cyan-electric">Pra quem organiza</p>
+            <ul className="space-y-1.5 text-[11px] opacity-70">
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Sorteio de times sem discussão</li>
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Controle de falta, atraso e reserva</li>
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Cobrança de mensalidade/quadra via Pix</li>
+            </ul>
+          </div>
+          <div className="card-glass p-5 rounded-2xl border border-border-mid space-y-2">
+            <p className="text-xs font-black uppercase tracking-widest text-cyan-electric">Pra quem joga</p>
+            <ul className="space-y-1.5 text-[11px] opacity-70">
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Confirma presença em 1 toque</li>
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Acompanha o placar e a fila ao vivo</li>
+              <li className="flex items-start gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-cyan-electric" /> Ganha avaliação, badges e ranking</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Planos — sem valores fixos aqui até o plano de assinatura ser publicado no app */}
+        <div className="card-glass p-5 rounded-2xl border border-border-mid space-y-3 animate-fade-in">
+          <div className="flex items-center gap-2 justify-center">
+            <Sparkles size={16} className="text-cyan-electric" />
+            <p className="text-xs font-black uppercase tracking-widest">Grátis pra jogar</p>
+          </div>
+          <p className="text-[11px] text-center opacity-60 leading-relaxed px-2">
+            Qualquer jogador entra e participa de baba(s) de graça. Quem organiza pode assinar o plano de coordenador
+            pra criar seus próprios babas e torneios e liberar os recursos avançados de gestão.
+          </p>
         </div>
 
         {/* Depoimento social — troque pelo relato real de um coordenador ou jogador que já usa o app */}
@@ -182,9 +246,16 @@ const LandingPage = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
-          Powered by Draft Baba v3.0
-        </p>
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-widest opacity-40">
+            <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
+            <span className="opacity-30">·</span>
+            <a href="/privacidade" className="hover:text-cyan-electric transition-colors">Privacidade</a>
+          </div>
+          <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
+            Powered by Draft Baba v3.0
+          </p>
+        </div>
       </div>
     </div>
   );
