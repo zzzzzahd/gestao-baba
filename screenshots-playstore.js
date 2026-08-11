@@ -14,14 +14,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Definição dos valores padrão para evitar passar por $env toda vez
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const EMAIL = process.env.TEST_EMAIL || '';
-const PASSWORD = process.env.TEST_PASSWORD || '';
+const EMAIL = process.env.TEST_EMAIL || 'draftplayapp@gmail.com';
+const PASSWORD = process.env.TEST_PASSWORD || 'DraftPlay#Teste2026';
+
+// Adicione aqui IDs válidos do seu banco se quiser tirar print do torneio e perfil público
 const TOURNAMENT_ID = process.env.TOURNAMENT_ID || '';
 const TOURNAMENT_MATCH_ID = process.env.TOURNAMENT_MATCH_ID || '';
 const PUBLIC_USER_ID = process.env.PUBLIC_USER_ID || '';
-const OUT_DIR = path.join(__dirname, 'screenshots');
 
+const OUT_DIR = path.join(__dirname, 'screenshots');
 const DEVICE = devices['Pixel 7'];
 
 const DEMO_VISITOR_PLAYERS = [
@@ -131,12 +134,11 @@ async function ensureOutDir() {
 
 async function login(page) {
   if (!EMAIL || !PASSWORD) {
-    console.log('⚠️  TEST_EMAIL/TEST_PASSWORD não definidos — pulando login e telas protegidas.');
+    console.log('⚠️  EMAIL ou PASSWORD não definidos — pulando login.');
     return false;
   }
 
-  // Captura erros e logs do navegador para identificar problemas de autenticação
-  page.on('console', msg => {
+  page.on('console', (msg) => {
     if (msg.type() === 'error') console.log(`   [Browser Error]: ${msg.text()}`);
   });
 
@@ -156,14 +158,11 @@ async function login(page) {
     await passInput.fill(PASSWORD);
 
     console.log('⏳ Enviando formulário de login...');
-    
-    // Tenta submeter pressionando Enter no campo de senha
     await passInput.press('Enter');
 
-    // Aguarda o redirecionamento para rotas privadas (/home, /dashboard ou similar)
     await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
-    await page.waitForTimeout(2000); // Aguarda carregamento do AuthContext / Supabase
     console.log(`✅ Login efetuado! URL atual: ${page.url()}`);
     return true;
   } catch (err) {
@@ -203,7 +202,6 @@ async function shoot(page, route) {
 (async () => {
   await ensureOutDir();
 
-  // Ativado headless: false para visualizar a janela executando o processo
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ ...DEVICE });
   const page = await context.newPage();
