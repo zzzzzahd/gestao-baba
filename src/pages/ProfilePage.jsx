@@ -18,6 +18,7 @@ import BadgesSection      from '../components/BadgesSection';
 import ThemeToggle        from '../components/ThemeToggle';
 import { PlanBadge }     from '../components/PlanBadge';
 import ReferralPanel     from '../components/ReferralPanel';
+import AdBanner          from '../components/AdBanner';
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 
@@ -320,6 +321,11 @@ const ProfilePage = () => {
           <div className="bg-surface-1 border border-border-subtle rounded-3xl p-5">
             <ReferralPanel />
           </div>
+        )}
+
+        {/* ── Banner AdSense — rodapé do Perfil/Estatísticas (Free/anônimo) ── */}
+        {tab === 'stats' && (
+          <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PROFILE} className="mt-2" />
         )}
       </div>
 

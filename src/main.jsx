@@ -62,6 +62,20 @@ if (SENTRY_DSN) {
   });
 }
 
+// ─── Google AdSense — Fase 1.1/1.2: injeta o script só quando o client ID
+// existir de verdade. Diferente da tag estática no index.html, aqui a checagem
+// roda em JS (import.meta.env), então uma env var vazia simplesmente não gera
+// nenhuma requisição — nada de client= quebrado nem erro no console à toa
+// enquanto a conta AdSense não for aprovada. ───────────────────────────────────
+const ADSENSE_CLIENT_ID = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+if (ADSENSE_CLIENT_ID) {
+  const script = document.createElement('script');
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`;
+  document.head.appendChild(script);
+}
+
 // ─── PWA: Service Worker via Vite PWA plugin ─────────────────────────────────
 // O registerSW é injetado automaticamente pelo vite-plugin-pwa.
 // Mantemos listener manual apenas como fallback.
