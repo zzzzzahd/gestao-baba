@@ -88,7 +88,7 @@ const makeCtx = (overrides = {}) => ({
 let ctxValue = makeCtx();
 vi.mock('../../contexts/BabaContext', () => ({ useBaba: () => ctxValue }));
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ profile: { id: 'user1', name: 'Zé' }, user: { id: 'user1' }, signOut: vi.fn() }),
+  useAuth: () => ({ profile: { id: 'user1', name: 'Zé', plan: 'assinante' }, user: { id: 'user1' }, signOut: vi.fn() }),
 }));
 
 const wrap = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);

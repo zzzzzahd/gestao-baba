@@ -16,7 +16,7 @@ vi.mock('react-router-dom', async () => {
 const mockUseBaba = vi.fn();
 vi.mock('../../contexts/BabaContext', () => ({ useBaba: () => mockUseBaba() }));
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: vi.fn(() => ({ user: { id: 'user-1' }, profile: { id: 'user-1', name: 'Zé' } })),
+  useAuth: vi.fn(() => ({ user: { id: 'user-1' }, profile: { id: 'user-1', name: 'Zé', plan: 'assinante' } })),
 }));
 vi.mock('../../services/supabase', () => ({
   supabase: {

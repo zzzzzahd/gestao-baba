@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useBaba }               from '../../contexts/BabaContext';
+import { useFeatures }           from '../../utils/babaMode';
 import { supabase }              from '../../services/supabase';
 import Tooltip                   from '../../components/Tooltip';
 import DrawConstraintsPanel      from '../../components/DrawConstraintsPanel';
@@ -79,6 +80,7 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
 
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
   const { currentBaba, gameConfirmations, players, isDrawing } = useBaba();
+  const features = useFeatures();
   const [drawing,         setDrawing]         = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
 
@@ -241,7 +243,8 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         </div>
       </div>
 
-      {/* Restrições */}
+      {/* Restrições — Fase 2: "sorteio com restrições" é recurso de Assinante */}
+      {features.drawConstraints && (
       <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
         <button
           onClick={() => setShowConstraints(v => !v)}
@@ -266,6 +269,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
           </div>
         )}
       </div>
+      )}
 
       {/* Prévia */}
       {confirmedCount >= minRequired && (

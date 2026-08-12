@@ -21,7 +21,7 @@ vi.mock('../../services/supabase', () => ({
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({
     user:    { id: 'user-1' },
-    profile: { name: 'Zé Presidente' },
+    profile: { name: 'Zé Presidente', plan: 'assinante' },
   })),
 }));
 
@@ -49,7 +49,7 @@ const PLAYERS = [{ id: 'p-1', name: 'Zé', baba_id: 'baba-1', user_id: 'user-1',
 // "baba permanece null quando user é null" no bloco de inicialização), então
 // sem isso o mock de useAuth vaza entre describes.
 const setupAuthenticatedUser = () => {
-  useAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { name: 'Zé Presidente' } });
+  useAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { name: 'Zé Presidente', plan: 'assinante' } });
 };
 
 const setupMocks = (overrides = {}) => {

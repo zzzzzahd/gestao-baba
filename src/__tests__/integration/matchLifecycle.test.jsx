@@ -293,7 +293,7 @@ beforeEach(() => {
   currentTeamAName = 'Time A';
   currentTeamBName = 'Time B';
   mockUseBaba.mockReturnValue({ currentBaba: BABA });
-  mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+  mockUseAuth.mockReturnValue({ user: { id: 'user-1' }, profile: { id: 'user-1', plan: 'assinante' } });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
