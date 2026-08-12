@@ -1,11 +1,28 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
+import { usePlan } from '../hooks/usePlan';
 import toast from 'react-hot-toast';
 import { customAlphabet } from 'nanoid';
 
 // BUG-008 FIX: nanoid agora está corretamente declarado como dependência em package.json
 const nanoid = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
+
+// Fase 2 — traduz os erros dos triggers de gating (check_free_cannot_create_baba
+// e check_free_baba_limit, ver migration fase2_limite_baba_free) pra mensagem
+// amigável. Funciona como rede de segurança: a UI já bloqueia antes de chamar
+// o banco, mas se algo escapar (ex: RPC de convite chamada diretamente), o
+// usuário ainda vê uma mensagem decente em vez do erro cru do Postgres.
+const mensagemGatingFree = (error) => {
+  const msg = error?.message || '';
+  if (msg.includes('PLANO_FREE_NAO_PODE_CRIAR_BABA')) {
+    return 'Conta Free não pode criar baba. Assine para criar o seu.';
+  }
+  if (msg.includes('PLANO_FREE_LIMITE_1_BABA')) {
+    return 'Conta Free só pode participar de 1 baba. Assine para participar de mais.';
+  }
+  return null;
+};
 
 const BabaContext = createContext();
 
@@ -132,6 +149,7 @@ export const generateBalancedTeams = (players, numTeams = 2) => {
 
 export const BabaProvider = ({ children }) => {
   const { user, profile } = useAuth();
+  const { isAssinante } = usePlan();
 
   const [myBabas,        setMyBabas]        = useState([]);
   const [currentBaba,    setCurrentBaba]    = useState(null);
@@ -423,6 +441,10 @@ export const BabaProvider = ({ children }) => {
   // ─────────────────────────────────────────────
 
   const createBaba = async (babaData) => {
+    if (!isAssinante) {
+      toast.error('Conta Free não pode criar baba. Assine para criar o seu.');
+      return null;
+    }
     setLoading(true);
     try {
       let clean = [];
@@ -478,7 +500,7 @@ export const BabaProvider = ({ children }) => {
 
     } catch (error) {
       console.error('[createBaba] falhou:', error?.message ?? error);
-      toast.error(error?.message || 'Erro ao criar baba');
+      toast.error(mensagemGatingFree(error) || error?.message || 'Erro ao criar baba');
       return null;
     } finally {
       setLoading(false);
@@ -536,6 +558,10 @@ export const BabaProvider = ({ children }) => {
   };
 
   const joinBaba = async (inviteCode) => {
+    if (!isAssinante && myBabas.length >= 1) {
+      toast.error('Conta Free só pode participar de 1 baba. Assine para participar de mais.');
+      return null;
+    }
     setLoading(true);
     try {
       const code = inviteCode.trim().toUpperCase();
@@ -605,7 +631,7 @@ export const BabaProvider = ({ children }) => {
 
     } catch (error) {
       console.error('[joinBaba]', error);
-      toast.error(error.message || 'Erro ao entrar no baba');
+      toast.error(mensagemGatingFree(error) || error.message || 'Erro ao entrar no baba');
       return null;
     } finally {
       setLoading(false);
