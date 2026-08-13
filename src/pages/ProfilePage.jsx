@@ -3,7 +3,7 @@
 // Cartão de perfil público reorganizado com cara de rede social.
 
 import React, { useState, useEffect, useReducer, useCallback } from 'react';
-import { Share2, ExternalLink, Copy, Check, Shield, Globe, Lock, Users } from 'lucide-react';
+import { Share2, ExternalLink, Copy, Check, Shield, Globe, Lock, Users, Download, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth }  from '../contexts/AuthContext';
 import { useBaba }  from '../contexts/BabaContext';
@@ -19,6 +19,10 @@ import ThemeToggle        from '../components/ThemeToggle';
 import { PlanBadge }     from '../components/PlanBadge';
 import ReferralPanel     from '../components/ReferralPanel';
 import AdBanner          from '../components/AdBanner';
+import ExportDataModal   from '../components/ExportDataModal';
+import DeleteAccountModal from '../components/DeleteAccountModal';
+import DivisionChangeScreen from '../components/DivisionChangeScreen';
+import { getDivision } from '../components/DivisionBadge';
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +63,9 @@ const ProfilePage = () => {
   const [showShare,     setShowShare]     = useState(false);
   const [copied,        setCopied]        = useState(false);
   const [followerCount, setFollowerCount] = useState(null);
+  const [showExportData,   setShowExportData]   = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [divisionChange,   setDivisionChange]   = useState(null);
   const [state, dispatch]                 = useReducer(reducer, INITIAL);
 
   // Buscar contagem de seguidores do usuário logado
@@ -120,6 +127,24 @@ const ProfilePage = () => {
   const totalGoals   = state.matchStats.reduce((s, m) => s + (m.goals   || 0), 0);
   const totalAssists = state.matchStats.reduce((s, m) => s + (m.assists || 0), 0);
   const totalMatches = state.matchStats.reduce((s, m) => s + (m.matches || 0), 0);
+
+  // Detecta mudança de divisão desde a última visita ao perfil neste aparelho
+  useEffect(() => {
+    if (state.loading || !user?.id || globalRating <= 0) return;
+    const storageKey = `division_seen_${user.id}`;
+    const stored      = localStorage.getItem(storageKey);
+    if (stored !== null) {
+      const storedRating = parseFloat(stored);
+      if (!Number.isNaN(storedRating)) {
+        const oldDivId = getDivision(storedRating).id;
+        const newDivId = getDivision(globalRating).id;
+        if (oldDivId !== newDivId) {
+          setDivisionChange({ oldRating: storedRating, newRating: globalRating });
+        }
+      }
+    }
+    localStorage.setItem(storageKey, String(globalRating));
+  }, [state.loading, globalRating, user?.id]);
 
   const profileShareData = profile ? {
     name:              profile.name       || 'Jogador',
@@ -316,6 +341,40 @@ const ProfilePage = () => {
           </div>
         )}
 
+        {/* ── Privacidade e dados (LGPD) ── */}
+        {tab === 'stats' && (
+          <div className="rounded-2xl bg-surface-1 border border-border-subtle overflow-hidden">
+            <p className="px-4 pt-4 text-[9px] font-black uppercase text-text-muted tracking-widest">
+              Privacidade e dados
+            </p>
+            <button
+              onClick={() => setShowExportData(true)}
+              className="w-full flex items-center justify-between px-4 py-4 hover:bg-surface-2/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Download size={16} className="text-cyan-electric" />
+                <div className="text-left">
+                  <p className="text-[10px] font-black uppercase text-text-low tracking-widest">Exportar meus dados</p>
+                  <p className="text-[9px] text-text-muted mt-0.5">Baixe um arquivo .json com tudo que temos sobre você</p>
+                </div>
+              </div>
+            </button>
+            <div className="border-t border-border-subtle" />
+            <button
+              onClick={() => setShowDeleteAccount(true)}
+              className="w-full flex items-center justify-between px-4 py-4 hover:bg-red-500/5 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Trash2 size={16} className="text-red-400" />
+                <div className="text-left">
+                  <p className="text-[10px] font-black uppercase text-red-400 tracking-widest">Excluir minha conta</p>
+                  <p className="text-[9px] text-text-muted mt-0.5">Remove seus dados pessoais permanentemente</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
         {/* ── Indicações ── */}
         {tab === 'stats' && (
           <div className="bg-surface-1 border border-border-subtle rounded-3xl p-5">
@@ -335,6 +394,23 @@ const ProfilePage = () => {
         rankingType="profile"
         profileData={profileShareData}
       />
+
+      {showExportData && (
+        <ExportDataModal onClose={() => setShowExportData(false)} />
+      )}
+
+      {showDeleteAccount && (
+        <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />
+      )}
+
+      {divisionChange && (
+        <DivisionChangeScreen
+          oldRating={divisionChange.oldRating}
+          newRating={divisionChange.newRating}
+          playerName={profile?.name || 'Atleta'}
+          onDone={() => setDivisionChange(null)}
+        />
+      )}
     </div>
   );
 };

@@ -46,6 +46,7 @@ import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingMo
 import ChangelogModal, { shouldShowChangelog }    from './components/ChangelogModal';
 import FeedbackModal  from './components/FeedbackModal';
 import BetaFeedback, { shouldShowBetaFeedback }   from './components/BetaFeedback';
+import InstallPWA    from './components/InstallPWA';
 
 // Fallback padrão enquanto o chunk da rota carrega (mesmo spinner já usado no ProtectedRoute).
 const PageLoader = () => (
@@ -181,6 +182,9 @@ const AppInner = () => {
       )}
       {showBetaFeedback && needsConsent === false && (
         <BetaFeedback onClose={() => setShowBetaFeedback(false)} />
+      )}
+      {user && needsConsent === false && (
+        <InstallPWA hidden={showPushPrompt || showOnboarding || showChangelog || showBetaFeedback} />
       )}
       {user && needsConsent === false && (
         <button

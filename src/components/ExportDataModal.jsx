@@ -18,6 +18,10 @@ const ExportDataModal = ({ onClose }) => {
     if (!user) return;
     setLoading(true);
     try {
+      const { data: myPlayers } = await supabase
+        .from('players').select('id').eq('user_id', user.id);
+      const playerIds = (myPlayers || []).map(p => p.id);
+
       // Buscar todos os dados do usuário
       const [
         { data: profileData },
@@ -28,15 +32,15 @@ const ExportDataModal = ({ onClose }) => {
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('players').select('*, babas(name)').eq('user_id', user.id),
-        supabase.from('game_confirmations').select('*, babas(name)').in(
-          'player_id',
-          (await supabase.from('players').select('id').eq('user_id', user.id)).data?.map(p => p.id) || []
-        ),
-        supabase.from('player_ratings').select('*').in(
-          'rated_player_id',
-          (await supabase.from('players').select('id').eq('user_id', user.id)).data?.map(p => p.id) || []
-        ),
-        supabase.from('payments').select('*, financials(description, amount)').eq('user_id', user.id),
+        playerIds.length
+          ? supabase.from('game_confirmations').select('*, babas(name)').in('player_id', playerIds)
+          : Promise.resolve({ data: [] }),
+        playerIds.length
+          ? supabase.from('player_ratings').select('*').in('rated_id', playerIds)
+          : Promise.resolve({ data: [] }),
+        playerIds.length
+          ? supabase.from('payments').select('*, financials(description, amount)').in('player_id', playerIds)
+          : Promise.resolve({ data: [] }),
       ]);
 
       // Remover campos sensíveis internos
@@ -74,7 +78,7 @@ const ExportDataModal = ({ onClose }) => {
           descricao:  p.financials?.description,
           valor:      p.financials?.amount,
           status:     p.status,
-          data:       p.created_at,
+          data:       p.paid_at || p.confirmed_at,
         })),
       };
 

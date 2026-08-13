@@ -186,7 +186,7 @@ const RankingsPage = () => {
           player_id,
           goals,
           assists,
-          player:players!inner(name, position, user_id, profile:profiles(avatar_url)),
+          player:players!inner(name, position, user_id, is_guest, profile:profiles(avatar_url)),
           match:matches!inner(match_date, baba_id)
         `)
         .eq('match.baba_id', currentBaba.id);
@@ -197,7 +197,7 @@ const RankingsPage = () => {
       if (error) throw error;
 
       const statsMap = {};
-      (data || []).forEach(mp => {
+      (data || []).filter(mp => !mp.player?.is_guest).forEach(mp => {
         const id = mp.player_id;
         if (!statsMap[id]) {
           statsMap[id] = {

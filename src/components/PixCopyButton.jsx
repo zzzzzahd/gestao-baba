@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import QRCode from "qrcode";
+import { useState, useMemo } from "react";
+import { QRCodeSVG } from "qrcode.react";
 
 /**
  * Gera a string EMV/PIX estático (copia-e-cola) a partir de uma chave Pix.
@@ -21,7 +21,7 @@ function buildPixEMV(pixKey, merchantName = "Gestao Baba", merchantCity = "Brasi
 
   let emv =
     pad("00", "01") +
-    pad("01", "12") + // sem pagamento único, reutilizável
+    pad("01", amount > 0 ? "12" : "11") + // 12 = valor fixo (dinâmico), 11 = chave reutilizável sem valor
     merchantAccountInfo +
     pad("52", "0000") + // MCC genérico
     pad("53", "986") +  // BRL
@@ -47,19 +47,13 @@ function buildPixEMV(pixKey, merchantName = "Gestao Baba", merchantCity = "Brasi
   return emv + crc16(emv);
 }
 
-export default function PixCopyButton({ pixKey, babaName = "Gestao Baba", city = "Brasil" }) {
+export default function PixCopyButton({ pixKey, babaName = "Gestao Baba", city = "Brasil", amount = 0 }) {
   const [copied, setCopied] = useState(false);
-  const [qrUrl, setQrUrl] = useState(null);
-  const [emv, setEmv] = useState("");
 
-  useEffect(() => {
-    if (!pixKey) return;
-    const code = buildPixEMV(pixKey, babaName, city);
-    setEmv(code);
-    QRCode.toDataURL(code, { width: 200, margin: 1, color: { dark: "#06b6d4", light: "#0f172a" } })
-      .then(setQrUrl)
-      .catch(console.error);
-  }, [pixKey, babaName, city]);
+  const emv = useMemo(
+    () => (pixKey ? buildPixEMV(pixKey, babaName, city, amount) : ""),
+    [pixKey, babaName, city, amount]
+  );
 
   const handleCopy = async () => {
     if (!emv) return;
@@ -91,10 +85,16 @@ export default function PixCopyButton({ pixKey, babaName = "Gestao Baba", city =
   return (
     <div className="flex flex-col items-center gap-4">
       {/* QR Code */}
-      {qrUrl && (
-        <div className="rounded-xl overflow-hidden border border-cyan-500/30 shadow-lg shadow-cyan-500/10">
-          <img src={qrUrl} alt="QR Code Pix" className="w-48 h-48" />
+      {emv && (
+        <div className="rounded-xl overflow-hidden border border-cyan-500/30 shadow-lg shadow-cyan-500/10 p-3 bg-[#0f172a]">
+          <QRCodeSVG value={emv} size={180} bgColor="#0f172a" fgColor="#06b6d4" level="M" />
         </div>
+      )}
+
+      {amount > 0 && (
+        <p className="text-2xl font-black font-mono text-white">
+          {amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </p>
       )}
 
       {/* Chave mascarada */}
@@ -133,7 +133,7 @@ export default function PixCopyButton({ pixKey, babaName = "Gestao Baba", city =
       </button>
 
       <p className="text-xs text-gray-500 text-center max-w-xs">
-        Cole no seu app de banco para pagar via Pix instantâneo.
+        Escaneie o QR Code ou cole a chave no seu app de banco para pagar via Pix instantâneo.
       </p>
     </div>
   );

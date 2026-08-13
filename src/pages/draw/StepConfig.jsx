@@ -2,7 +2,7 @@
 // Sprint 3/16 — Adiciona sons no sorteio + constraints existentes.
 
 import React, { useState } from 'react';
-import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp, UserPlus, X } from 'lucide-react';
 import { useBaba }               from '../../contexts/BabaContext';
 import { useFeatures }           from '../../utils/babaMode';
 import { supabase }              from '../../services/supabase';
@@ -79,19 +79,68 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
 // ─── StepConfig ───────────────────────────────────────────────────────────────
 
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
-  const { currentBaba, gameConfirmations, players, isDrawing } = useBaba();
+  const { currentBaba, gameConfirmations, players, isDrawing, nextGameDay, reloadConfirmations } = useBaba();
   const features = useFeatures();
   const [drawing,         setDrawing]         = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
+  const [showGuestForm,   setShowGuestForm]   = useState(false);
+  const [guestName,       setGuestName]       = useState('');
+  const [guestPosition,   setGuestPosition]   = useState('linha');
+  const [addingGuest,     setAddingGuest]     = useState(false);
 
   const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
   const confirmedCount = gameConfirmations?.length || 0;
+  const guests          = (gameConfirmations || []).filter(c => c.player?.is_guest);
   const minRequired    = safeConfig.playersPerTeam * 2;
   const totalTeams     = Math.floor(confirmedCount / safeConfig.playersPerTeam);
   const totalMatches   = Math.floor(totalTeams / 2);
   const reserveCount   = confirmedCount % safeConfig.playersPerTeam
     + (totalTeams % 2) * safeConfig.playersPerTeam;
   const canDraw        = confirmedCount >= minRequired && !drawing;
+
+  const handleAddGuest = async () => {
+    if (!currentBaba || !nextGameDay) return;
+    setAddingGuest(true);
+    try {
+      const n     = guests.length + 1;
+      const label = guestName.trim()
+        ? `${guestName.trim()} - Convidado ${n}`
+        : `Convidado ${String(n).padStart(2, '0')}`;
+
+      const { data: newPlayer, error: playerErr } = await supabase
+        .from('players')
+        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true }])
+        .select().single();
+      if (playerErr) throw playerErr;
+
+      const { error: confirmErr } = await supabase
+        .from('game_confirmations')
+        .insert([{ baba_id: currentBaba.id, player_id: newPlayer.id, game_date: nextGameDay.dateStr, status: 'confirmed' }]);
+      if (confirmErr) throw confirmErr;
+
+      await reloadConfirmations();
+      setGuestName('');
+      setGuestPosition('linha');
+      toast.success(`${label} adicionado ao sorteio!`);
+    } catch (err) {
+      console.error('[StepConfig] addGuest error:', err);
+      toast.error('Erro ao adicionar convidado');
+    } finally {
+      setAddingGuest(false);
+    }
+  };
+
+  const handleRemoveGuest = async (confirmation) => {
+    try {
+      await supabase.from('game_confirmations').delete().eq('id', confirmation.id);
+      await supabase.from('players').delete().eq('id', confirmation.player_id);
+      await reloadConfirmations();
+      toast.success('Convidado removido');
+    } catch (err) {
+      console.error('[StepConfig] removeGuest error:', err);
+      toast.error('Erro ao remover convidado');
+    }
+  };
 
   const handleDelta = (delta) => {
     const next = Math.max(2, Math.min(11, safeConfig.playersPerTeam + delta));
@@ -185,6 +234,76 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
           <p className="text-[10px] text-text-muted font-bold mt-1">
             Mínimo {minRequired} para sortear · faltam {minRequired - confirmedCount}
           </p>
+        )}
+      </div>
+
+      {/* Convidados avulsos — participam só deste sorteio, não entram no rank */}
+      <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
+        <button
+          onClick={() => setShowGuestForm(v => !v)}
+          disabled={drawing}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors disabled:opacity-40"
+        >
+          <div className="flex items-center gap-2">
+            <UserPlus size={14} className="text-cyan-electric" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+              Convidados{guests.length > 0 ? ` (${guests.length})` : ''}
+            </span>
+          </div>
+          {showGuestForm
+            ? <ChevronUp   size={14} className="text-text-low" />
+            : <ChevronDown size={14} className="text-text-low" />}
+        </button>
+
+        {guests.length > 0 && (
+          <div className="px-5 pb-3 space-y-2">
+            {guests.map(g => (
+              <div key={g.id} className="flex items-center justify-between bg-surface-2 rounded-xl px-3 py-2 border border-border-subtle">
+                <span className="text-[11px] font-bold truncate">{g.player?.name}</span>
+                <button
+                  onClick={() => handleRemoveGuest(g)}
+                  disabled={drawing}
+                  className="text-text-low hover:text-red-500 transition-colors p-1 disabled:opacity-40"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showGuestForm && (
+          <div className="px-5 pb-5 border-t border-border-subtle pt-4 space-y-3">
+            <p className="text-[9px] text-text-muted font-bold leading-relaxed">
+              O convidado participa só deste sorteio/partida — não precisa ser integrante do baba,
+              não entra nos rankings nem nas conquistas, mas gols, assistências e cartões dele ficam
+              registrados no histórico da partida.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={guestName}
+                onChange={e => setGuestName(e.target.value)}
+                placeholder="Nome (opcional)"
+                className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-cyan-electric transition-colors"
+              />
+              <select
+                value={guestPosition}
+                onChange={e => setGuestPosition(e.target.value)}
+                className="bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-sm font-black outline-none cursor-pointer"
+              >
+                <option value="linha">⚽ LINHA</option>
+                <option value="goleiro">🧤 GOL</option>
+              </select>
+            </div>
+            <button
+              onClick={handleAddGuest}
+              disabled={addingGuest}
+              className="w-full py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl font-black text-xs uppercase tracking-[3px] text-cyan-electric active:scale-95 transition-transform disabled:opacity-40"
+            >
+              {addingGuest ? 'Adicionando...' : '+ Adicionar convidado'}
+            </button>
+          </div>
         )}
       </div>
 

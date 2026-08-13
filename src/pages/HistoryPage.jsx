@@ -17,6 +17,8 @@ import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 import { usePullToRefresh }    from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator  from '../components/PullToRefreshIndicator';
 import MatchShareButton        from '../components/MatchShareButton';
+import MatchGallery            from '../components/MatchGallery';
+import { usePlan }             from '../hooks/usePlan';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ const MatchCard = ({ match }) => {
   const [open,           setOpen]           = useState(false);
   const [players,        setPlayers]        = useState([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const { isAssinante }  = usePlan();
 
   const st      = statusLabel[match.status] || statusLabel.scheduled;
   const scoreA  = match.team_a_score ?? 0;
@@ -54,12 +57,23 @@ const MatchCard = ({ match }) => {
   const loadPlayers = async () => {
     if (players.length > 0) { setOpen(o => !o); return; }
     setLoadingPlayers(true);
-    const { data } = await supabase
-      .from('match_players')
-      .select('team, goals, assists, player:players(name, position)')
-      .eq('match_id', match.id)
-      .order('team');
-    setPlayers(data || []);
+    const [{ data: mpData }, { data: cardsData }] = await Promise.all([
+      supabase
+        .from('match_players')
+        .select('player_id, team, goals, assists, player:players(name, position)')
+        .eq('match_id', match.id)
+        .order('team'),
+      supabase
+        .from('cards')
+        .select('player_id, card_type')
+        .eq('match_id', match.id),
+    ]);
+    const cardsByPlayer = {};
+    (cardsData || []).forEach(c => {
+      if (!cardsByPlayer[c.player_id]) cardsByPlayer[c.player_id] = { yellow: 0, red: 0 };
+      cardsByPlayer[c.player_id][c.card_type] += 1;
+    });
+    setPlayers((mpData || []).map(p => ({ ...p, cards: cardsByPlayer[p.player_id] || null })));
     setLoadingPlayers(false);
     setOpen(true);
   };
@@ -174,11 +188,25 @@ const MatchCard = ({ match }) => {
                         p.player?.position === 'goleiro' ? 'bg-green-500' : 'bg-surface-3'
                       }`} />
                       <span className="text-[10px] text-text-mid truncate">{p.player?.name}</span>
+                      {p.cards?.yellow > 0 && (
+                        <span className="text-[8px] font-black text-yellow-500">
+                          🟨{p.cards.yellow > 1 ? `×${p.cards.yellow}` : ''}
+                        </span>
+                      )}
+                      {p.cards?.red > 0 && (
+                        <span className="text-[8px] font-black text-red-500">
+                          🟥{p.cards.red > 1 ? `×${p.cards.red}` : ''}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="border-t border-border-subtle pt-4">
+            <MatchGallery matchId={match.id} babaId={match.baba_id} canUpload={isAssinante} />
           </div>
         </div>
       )}

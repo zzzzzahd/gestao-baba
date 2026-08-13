@@ -2,7 +2,7 @@
 // Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown } from 'lucide-react';
+import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown, Square } from 'lucide-react';
 import { useBaba }           from '../../contexts/BabaContext';
 import { useAuth }           from '../../contexts/AuthContext';
 import { supabase }          from '../../services/supabase';
@@ -36,6 +36,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [goalTeam,         setGoalTeam]         = useState(null);
   const [selectedScorer,   setSelectedScorer]   = useState('');
   const [selectedAssist,   setSelectedAssist]   = useState('');
+  const [showCardModal,    setShowCardModal]    = useState(false);
+  const [cardTeam,         setCardTeam]         = useState(null);
+  const [selectedCardPlayer, setSelectedCardPlayer] = useState('');
+  const [selectedCardType,   setSelectedCardType]   = useState('yellow');
+  const [savingCard,       setSavingCard]       = useState(false);
   const [showWinnerPhoto,  setShowWinnerPhoto]  = useState(false);
   const [winnerInfo,       setWinnerInfo]       = useState({ name: '', matchId: null });
   const [pendingQueue,     setPendingQueue]     = useState([]);
@@ -196,6 +201,30 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     }
   };
 
+  const handleCardClick = (team) => {
+    setCardTeam(team); setSelectedCardPlayer(''); setSelectedCardType('yellow'); setShowCardModal(true);
+  };
+
+  const handleSaveCard = async () => {
+    if (!selectedCardPlayer) { toast.error('Selecione o jogador!'); return; }
+    setSavingCard(true);
+    try {
+      const { error } = await supabase.from('cards').insert([{
+        match_id:  matchId,
+        player_id: selectedCardPlayer,
+        card_type: selectedCardType,
+      }]);
+      if (error) throw error;
+      setShowCardModal(false);
+      toast.success(selectedCardType === 'yellow' ? 'Cartão amarelo registrado!' : 'Cartão vermelho registrado!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao registrar cartão');
+    } finally {
+      setSavingCard(false);
+    }
+  };
+
   const handleMatchEnd = useCallback(async () => {
     if (!currentMatch) return;
     Sounds.whistle();
@@ -317,6 +346,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
               >
                 {currentMatch.scoreA}
               </button>
+              <button
+                onClick={() => handleCardClick('A')}
+                className="w-full py-1.5 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase text-text-low hover:text-yellow-500 transition-colors"
+              >
+                <Square size={10} className="fill-current" /> Cartão
+              </button>
             </div>
             <span className="text-lg font-black text-text-muted italic">VS</span>
             <div className="flex-1 space-y-2">
@@ -328,6 +363,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 className="text-5xl font-black tabular-nums w-full py-5 bg-surface-2 rounded-2xl border border-border-mid hover:bg-surface-3 active:scale-90 transition-all"
               >
                 {currentMatch.scoreB}
+              </button>
+              <button
+                onClick={() => handleCardClick('B')}
+                className="w-full py-1.5 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase text-text-low hover:text-yellow-500 transition-colors"
+              >
+                <Square size={10} className="fill-current" /> Cartão
               </button>
             </div>
           </div>
@@ -508,6 +549,85 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 className="flex-1 py-3 bg-cyan-electric text-black rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de cartão */}
+      {showCardModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Square className="text-yellow-500 fill-current" size={20} />
+                <h3 className="text-xl font-black uppercase">Cartão</h3>
+              </div>
+              <button onClick={() => setShowCardModal(false)} className="text-text-low hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className={`p-3 rounded-xl text-center font-black text-sm ${
+              cardTeam === 'A' ? 'bg-cyan-electric/10 text-cyan-electric' : 'bg-yellow-500/10 text-yellow-500'
+            }`}>
+              {cardTeam === 'A' ? currentMatch.teamA.name : currentMatch.teamB.name}
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-text-mid mb-2">
+                Jogador *
+              </label>
+              <select
+                value={selectedCardPlayer}
+                onChange={e => setSelectedCardPlayer(e.target.value)}
+                className="w-full bg-surface-2 border border-border-mid rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-yellow-500"
+              >
+                <option value="">Selecione...</option>
+                {(cardTeam === 'A' ? currentMatch.teamA.players : currentMatch.teamB.players)?.map(p =>
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-text-mid mb-2">
+                Tipo de cartão
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedCardType('yellow')}
+                  className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] border flex items-center justify-center gap-2 transition-all ${
+                    selectedCardType === 'yellow' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-surface-2 text-text-low border-border-mid'
+                  }`}
+                >
+                  <Square size={11} className="fill-current" /> Amarelo
+                </button>
+                <button
+                  onClick={() => setSelectedCardType('red')}
+                  className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] border flex items-center justify-center gap-2 transition-all ${
+                    selectedCardType === 'red' ? 'bg-red-500 text-white border-red-500' : 'bg-surface-2 text-text-low border-border-mid'
+                  }`}
+                >
+                  <Square size={11} className="fill-current" /> Vermelho
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCardModal(false)}
+                className="flex-1 py-3 bg-surface-2 border border-border-mid rounded-xl font-black uppercase text-[10px]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveCard}
+                disabled={savingCard}
+                className="flex-1 py-3 bg-yellow-500 text-black rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all disabled:opacity-40"
+              >
+                {savingCard ? 'Salvando...' : 'Confirmar'}
               </button>
             </div>
           </div>

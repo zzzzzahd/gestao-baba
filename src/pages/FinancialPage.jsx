@@ -4,7 +4,7 @@ import { useBaba } from '../contexts/BabaContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import {
-  ArrowLeft, DollarSign, Copy, Plus, CheckCircle, Clock, X,
+  ArrowLeft, DollarSign, Plus, CheckCircle, Clock, X,
   Loader2, Trash2, Camera, Eye, Ban, CreditCard, ChevronRight,
   Wallet, Receipt, TrendingDown, TrendingUp
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { CYAN_GRADIENT } from '../utils/constants';
 import { maskPix } from '../utils/securityUtils';
+import PixCopyButton from '../components/PixCopyButton';
 
 const FinancialPage = () => {
   const navigate = useNavigate();
@@ -608,18 +609,13 @@ const FinancialPage = () => {
               <div className="space-y-8">
                 <div className="p-6 bg-cyan-electric/5 rounded-3xl border border-cyan-electric/10 text-center">
                   <p className="text-[9px] font-black text-cyan-electric/60 uppercase mb-4 tracking-widest">
-                    Chave PIX
+                    Pagar via PIX
                   </p>
-                  <p className="text-lg font-mono font-bold text-white mb-6 select-all tracking-tighter break-all">
-                    {selectedFinancial.pix_key}
-                  </p>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(selectedFinancial.pix_key); toast.success('Copiado!'); }}
-                    className="flex items-center gap-2 mx-auto px-6 py-3 text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
-                    style={CYAN_GRADIENT}
-                  >
-                    <Copy size={14} /> Copiar Chave
-                  </button>
+                  <PixCopyButton
+                    pixKey={selectedFinancial.pix_key}
+                    babaName={currentBaba?.name}
+                    amount={Number(selectedFinancial.amount) || 0}
+                  />
                 </div>
 
                 <div className="space-y-3">

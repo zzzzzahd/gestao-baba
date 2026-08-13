@@ -109,7 +109,7 @@ const DashboardPage = () => {
   }, [currentBaba?.id]);
 
   const playersWithRatings = useMemo(() =>
-    (players || []).map(p => {
+    (players || []).filter(p => !p.is_guest).map(p => {
       const r = playerRatings.find(x => x.player_id === p.id);
       return { ...p, final_rating: r?.final_rating || 0, votes_count: r?.votes_count || 0 };
     }),

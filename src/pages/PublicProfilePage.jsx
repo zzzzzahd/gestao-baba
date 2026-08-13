@@ -10,6 +10,7 @@ import { supabase }                    from '../services/supabase';
 import { useAuth }                     from '../contexts/AuthContext';
 import { ArrowLeft, Star, UserPlus, UserMinus, Share2, Instagram, Users, Edit3 } from 'lucide-react';
 import StreakBadge from '../components/StreakBadge';
+import DivisionBadge from '../components/DivisionBadge';
 import { POSITION_LABEL } from '../constants/positions';
 
 const RARITY_COLOR = {
@@ -328,12 +329,13 @@ export default function PublicProfilePage() {
 
         {/* Rating */}
         {stats?.rating > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-surface-1 border border-cyan-electric/20">
+          <div className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-surface-1 border border-cyan-electric/20 flex-wrap">
             <Star size={18} className="text-cyan-electric" fill="currentColor" />
             <span className="text-3xl font-black font-mono text-white">
               {Number(stats.rating).toFixed(2)}
             </span>
             <span className="text-[10px] text-text-low font-black uppercase">rating global</span>
+            <DivisionBadge rating={stats.rating} />
           </div>
         )}
 
