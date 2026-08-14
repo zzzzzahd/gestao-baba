@@ -5,8 +5,28 @@ import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 // Fase 5 — Sentry sourcemaps + release tracking + Vitest.
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   const env = loadEnv(mode, process.cwd(), '');
+
+  // AdSense precisa da tag/script presente no HTML já entregue na primeira
+  // resposta — o crawler do AdSense (e a verificação de propriedade do site)
+  // não executa JS de forma confiável, então injetar isso via
+  // document.createElement em main.jsx (como era antes) é invisível pra ele.
+  // Injetando aqui, no build, o HTML final já sai com a tag, sem precisar
+  // de JS pra aparecer.
+  const adsenseClientId = env.VITE_ADSENSE_CLIENT_ID;
+  const adsensePlugin = {
+    name: 'inject-adsense-tags',
+    transformIndexHtml(html) {
+      if (!adsenseClientId) return html;
+      return html.replace(
+        '</head>',
+        `    <meta name="google-adsense-account" content="${adsenseClientId}" />\n` +
+          `    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}" crossorigin="anonymous"></script>\n` +
+          `  </head>`
+      );
+    },
+  };
 
 return {
   define: {
@@ -17,6 +37,7 @@ return {
 
   plugins: [
     react(),
+    adsensePlugin,
     sentryVitePlugin({
   org: 'zdias',
   project: 'javascript-react',
@@ -111,16 +132,18 @@ return {
 
   build: {
     sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
-          'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-ui':       ['lucide-react', 'react-hot-toast'],
-          'vendor-sentry':   ['@sentry/react'],
+    rollupOptions: isSsrBuild
+      ? undefined
+      : {
+          output: {
+            manualChunks: {
+              'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+              'vendor-supabase': ['@supabase/supabase-js'],
+              'vendor-ui':       ['lucide-react', 'react-hot-toast'],
+              'vendor-sentry':   ['@sentry/react'],
+            },
+          },
         },
-      },
-    },
   },
 
   server: {

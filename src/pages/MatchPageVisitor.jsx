@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
+import RewardedAdGate from '../components/RewardedAdGate';
 import TeamsShareButton from '../components/TeamsShareButton';
 import { supabase } from '../services/supabase';
 
@@ -18,6 +19,7 @@ const MatchPageVisitor = () => {
   const [isActive,     setIsActive]     = useState(false);
   const [confirmExit,  setConfirmExit]  = useState(false);
   const [reserves,     setReserves]     = useState([]);
+  const [showStartGate, setShowStartGate] = useState(false);
 
   // Empate: aguarda escolha de quem ganhou o par ou ímpar antes de reordenar a fila
   const [tieChoice, setTieChoice] = useState(null); // { teamA, teamB, rest }
@@ -258,7 +260,7 @@ const MatchPageVisitor = () => {
           {!isRealtime && (
             <>
               <button
-                onClick={() => setIsActive(!isActive)}
+                onClick={() => (isActive ? setIsActive(false) : setShowStartGate(true))}
                 className={`mt-10 w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[4px] transition-all ${
                   isActive
                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
@@ -417,6 +419,15 @@ const MatchPageVisitor = () => {
           </div>
         </div>
       )}
+
+      <RewardedAdGate
+        open={showStartGate}
+        placementName="iniciar-partida"
+        title="Prontos pra jogar!"
+        description="Assista a um anúncio curto pra iniciar a partida."
+        onGranted={() => { setShowStartGate(false); setIsActive(true); }}
+        onCancel={() => setShowStartGate(false)}
+      />
 
       <ConfirmModal
         open={confirmExit}

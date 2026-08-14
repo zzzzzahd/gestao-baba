@@ -6,6 +6,17 @@ import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'visitor_players_list';
 
+// Fisher-Yates — embaralhamento sem viés (diferente de sort(() => Math.random() - 0.5),
+// que não distribui as permutações de forma uniforme)
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 const StarRating = ({ value, onChange }) => (
   <div className="flex items-center gap-0.5">
     {[1, 2, 3].map((star) => (
@@ -23,8 +34,8 @@ const StarRating = ({ value, onChange }) => (
 );
 
 const balanceTeams = (players, numTeams, playersPerTeam, leftoverStrategy) => {
-  let goalies  = [...players.filter(p => p.position === 'goleiro')].sort(() => Math.random() - 0.5);
-  let outfield = [...players.filter(p => p.position === 'linha')];
+  let goalies  = shuffle(players.filter(p => p.position === 'goleiro'));
+  let outfield = shuffle(players.filter(p => p.position === 'linha'));
 
   const teams = Array.from({ length: numTeams }, (_, i) => ({
     id:      Date.now() + i,
