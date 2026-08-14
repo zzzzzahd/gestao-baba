@@ -17,7 +17,7 @@ import PixCopyButton from '../components/PixCopyButton';
 
 const FinancialPage = () => {
   const navigate = useNavigate();
-  const { currentBaba } = useBaba();
+  const { currentBaba, loading: babaLoading } = useBaba();
   const { user } = useAuth();
 
   const [financials, setFinancials]           = useState([]);
@@ -42,6 +42,7 @@ const FinancialPage = () => {
   const [expenseProofFile, setExpenseProofFile] = useState(null);
 
   useEffect(() => {
+    if (babaLoading) return; // ainda carregando os dados do baba, aguarda
     if (!currentBaba || !user) {
       if (!currentBaba) navigate('/home');
       return;
@@ -49,7 +50,7 @@ const FinancialPage = () => {
     setIsPresident(currentBaba.president_id === user.id);
     loadFinancials();
     loadExpenses();
-  }, [currentBaba, user]);
+  }, [currentBaba, user, babaLoading]);
 
   const loadFinancials = async () => {
     try {

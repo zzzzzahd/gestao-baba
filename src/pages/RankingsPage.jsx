@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2, ExternalLink, Users } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Award, ChevronDown, Share2, ExternalLink, Swords, ChevronRight } from 'lucide-react';
 import { PodiumSkeleton, RankingRowSkeleton } from '../components/SkeletonLoader';
 import { toastErrorWithRetry } from '../utils/toastUtils.jsx';
 import ShareableCardModal from '../components/ShareableCardModal';
@@ -326,15 +326,6 @@ const RankingsPage = () => {
             ) : null}
           </div>
           <div className="flex items-center gap-1">
-            {/* Comparação 1v1 */}
-            <button
-              onClick={() => navigate('/comparison')}
-              aria-label="Comparar jogadores 1v1"
-              title="Comparar jogadores"
-              className="p-2 hover:bg-surface-3 rounded-full transition-colors"
-            >
-              <Users size={20} className="text-text-low" />
-            </button>
             {/* Sprint 12: botão compartilhar */}
             <button
               onClick={() => setShowShare(true)}
@@ -367,6 +358,21 @@ const RankingsPage = () => {
             </button>
           ))}
         </div>
+
+        {/* Comparação 1v1 */}
+        <button
+          onClick={() => navigate('/comparison')}
+          className="w-full flex items-center gap-3 p-4 rounded-2xl border border-cyan-electric/20 bg-cyan-electric/5 hover:bg-cyan-electric/10 transition-colors text-left"
+        >
+          <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center flex-shrink-0">
+            <Swords size={18} className="text-cyan-electric" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[11px] font-black uppercase tracking-wide text-white">Comparar jogadores</p>
+            <p className="text-[9px] text-text-low font-bold mt-0.5">Veja gols, vitórias e mais lado a lado</p>
+          </div>
+          <ChevronRight size={16} className="text-text-low flex-shrink-0" />
+        </button>
 
         {/* Tabs */}
         <div className="grid grid-cols-3 gap-2">

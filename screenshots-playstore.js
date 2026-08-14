@@ -101,7 +101,7 @@ const PRIVATE_ROUTES = [
   { path: '/rankings', name: '08-rankings' },
   { path: '/history', name: '09-historico' },
   { path: '/financial', name: '10-financeiro' },
-  { path: '/comparison', name: '11-comparacao' },
+  { path: '/comparison?a=5fcc8d68-ae52-4daa-9905-a96527818f68&b=5201b579-02fc-4e19-9fff-88d362de1774', name: '11-comparacao' },
   { path: '/profile', name: '12-perfil' },
 ];
 
