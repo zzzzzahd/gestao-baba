@@ -30,8 +30,8 @@ describe('PrivacyPage — estrutura', () => {
 
   it('exibe versão e data da política', () => {
     renderPage();
-    expect(screen.getByText(/Versão 1\.0/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Mai\/2026/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Versão 1\.1/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Ago\/2026/i).length).toBeGreaterThan(0);
   });
 
   it('exibe ícone Shield (intro LGPD)', () => {
@@ -54,12 +54,13 @@ describe('PrivacyPage — seções de conteúdo', () => {
     '1. Quais dados coletamos',
     '2. Como usamos seus dados',
     '3. Com quem compartilhamos',
-    '4. Por quanto tempo guardamos',
-    '5. Seus direitos (LGPD)',
-    '6. Segurança',
-    '7. Encarregado de Dados (DPO)',
-    '8. Exercício de direitos',
-    '9. Contato',
+    '4. Publicidade e cookies',
+    '5. Por quanto tempo guardamos',
+    '6. Seus direitos (LGPD)',
+    '7. Segurança',
+    '8. Encarregado de Dados (DPO)',
+    '9. Exercício de direitos',
+    '10. Contato',
   ];
 
   sections.forEach((section) => {
@@ -206,6 +207,6 @@ describe('PrivacyPage — navegação', () => {
 
   it('exibe rodapé com versão LGPD', () => {
     renderPage();
-    expect(screen.getByText(/Draft Play · LGPD v1\.0/i)).toBeInTheDocument();
+    expect(screen.getByText(/Draft Play · LGPD v1\.1/i)).toBeInTheDocument();
   });
 });
