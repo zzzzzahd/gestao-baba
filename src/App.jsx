@@ -31,6 +31,7 @@ const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
 const DrawPage              = lazy(() => import('./pages/DrawPage'));
 const PrivacyPage          = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage            = lazy(() => import('./pages/TermsPage'));
+const AboutPage            = lazy(() => import('./pages/AboutPage'));
 const FollowersPage        = lazy(() => import('./pages/FollowersPage'));
 const JoinPage              = lazy(() => import('./pages/JoinPage'));
 const ComparisonPage       = lazy(() => import('./pages/ComparisonPage'));
@@ -153,6 +154,7 @@ const AppInner = () => {
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
           <Route path="/privacidade"   element={<PrivacyPage />} />
           <Route path="/termos"        element={<TermsPage />} />
+          <Route path="/sobre"         element={<AboutPage />} />
           <Route path="/join/:code"    element={<JoinPage />} />
           <Route path="/player/:userId"    element={<PublicProfilePage />} />
           <Route path="/followers/:userId" element={<FollowersPage />} />
