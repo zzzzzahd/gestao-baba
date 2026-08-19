@@ -251,6 +251,8 @@ const LandingPage = () => {
             <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
             <span className="opacity-30">·</span>
             <a href="/privacidade" className="hover:text-cyan-electric transition-colors">Privacidade</a>
+            <span className="opacity-30">·</span>
+            <a href="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</a>
           </div>
           <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
             Powered by Draft Baba v3.0
