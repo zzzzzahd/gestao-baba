@@ -1,8 +1,35 @@
-User-agent: *
+User-agent: Mediapartners-Google
+Allow: /
 Allow: /$
 Allow: /termos
 Allow: /privacidade
 Allow: /visitor
+Allow: /sobre
+Allow: /player/
+Allow: /followers/
+
+Disallow: /login
+Disallow: /redefinir-senha
+Disallow: /home
+Disallow: /dashboard
+Disallow: /create
+Disallow: /profile
+Disallow: /rankings
+Disallow: /financial
+Disallow: /history
+Disallow: /draw
+Disallow: /comparison
+Disallow: /torneio/
+Disallow: /join/
+Disallow: /visitor-match
+
+User-agent: *
+Allow: /
+Allow: /$
+Allow: /termos
+Allow: /privacidade
+Allow: /visitor
+Allow: /sobre
 Allow: /player/
 Allow: /followers/
 
