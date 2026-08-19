@@ -31,7 +31,7 @@ const PrivacyPage = () => {
           </button>
           <div>
             <h1 className="text-xl font-black uppercase italic tracking-tighter">Privacidade</h1>
-            <p className="text-[10px] text-text-muted font-bold uppercase">Versão 1.0 — Mai/2026</p>
+            <p className="text-[10px] text-text-muted font-bold uppercase">Versão 1.1 — Ago/2026</p>
           </div>
         </div>
 
@@ -102,7 +102,45 @@ const PrivacyPage = () => {
             </ul>
           </Section>
 
-          <Section title="4. Por quanto tempo guardamos">
+          <Section title="4. Publicidade e cookies">
+            <p>
+              O Draft Play exibe anúncios através do Google AdSense em algumas áreas
+              do app. O Google e seus parceiros de publicidade podem usar cookies e
+              identificadores semelhantes para veicular anúncios com base em suas
+              visitas anteriores a este ou a outros sites.
+            </p>
+            <ul className="space-y-1 pl-4 mt-2">
+              {[
+                'Cookies de terceiros (Google AdSense) usados para exibir anúncios relevantes',
+                'Esses cookies também ajudam a medir o desempenho dos anúncios e evitar repetição excessiva',
+                'Não compartilhamos seus dados pessoais (nome, email, dados financeiros) com anunciantes',
+              ].map(item => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="text-cyan-electric mt-1 shrink-0">·</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              Você pode desativar a personalização de anúncios do Google a qualquer
+              momento em{' '}
+              <a
+                href="https://adssettings.google.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-electric underline"
+              >adssettings.google.com</a>. Saiba mais sobre como o Google usa dados
+              de sites parceiros em{' '}
+              <a
+                href="https://policies.google.com/technologies/partner-sites"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-electric underline"
+              >policies.google.com/technologies/partner-sites</a>.
+            </p>
+          </Section>
+
+          <Section title="5. Por quanto tempo guardamos">
             <p>
               Seus dados ficam armazenados enquanto sua conta estiver ativa.
               Histórico de partidas é mantido mesmo após exclusão da conta
@@ -111,7 +149,7 @@ const PrivacyPage = () => {
             </p>
           </Section>
 
-          <Section title="5. Seus direitos (LGPD)">
+          <Section title="6. Seus direitos (LGPD)">
             <p>Você tem direito a:</p>
             <ul className="space-y-1 pl-4">
               {[
@@ -129,7 +167,7 @@ const PrivacyPage = () => {
             </ul>
           </Section>
 
-          <Section title="6. Segurança">
+          <Section title="7. Segurança">
             <p>
               Utilizamos criptografia em trânsito (HTTPS), controle de acesso
               por linha (Row Level Security) no banco de dados, e autenticação
@@ -138,7 +176,7 @@ const PrivacyPage = () => {
             </p>
           </Section>
 
-          <Section title="7. Encarregado de Dados (DPO)">
+          <Section title="8. Encarregado de Dados (DPO)">
             <p>
               Nos termos do Art. 41 da LGPD, o responsável pelo tratamento de dados pessoais
               no Draft Play é o próprio desenvolvedor da plataforma.
@@ -156,7 +194,7 @@ const PrivacyPage = () => {
             </p>
           </Section>
 
-          <Section title="8. Exercício de direitos">
+          <Section title="9. Exercício de direitos">
             <p>
               Para exercer seus direitos como titular de dados, você pode:
             </p>
@@ -169,7 +207,7 @@ const PrivacyPage = () => {
             </ul>
           </Section>
 
-          <Section title="9. Contato">
+          <Section title="10. Contato">
             <p>
               Dúvidas gerais sobre privacidade:{' '}
               <a href="mailto:privacidade@gestao-baba.app" className="text-cyan-electric underline">
@@ -188,7 +226,7 @@ const PrivacyPage = () => {
         </div>
 
         <p className="text-center text-[10px] text-text-muted font-bold uppercase tracking-widest pb-4">
-          Draft Play · LGPD v1.0 · Mai/2026
+          Draft Play · LGPD v1.1 · Ago/2026
         </p>
       </div>
     </div>
