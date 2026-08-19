@@ -41,6 +41,10 @@ const ROUTE_META = {
     title: 'Modo Visitante - Sorteio de Times | Draft Play',
     description: 'Monte a lista de jogadores e sorteie times equilibrados na hora, sem precisar criar conta.',
   },
+  '/sobre': {
+    title: 'Sobre - Draft Play',
+    description: 'Conheça o Draft Play: gestão de peladas e babas, sorteio de times, financeiro e ranking em um só lugar.',
+  },
 };
 
 async function main() {
