@@ -19,16 +19,18 @@ import LandingPage from './pages/LandingPage';
 import TermsPage   from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import VisitorMode from './pages/VisitorMode';
+import AboutPage   from './pages/AboutPage';
 
 // Rotas elegíveis para pré-render. Mantém só páginas públicas e estáveis —
 // nada que dependa de auth, dados do Supabase ou params dinâmicos.
-export const PRERENDER_ROUTES = ['/', '/termos', '/privacidade', '/visitor'];
+export const PRERENDER_ROUTES = ['/', '/termos', '/privacidade', '/visitor', '/sobre'];
 
 const PAGES = {
   '/':            LandingPage,
   '/termos':      TermsPage,
   '/privacidade': PrivacyPage,
   '/visitor':     VisitorMode,
+  '/sobre':       AboutPage,
 };
 
 export function render(url) {
