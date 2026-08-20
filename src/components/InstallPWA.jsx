@@ -3,43 +3,47 @@
 
 import React, { useEffect, useState } from 'react';
 import { Smartphone, Share, X, Download } from 'lucide-react';
+import {
+  getDeferredPrompt,
+  onDeferredPromptChange,
+  isIOSDevice,
+  isStandalonePWA,
+} from '../utils/pwaInstallPrompt';
 
 const DISMISSED_KEY   = 'pwa-dismissed';
 const DISMISS_DAYS    = 7;
 
 const InstallPWA = ({ hidden = false }) => {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(getDeferredPrompt());
   const [showBanner,     setShowBanner]     = useState(false);
   const [isIOS,          setIsIOS]          = useState(false);
 
   useEffect(() => {
     // Já está instalado como PWA?
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
-    if (isStandalone) return;
+    if (isStandalonePWA()) return;
 
     // Usuário já dispensou recentemente?
     const lastDismissed = localStorage.getItem(DISMISSED_KEY);
     if (lastDismissed && Date.now() - Number(lastDismissed) < DISMISS_DAYS * 24 * 60 * 60 * 1000) return;
 
     // Detecta iOS (Safari não dispara beforeinstallprompt)
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-    if (ios) {
+    if (isIOSDevice()) {
       setIsIOS(true);
       setShowBanner(true);
       return;
     }
 
-    // Android / Chrome
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    // Android / Chrome — usa o deferredPrompt já capturado pelo módulo central
+    const existing = getDeferredPrompt();
+    if (existing) {
+      setDeferredPrompt(existing);
       setShowBanner(true);
-    };
+    }
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return onDeferredPromptChange((prompt) => {
+      setDeferredPrompt(prompt);
+      setShowBanner(!!prompt);
+    });
   }, []);
 
   const handleInstall = async () => {
