@@ -108,15 +108,17 @@ export const getNextGameDay = (baba) => {
 };
 
 // ─────────────────────────────────────────────
-// SORTEIO BALANCEADO POR RATING
+// SORTEIO BALANCEADO POR NÍVEL (abaixo/na média/acima)
+// balance_level vem de player_rating_summary.avg_level (ou guest_level p/ convidados)
+// — não usa mais final_rating (esse fica só p/ perfil/stats).
 // ─────────────────────────────────────────────
 export const generateBalancedTeams = (players, numTeams = 2) => {
   const n = Math.max(2, numTeams);
 
   const goalies  = players.filter(p => p.position === 'goleiro')
-                          .sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+                          .sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
   const outfield = players.filter(p => p.position !== 'goleiro')
-                          .sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+                          .sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
 
   const teams = Array.from({ length: n }, (_, i) => ({
     name:        `Time ${String.fromCharCode(65 + i)}`,
@@ -127,14 +129,14 @@ export const generateBalancedTeams = (players, numTeams = 2) => {
   goalies.forEach((g, i) => {
     const t = i % n;
     teams[t].players.push(g);
-    teams[t].totalRating += g.final_rating || 0;
+    teams[t].totalRating += g.balance_level || 0;
   });
 
   let direction = 1;
   let pointer   = 0;
   outfield.forEach((p) => {
     teams[pointer].players.push(p);
-    teams[pointer].totalRating += p.final_rating || 0;
+    teams[pointer].totalRating += p.balance_level || 0;
     pointer += direction;
     if (pointer >= n) { pointer = n - 1; direction = -1; }
     else if (pointer < 0) { pointer = 0; direction = 1; }
@@ -226,6 +228,7 @@ export const BabaProvider = ({ children }) => {
             skill:      ratings.skill,
             physical:   ratings.physical,
             commitment: ratings.commitment,
+            level:      ratings.level,
           },
           { onConflict: 'baba_id,rater_id,rated_id' }
         );
@@ -722,11 +725,11 @@ export const BabaProvider = ({ children }) => {
       }
 
       const ratingsData = await getAllRatings();
-      const ratingMap   = new Map(ratingsData.map(r => [r.player_id, r.final_rating || 0]));
+      const levelMap    = new Map(ratingsData.map(r => [r.player_id, r.avg_level ?? 2]));
 
       const enriched = confirmed.map(p => ({
         ...p,
-        final_rating: ratingMap.get(p.id) || 0,
+        balance_level: p.is_guest ? (p.guest_level ?? 2) : (levelMap.get(p.id) ?? 2),
       }));
 
       const numTeams  = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));

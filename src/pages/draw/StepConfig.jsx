@@ -19,7 +19,7 @@ const STRATEGIES = [
 // ─── Algoritmo de sorteio balanceado ─────────────────────────────────────────
 
 const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = []) => {
-  const sorted     = [...players].sort((a, b) => (b.final_rating || 0) - (a.final_rating || 0));
+  const sorted     = [...players].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
   const totalTeams = Math.floor(sorted.length / playersPerTeam);
   const teams      = Array.from({ length: totalTeams }, (_, i) => ({
     name:    `Time ${String.fromCharCode(65 + i)}`,
@@ -52,19 +52,19 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
 
     if (constraint_type === 'must_together' && tA !== tB) {
       const playerBObj   = teams[tB].players.find(p => p.id === player_b_id);
-      const ratingTarget = playerBObj?.final_rating || 0;
+      const ratingTarget = playerBObj?.balance_level || 0;
       const candidates   = teams[tA].players
         .filter(p => p.id !== player_a_id)
-        .sort((a, b) => Math.abs((a.final_rating || 0) - ratingTarget) - Math.abs((b.final_rating || 0) - ratingTarget));
+        .sort((a, b) => Math.abs((a.balance_level || 0) - ratingTarget) - Math.abs((b.balance_level || 0) - ratingTarget));
       if (candidates[0]) swapPlayers(tA, candidates[0].id, tB, player_b_id);
     }
 
     if (constraint_type === 'must_apart' && tA === tB) {
       const playerBObj   = teams[tA].players.find(p => p.id === player_b_id);
-      const ratingTarget = playerBObj?.final_rating || 0;
+      const ratingTarget = playerBObj?.balance_level || 0;
       const otherTeamIdx = (tA + 1) % totalTeams;
       const candidates   = teams[otherTeamIdx].players
-        .sort((a, b) => Math.abs((a.final_rating || 0) - ratingTarget) - Math.abs((b.final_rating || 0) - ratingTarget));
+        .sort((a, b) => Math.abs((a.balance_level || 0) - ratingTarget) - Math.abs((b.balance_level || 0) - ratingTarget));
       if (candidates[0]) swapPlayers(tA, player_b_id, otherTeamIdx, candidates[0].id);
     }
   });
@@ -79,13 +79,14 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
 // ─── StepConfig ───────────────────────────────────────────────────────────────
 
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
-  const { currentBaba, gameConfirmations, players, isDrawing, nextGameDay, reloadConfirmations } = useBaba();
+  const { currentBaba, gameConfirmations, players, isDrawing, nextGameDay, reloadConfirmations, getAllRatings } = useBaba();
   const features = useFeatures();
   const [drawing,         setDrawing]         = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
   const [showGuestForm,   setShowGuestForm]   = useState(false);
   const [guestName,       setGuestName]       = useState('');
   const [guestPosition,   setGuestPosition]   = useState('linha');
+  const [guestLevel,      setGuestLevel]      = useState(2);
   const [addingGuest,     setAddingGuest]     = useState(false);
 
   const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
@@ -109,7 +110,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
 
       const { data: newPlayer, error: playerErr } = await supabase
         .from('players')
-        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true }])
+        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, guest_level: guestLevel }])
         .select().single();
       if (playerErr) throw playerErr;
 
@@ -121,6 +122,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       await reloadConfirmations();
       setGuestName('');
       setGuestPosition('linha');
+      setGuestLevel(2);
       toast.success(`${label} adicionado ao sorteio!`);
     } catch (err) {
       console.error('[StepConfig] addGuest error:', err);
@@ -169,10 +171,13 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         p_baba_id: currentBaba.id,
       });
 
+      const ratingsData = await getAllRatings();
+      const levelMap     = new Map(ratingsData.map(r => [r.player_id, r.avg_level ?? 2]));
+
       const confirmedIds     = gameConfirmations.map(c => c.player_id);
       const confirmedPlayers = players
         .filter(p => confirmedIds.includes(p.id))
-        .map(p => ({ ...p, final_rating: p.final_rating || 3 }));
+        .map(p => ({ ...p, balance_level: p.is_guest ? (p.guest_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
 
       const { teams, reserves } = drawTeamsWithConstraints(
         confirmedPlayers,
@@ -182,7 +187,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       );
 
       const avgRatings   = teams.map(t =>
-        t.players.reduce((s, p) => s + (p.final_rating || 0), 0) / (t.players.length || 1)
+        t.players.reduce((s, p) => s + (p.balance_level || 0), 0) / (t.players.length || 1)
       );
       const balanceScore = avgRatings.length > 1
         ? Math.max(...avgRatings) - Math.min(...avgRatings)
@@ -295,6 +300,31 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
                 <option value="linha">⚽ LINHA</option>
                 <option value="goleiro">🧤 GOL</option>
               </select>
+            </div>
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-text-low block mb-1.5">
+                Nível (pro equilíbrio do sorteio)
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 1, label: 'Abaixo' },
+                  { value: 2, label: 'Média' },
+                  { value: 3, label: 'Acima' },
+                ].map(l => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setGuestLevel(l.value)}
+                    className={`py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${
+                      guestLevel === l.value
+                        ? 'bg-cyan-electric text-black border-cyan-electric'
+                        : 'bg-surface-2 text-text-low border-border-mid hover:border-border-strong'
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <button
               onClick={handleAddGuest}

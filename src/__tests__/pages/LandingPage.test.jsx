@@ -37,28 +37,34 @@ describe('LandingPage › estrutura', () => {
     expect(logo.getAttribute('data-size')).toBe('large');
   });
 
-  it('exibe título "Bem-vindo ao DRAFT"', () => {
+  it('exibe título "Organize o baba sem zap lotado"', () => {
     wrap();
-    expect(screen.getByText(/Bem-vindo ao DRAFT/i)).toBeInTheDocument();
+    expect(screen.getByText(/Organize o baba sem zap lotado/i)).toBeInTheDocument();
   });
 
-  it('exibe subtítulo sobre plataforma de gestão', () => {
+  it('exibe subtítulo sobre o app de gestão', () => {
     wrap();
-    expect(screen.getByText(/Plataforma de gestão/i)).toBeInTheDocument();
+    expect(screen.getByText(/O Draft Play é o app de gestão/i)).toBeInTheDocument();
   });
 
   it('exibe rodapé "Powered by Draft Baba"', () => {
     wrap();
     expect(screen.getByText(/Powered by Draft Baba/i)).toBeInTheDocument();
   });
+
+  it('exibe link "Sobre" no rodapé apontando para /sobre', () => {
+    wrap();
+    const link = screen.getByRole('link', { name: /^Sobre$/i });
+    expect(link).toHaveAttribute('href', '/sobre');
+  });
 });
 
 // ─── Botões de ação ───────────────────────────────────────────────────────────
 describe('LandingPage › botões', () => {
-  it('botão "Entrar no Meu Baba" está presente', () => {
+  it('botão "Começar agora" está presente', () => {
     wrap();
     expect(
-      screen.getByRole('button', { name: /Entrar no Meu Baba/i })
+      screen.getByRole('button', { name: /Começar agora/i })
     ).toBeInTheDocument();
   });
 
@@ -69,9 +75,9 @@ describe('LandingPage › botões', () => {
     ).toBeInTheDocument();
   });
 
-  it('"Entrar no Meu Baba" navega para /login', () => {
+  it('"Começar agora" navega para /login', () => {
     wrap();
-    fireEvent.click(screen.getByRole('button', { name: /Entrar no Meu Baba/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Começar agora/i }));
     expect(mockNavigate).toHaveBeenCalledWith('/login');
   });
 
@@ -84,29 +90,29 @@ describe('LandingPage › botões', () => {
 
 // ─── Recursos listados ────────────────────────────────────────────────────────
 describe('LandingPage › recursos', () => {
-  it('exibe "Sorteio de Times"', () => {
+  it('exibe "Presença e falta"', () => {
     wrap();
-    expect(screen.getByText('Sorteio de Times')).toBeInTheDocument();
+    expect(screen.getByText('Presença e falta')).toBeInTheDocument();
   });
 
-  it('exibe "Placar ao Vivo"', () => {
+  it('exibe "Conquistas e ranking"', () => {
     wrap();
-    expect(screen.getByText('Placar ao Vivo')).toBeInTheDocument();
+    expect(screen.getByText('Conquistas e ranking')).toBeInTheDocument();
   });
 
-  it('exibe "Rankings"', () => {
+  it('exibe "Cobrança via Pix"', () => {
     wrap();
-    expect(screen.getByText('Rankings')).toBeInTheDocument();
+    expect(screen.getByText('Cobrança via Pix')).toBeInTheDocument();
   });
 
-  it('exibe "Gestão Financeira"', () => {
+  it('exibe "Sem zap lotado"', () => {
     wrap();
-    expect(screen.getByText('Gestão Financeira')).toBeInTheDocument();
+    expect(screen.getByText('Sem zap lotado')).toBeInTheDocument();
   });
 
   it('4 recursos listados no total', () => {
     wrap();
-    const recursos = ['Sorteio de Times', 'Placar ao Vivo', 'Rankings', 'Gestão Financeira'];
+    const recursos = ['Presença e falta', 'Conquistas e ranking', 'Cobrança via Pix', 'Sem zap lotado'];
     recursos.forEach(r => expect(screen.getByText(r)).toBeInTheDocument());
   });
 });
@@ -123,7 +129,7 @@ describe('LandingPage › separador', () => {
 describe('LandingPage › estilos', () => {
   it('botão principal tem gradient cyan', () => {
     wrap();
-    const btn = screen.getByRole('button', { name: /Entrar no Meu Baba/i });
+    const btn = screen.getByRole('button', { name: /Começar agora/i });
     expect(btn.style.background).toContain('linear-gradient');
     expect(btn.style.background).toContain('#00f2ff');
   });
@@ -141,7 +147,7 @@ describe('LandingPage › acessibilidade', () => {
     wrap();
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1).toBeInTheDocument();
-    expect(h1.textContent).toContain('DRAFT');
+    expect(h1.textContent).toContain('Organize o baba sem zap lotado');
   });
 
   it('ambos os botões são do tipo button', () => {

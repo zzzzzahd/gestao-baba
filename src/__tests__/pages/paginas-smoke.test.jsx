@@ -36,6 +36,7 @@ import LandingPage from '../../pages/LandingPage';
 import LoginPage from '../../pages/LoginPage';
 import PrivacyPage from '../../pages/PrivacyPage';
 import TermsPage from '../../pages/TermsPage';
+import AboutPage from '../../pages/AboutPage';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,8 +58,8 @@ describe('Páginas públicas › smoke', () => {
         <LandingPage />
       </MemoryRouter>
     );
-    expect(screen.getByText(/bem-vindo ao draft/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /entrar no meu baba/i })).toBeInTheDocument();
+    expect(screen.getByText(/organize o baba sem zap lotado/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /começar agora/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /modo visitante/i })).toBeInTheDocument();
   });
 
@@ -80,5 +81,11 @@ describe('Páginas públicas › smoke', () => {
   it('Termos menciona termos de uso', () => {
     renderAt('/termos', <TermsPage />);
     expect(screen.getAllByText(/termos/i).length).toBeGreaterThan(0);
+  });
+
+  it('Sobre exibe informações institucionais do Draft Play', () => {
+    renderAt('/sobre', <AboutPage />);
+    expect(screen.getByText('Sobre o Draft Play')).toBeInTheDocument();
+    expect(screen.getAllByText(/draft play/i).length).toBeGreaterThan(0);
   });
 });

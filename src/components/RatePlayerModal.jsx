@@ -29,15 +29,22 @@ const CATEGORIES = [
   },
 ];
 
+const LEVELS = [
+  { value: 1, label: 'Abaixo da média' },
+  { value: 2, label: 'Na média' },
+  { value: 3, label: 'Acima da média' },
+];
+
 const RatePlayerModal = ({ player, onClose, onRate }) => {
   const [ratings,    setRatings]    = useState({ skill: 3, physical: 3, commitment: 3 });
+  const [level,      setLevel]      = useState(2);
   const [submitting, setSubmitting] = useState(false);
 
   const handleConfirm = async () => {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await onRate(player.id, ratings);
+      await onRate(player.id, { ...ratings, level });
       onClose();
     } finally {
       setSubmitting(false);
@@ -66,6 +73,38 @@ const RatePlayerModal = ({ player, onClose, onRate }) => {
           <p className="text-[10px] text-text-low font-bold uppercase tracking-[0.2em] mt-1">
             Avaliação Técnica
           </p>
+          <p className="text-[9px] text-text-muted font-medium mt-2 px-2">
+            Habilidade, físico e comprometimento aparecem no perfil do jogador — não afetam o sorteio.
+          </p>
+        </div>
+
+        {/* Nível — usado para o balanceamento do sorteio */}
+        <div className="mb-6 pb-6 border-b border-border-subtle">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">
+              Nível geral
+            </span>
+            <Tooltip
+              text="Usado para equilibrar os times no sorteio. Compare com o nível médio do grupo."
+              iconClassName="text-cyan-electric opacity-50 hover:opacity-100"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {LEVELS.map(l => (
+              <button
+                key={l.value}
+                type="button"
+                onClick={() => setLevel(l.value)}
+                className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all border ${
+                  level === l.value
+                    ? 'bg-cyan-electric text-black border-cyan-electric'
+                    : 'bg-surface-2 text-text-low border-border-mid hover:border-border-strong'
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Sliders */}

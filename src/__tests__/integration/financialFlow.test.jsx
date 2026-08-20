@@ -62,11 +62,11 @@ const makePayment = (overrides = {}) => ({
   ...overrides,
 });
 
-const setupMocks = ({ financials = [], user = USER_PRESIDENT } = {}) => {
+const setupMocks = ({ financials = [], expenses = [], user = USER_PRESIDENT } = {}) => {
   useBaba.mockReturnValue({ currentBaba: BABA });
   useAuth.mockReturnValue({ user });
 
-  const chain = {
+  const financialsChain = {
     select:  vi.fn().mockReturnThis(),
     eq:      vi.fn().mockReturnThis(),
     order:   vi.fn().mockResolvedValue({ data: financials, error: null }),
@@ -76,12 +76,24 @@ const setupMocks = ({ financials = [], user = USER_PRESIDENT } = {}) => {
     upsert:  vi.fn().mockReturnThis(),
     single:  vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  supabase.from.mockReturnValue(chain);
+  const expensesChain = {
+    select:  vi.fn().mockReturnThis(),
+    eq:      vi.fn().mockReturnThis(),
+    order:   vi.fn().mockResolvedValue({ data: expenses, error: null }),
+    update:  vi.fn().mockReturnThis(),
+    insert:  vi.fn().mockReturnThis(),
+    delete:  vi.fn().mockReturnThis(),
+    upsert:  vi.fn().mockReturnThis(),
+    single:  vi.fn().mockResolvedValue({ data: null, error: null }),
+  };
+  // Qualquer outra tabela (ex: payments) cai no chain de financials — não
+  // é usado pra ler dados nesses testes, só serve pra não quebrar chamadas.
+  supabase.from.mockImplementation((table) => table === 'expenses' ? expensesChain : financialsChain);
   supabase.storage.from.mockReturnValue({
     upload:       vi.fn().mockResolvedValue({ error: null }),
     getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://cdn.test/proof.jpg' } }),
   });
-  return chain;
+  return financialsChain;
 };
 
 const renderPage = () =>
@@ -530,12 +542,12 @@ describe('FinancialPage — modal de pagamento (membro)', () => {
     expect(screen.getByText('11999991234')).toBeInTheDocument();
   });
 
-  it('exibe botão "Copiar Chave" no modal', async () => {
+  it('exibe botão "Copiar chave Pix" no modal', async () => {
     setupMocks({ financials: [makeFinancial()], user: USER_MEMBER });
     renderPage();
     await waitFor(() => screen.getByText('Pagar Agora'));
     fireEvent.click(screen.getByText('Pagar Agora'));
-    expect(screen.getByText('Copiar Chave')).toBeInTheDocument();
+    expect(screen.getByText('Copiar chave Pix')).toBeInTheDocument();
   });
 
   it('fecha modal ao clicar em X', async () => {

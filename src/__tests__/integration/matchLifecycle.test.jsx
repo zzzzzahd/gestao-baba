@@ -242,10 +242,12 @@ const renderStepMatch = (overrides = {}) => {
 // então clicamos no botão de placar que fica dentro do MESMO bloco que o
 // primeiro <p> com o nome do time (o placar é sempre o primeiro a aparecer
 // no DOM).
+// O bloco do placar agora tem 2 botões: o placar em si (números) e o botão
+// "Cartão" abaixo dele. Pegamos o primeiro, que é sempre o placar.
 const clickScoreButton = (teamLabel) => {
   const nameEl = screen.getAllByText(teamLabel)[0];
   const block  = nameEl.closest('div');
-  fireEvent.click(within(block).getByRole('button'));
+  fireEvent.click(within(block).getAllByRole('button')[0]);
 };
 
 // Marca um gol pela UI: abre o modal do time, seleciona o autor (e

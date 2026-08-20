@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── React Router ──────────────────────────────────────────────────────────────
@@ -127,9 +127,10 @@ describe('ProfilePage › estrutura', () => {
 
   it('exibe ProfileHeader com nome do usuário', async () => {
     wrap();
-    await waitFor(() =>
-      expect(screen.getByText('Zico')).toBeInTheDocument()
-    );
+    await waitFor(() => {
+      const header = screen.getByTestId('profile-header');
+      expect(within(header).getByText('Zico')).toBeInTheDocument();
+    });
   });
 
   it('exibe as 3 tabs: Estatísticas, Conquistas, Editar', async () => {
@@ -277,17 +278,19 @@ describe('ProfilePage › ShareableCardModal', () => {
 
 // ─── Banner perfil público ────────────────────────────────────────────────────
 describe('ProfilePage › perfil público', () => {
-  it('exibe URL parcial do usuário', async () => {
+  it('exibe cartão de perfil público com nome do usuário', async () => {
     wrap();
     await waitFor(() =>
-      expect(screen.getByText(/\/player\/user-abc/)).toBeInTheDocument()
+      expect(screen.getByText('Perfil público')).toBeInTheDocument()
     );
+    // O nome aparece tanto no ProfileHeader mockado quanto no cartão de perfil público.
+    expect(screen.getAllByText('Zico').length).toBeGreaterThanOrEqual(2);
   });
 
   it('botão copiar link chama clipboard.writeText', async () => {
     wrap();
-    await waitFor(() => screen.getByTitle('Copiar link'));
-    fireEvent.click(screen.getByTitle('Copiar link'));
+    await waitFor(() => screen.getByRole('button', { name: /copiar link/i }));
+    fireEvent.click(screen.getByRole('button', { name: /copiar link/i }));
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
         expect.stringContaining('/player/user-abc-123')
@@ -297,8 +300,14 @@ describe('ProfilePage › perfil público', () => {
 
   it('botão "Ver perfil público" navega para /player/:id', async () => {
     wrap();
-    await waitFor(() => screen.getByTitle('Ver perfil público'));
-    fireEvent.click(screen.getByTitle('Ver perfil público'));
+    await waitFor(() =>
+      screen.getByText('Toque para ver como outros jogadores veem seu perfil')
+    );
+    fireEvent.click(
+      screen
+        .getByText('Toque para ver como outros jogadores veem seu perfil')
+        .closest('button')
+    );
     expect(mockNavigate).toHaveBeenCalledWith('/player/user-abc-123');
   });
 
