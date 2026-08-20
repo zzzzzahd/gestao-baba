@@ -40,6 +40,7 @@ const TournamentMatchPage  = lazy(() => import('./pages/TournamentMatchPage'));
 
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
+import UpdatePrompt  from './components/UpdatePrompt';
 import PageWrapper   from './components/PageWrapper';
 import PushPrompt    from './components/PushPrompt';
 import ConsentModal  from './components/ConsentModal';
@@ -145,6 +146,7 @@ const AppInner = () => {
   return (
     <>
       <OfflineBanner />
+      <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/"              element={<LandingPage />} />

@@ -6,16 +6,18 @@ import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import {
   Plus, LogIn, Trophy, User,
-  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight, Trash2
+  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight, Trash2, Download
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import CreateTournamentModal from '../components/CreateTournamentModal';
+import InstallAppModal from '../components/InstallAppModal';
 import { deleteTournament } from '../services/tournamentService';
 import toast from 'react-hot-toast';
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 import AdBanner                   from '../components/AdBanner';
+import { isStandalonePWA } from '../utils/pwaInstallPrompt';
 
 // ─── Countdown hook inline ─────────────────────────────────────────────────────
 const useCountdown = (targetDayOfWeek, targetTime) => {
@@ -272,6 +274,8 @@ const HomePage = () => {
   const [tournaments, setTournaments] = useState([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [isStandalone, setIsStandalone]         = useState(() => isStandalonePWA());
 
   const nextBaba  = useMemo(() => myBabas?.[0] || null, [myBabas]);
   const restBabas = useMemo(() => myBabas?.slice(1) || [], [myBabas]);
@@ -294,6 +298,12 @@ const HomePage = () => {
         setTournaments(data || []);
       });
   }, [user?.id]);
+
+  useEffect(() => {
+    const onInstalled = () => setIsStandalone(true);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => window.removeEventListener('appinstalled', onInstalled);
+  }, []);
 
   const { pulling, pullY, refreshing, progress } = usePullToRefresh(
     async () => { await syncData?.(); },
@@ -371,6 +381,23 @@ const HomePage = () => {
             )}
           </button>
         </div>
+
+        {/* ── Card de instalação do app (some sozinho quando já instalado) ── */}
+        {!isStandalone && (
+          <button
+            onClick={() => setShowInstallModal(true)}
+            className="w-full p-4 rounded-2xl bg-surface-1 border border-border-subtle hover:border-cyan-electric/30 flex items-center gap-3 transition-all active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-electric/10 border border-cyan-electric/20 flex items-center justify-center shrink-0">
+              <Download size={18} className="text-cyan-electric" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-xs font-black uppercase tracking-widest text-white">Instalar o app</p>
+              <p className="text-[10px] text-text-low">Acesso rápido direto da tela inicial</p>
+            </div>
+            <ChevronRight size={16} className="text-text-muted" />
+          </button>
+        )}
 
         {/* ── Estado vazio OR conteúdo ── */}
         {!hasBabas ? (
@@ -535,6 +562,12 @@ const HomePage = () => {
           setTournaments(prev => [t, ...prev]);
           navigate(`/torneio/${t.id}`);
         }}
+      />
+
+      <InstallAppModal
+        open={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        onInstalled={() => setIsStandalone(true)}
       />
     </>
   );

@@ -73,6 +73,10 @@ const setupBaba = (confirmations = CONFIRMATIONS) => {
     nextGameDay:         { dateStr: '2025-06-15', date: new Date(), deadline: new Date(Date.now() + 3600000) },
     nextMatch:           null,
     refreshBaba:         vi.fn(),
+    // StepConfig.handleDraw usa getAllRatings() para montar o balance_level
+    // (Nível geral) de cada jogador antes do sorteio — sem isso o mock quebra
+    // com "getAllRatings is not a function" e o sorteio nunca completa.
+    getAllRatings:       vi.fn().mockResolvedValue([]),
   });
 };
 
@@ -232,8 +236,11 @@ describe('DrawPage — fluxo de sorteio', () => {
     });
 
     await waitFor(() => {
-      // Step 2 deve estar ativo
-      const timesStep = screen.getByText('Times').closest('div');
+      // Step 2 deve estar ativo.
+      // "Times" aparece tanto no stepper quanto no card de prévia do Step 1
+      // (quando confirmedCount >= minRequired), então usamos o testid do
+      // item do stepper em vez de getByText('Times').
+      const timesStep = screen.getByTestId('step-nav-2');
       expect(timesStep.className).toContain('bg-cyan-electric');
     }, { timeout: 5000 });
   });

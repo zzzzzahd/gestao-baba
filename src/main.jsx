@@ -89,6 +89,17 @@ if ('serviceWorker' in navigator && !import.meta.env.DEV) {
         };
       })
       .catch(err => console.warn('[PWA] Service Worker falhou:', err));
+
+    // Sem isso, o SW novo fica "esperando" pra sempre num PWA instalado
+    // (o usuário quase nunca fecha o app de verdade) — quando o usuário
+    // confirma no UpdatePrompt (SKIP_WAITING), esse listener recarrega
+    // a página já com o código novo.
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   });
 }
 

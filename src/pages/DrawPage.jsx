@@ -30,7 +30,9 @@ const Stepper = ({ current }) => (
       const active = s.n === current;
       return (
         <React.Fragment key={s.n}>
-          <div className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+          <div
+            data-testid={`step-nav-${s.n}`}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
             active ? 'bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric'
                    : done ? 'text-text-mid' : 'text-text-muted'
           }`}>

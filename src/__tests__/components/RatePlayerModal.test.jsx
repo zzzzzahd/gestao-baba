@@ -68,12 +68,15 @@ describe('RatePlayerModal › estrutura', () => {
 describe('RatePlayerModal › categorias', () => {
   it('exibe categoria Habilidade', () => {
     mkModal();
-    expect(screen.getByText(/Habilidade/i)).toBeInTheDocument();
+    // "Habilidade" também aparece no texto de aviso ("...não afetam o sorteio."),
+    // então casamos o label completo (com emoji) para pegar só o slider.
+    expect(screen.getByText('⚽ Habilidade')).toBeInTheDocument();
   });
 
   it('exibe categoria Físico', () => {
     mkModal();
-    expect(screen.getByText(/Físico/i)).toBeInTheDocument();
+    // idem — "físico" também aparece no texto de aviso.
+    expect(screen.getByText('💪 Físico')).toBeInTheDocument();
   });
 
   it('exibe categoria Compromisso', () => {
@@ -181,12 +184,24 @@ describe('RatePlayerModal › botões', () => {
 
 // ─── Rating default ───────────────────────────────────────────────────────────
 describe('RatePlayerModal › valores default', () => {
-  it('envia { skill:3, physical:3, commitment:3 } sem alteração', async () => {
+  it('envia { skill:3, physical:3, commitment:3, level:2 } sem alteração', async () => {
     const onRate = vi.fn().mockResolvedValue(undefined);
     mkModal({ onRate });
     fireEvent.click(screen.getByRole('button', { name: /confirmar/i }));
     await waitFor(() =>
-      expect(onRate).toHaveBeenCalledWith('p1', { skill: 3, physical: 3, commitment: 3 })
+      // "Nível geral" (level) começa em 2 = "Na média" e é o valor
+      // que efetivamente entra no balanceamento do sorteio.
+      expect(onRate).toHaveBeenCalledWith('p1', { skill: 3, physical: 3, commitment: 3, level: 2 })
+    );
+  });
+
+  it('nível geral pode ser alterado antes de confirmar', async () => {
+    const onRate = vi.fn().mockResolvedValue(undefined);
+    mkModal({ onRate });
+    fireEvent.click(screen.getByRole('button', { name: /acima da média/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirmar/i }));
+    await waitFor(() =>
+      expect(onRate).toHaveBeenCalledWith('p1', { skill: 3, physical: 3, commitment: 3, level: 3 })
     );
   });
 });
