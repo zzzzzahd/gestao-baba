@@ -6,7 +6,8 @@ import { useBaba } from '../contexts/BabaContext';
 import { supabase } from '../services/supabase';
 import {
   Plus, LogIn, Trophy, User,
-  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight, Trash2, Download
+  ArrowRight, Zap, Users, CheckCircle2, Clock, ChevronRight, Trash2, Download,
+  Coins
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import CreateTournamentModal from '../components/CreateTournamentModal';
@@ -370,16 +371,30 @@ const HomePage = () => {
         {/* ── Topo compacto ── */}
         <div className="flex items-center justify-between">
           <Logo size="small" />
-          <button
-            onClick={() => navigate('/profile')}
-            className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden"
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
-            ) : (
-              <span className="text-cyan-electric font-black text-sm">{initials}</span>
-            )}
-          </button>
+          
+          <div className="flex items-center gap-2">
+            {/* Botão da Loja DP */}
+            <button
+              onClick={() => navigate('/dpstore')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-cyan-electric/10 border border-cyan-electric/30 text-cyan-electric hover:bg-cyan-electric/20 active:scale-95 transition-all"
+              aria-label="Abrir Loja DP"
+            >
+              <Coins size={16} />
+              <span className="text-xs font-black uppercase tracking-wider">Loja DP</span>
+            </button>
+
+            {/* Ícone de Perfil */}
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full bg-cyan-electric/10 flex items-center justify-center border border-cyan-electric/20 overflow-hidden"
+            >
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="" />
+              ) : (
+                <span className="text-cyan-electric font-black text-sm">{initials}</span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* ── Card de instalação do app (some sozinho quando já instalado) ── */}
@@ -537,8 +552,7 @@ const HomePage = () => {
       </div>
       {/* ── Fim do container scrollável ── */}
 
-      {/* ── FAB e Menu via portal — escapam do transform do PageWrapper (animate-page-in),
-             que quebraria o position:fixed deles se ficassem dentro do <main> ── */}
+      {/* ── FAB e Menu via portal ── */}
       {createPortal(
         <>
           {fabOpen && (
