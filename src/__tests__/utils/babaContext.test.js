@@ -195,7 +195,7 @@ describe('generateBalancedTeams', () => {
     id,
     name:         `Jogador ${id}`,
     position,
-    final_rating: rating,
+    balance_level: rating,
   });
 
   it('retorna 2 times por padrão', () => {

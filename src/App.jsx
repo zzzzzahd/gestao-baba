@@ -37,6 +37,7 @@ const JoinPage              = lazy(() => import('./pages/JoinPage'));
 const ComparisonPage       = lazy(() => import('./pages/ComparisonPage'));
 const TournamentPage       = lazy(() => import('./pages/TournamentPage'));
 const TournamentMatchPage  = lazy(() => import('./pages/TournamentMatchPage'));
+const DpStorePage          = lazy(() => import('./pages/DpStorePage'));
 
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -172,6 +173,7 @@ const AppInner = () => {
           <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/torneio/:id" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/loja" element={<ProtectedRoute><PageWrapper><DpStorePage /></PageWrapper></ProtectedRoute>} />
           <Route path="/tournament" element={<Navigate to="/home" replace />} />
           <Route path="/teams" element={<Navigate to="/draw" replace />} />
           <Route path="/match" element={<Navigate to="/draw" replace />} />
