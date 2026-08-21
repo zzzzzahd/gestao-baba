@@ -173,7 +173,7 @@ const AppInner = () => {
           <Route path="/comparison" element={<ProtectedRoute><PageWrapper><ComparisonPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/torneio/:id" element={<ProtectedRoute><PageWrapper><TournamentPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
-          <Route path="/loja" element={<ProtectedRoute><PageWrapper><DpStorePage /></PageWrapper></ProtectedRoute>} />
+          <Route path="/dpstore" element={<ProtectedRoute><PageWrapper><DpStorePage /></PageWrapper></ProtectedRoute>} />
           <Route path="/tournament" element={<Navigate to="/home" replace />} />
           <Route path="/teams" element={<Navigate to="/draw" replace />} />
           <Route path="/match" element={<Navigate to="/draw" replace />} />
