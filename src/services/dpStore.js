@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient'; // ajuste pro caminho real do seu cliente Supabase
+import { supabase } from './supabase';
 
 // ---------- Loja 1: comprar DP com dinheiro real ----------
 
