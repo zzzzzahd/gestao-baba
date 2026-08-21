@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Coins, Sparkles, Crown, Loader2, ShoppingBag, History } from 'lucide-react';
-import { useAuth } from '../context/AuthContext'; // ajuste se o hook/caminho for outro
+import { useAuth } from '../contexts/AuthContext'; // ajuste se o hook/caminho for outro
 import {
   fetchDpPackages,
   fetchStoreItems,
