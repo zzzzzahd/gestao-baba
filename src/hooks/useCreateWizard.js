@@ -63,6 +63,7 @@ export const buildInsertPayload = ({ name, modality, location, playersPerTeam, s
     modality,
     location:        location.trim() || null,
     max_players:     maxPlayers ?? playersPerTeam * 2,
+    players_per_team: playersPerTeam,
     game_days:       cleanDays.map(d => d.day),
     game_days_config,
     game_time:       toDbTime(cleanDays[0]?.time || DEFAULT_TIME),
