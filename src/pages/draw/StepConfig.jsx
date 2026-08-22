@@ -18,19 +18,74 @@ const STRATEGIES = [
 
 // ─── Algoritmo de sorteio balanceado ─────────────────────────────────────────
 
-const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = []) => {
-  const sorted     = [...players].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
-  const totalTeams = Math.floor(sorted.length / playersPerTeam);
-  const teams      = Array.from({ length: totalTeams }, (_, i) => ({
+/** Distribui um pool (já ordenado por prioridade) em times respeitando a capacidade de cada um, em formato serpentina (cobra). */
+const snakeDistribute = (pool, capacities) => {
+  const teams = capacities.map(() => []);
+  let dir = 1, poolIdx = 0;
+  while (poolIdx < pool.length) {
+    const order = dir === 1 ? capacities.map((_, i) => i) : capacities.map((_, i) => i).reverse();
+    let placedAny = false;
+    for (const t of order) {
+      if (poolIdx >= pool.length) break;
+      if (teams[t].length < capacities[t]) {
+        teams[t].push(pool[poolIdx]);
+        poolIdx++;
+        placedAny = true;
+      }
+    }
+    if (!placedAny) break;
+    dir *= -1;
+  }
+  return teams;
+};
+
+const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = [], gkMode = 'fixed') => {
+  const gks      = players.filter(p => p.position === 'goleiro');
+  const outfield = players.filter(p => p.position !== 'goleiro');
+
+  const totalTeamsIfFixed    = Math.floor(players.length / playersPerTeam);
+  const totalTeamsIfLineOnly = Math.floor(outfield.length / playersPerTeam);
+
+  // court: decide sozinho — goleiro fixo no time se a conta bate exatamente
+  // (1 goleiro por time), senão vira fila própria da quadra (goalkeeperQueue)
+  let mode; // 'fixed' | 'separate' | 'court-fixed' | 'court-queue'
+  if (gkMode === 'separate') mode = 'separate';
+  else if (gkMode === 'court') {
+    mode = (totalTeamsIfFixed > 0 && gks.length === totalTeamsIfFixed) ? 'court-fixed' : 'court-queue';
+  } else mode = 'fixed';
+
+  const totalTeams = (mode === 'separate' || mode === 'court-queue') ? totalTeamsIfLineOnly : totalTeamsIfFixed;
+
+  // Goleiro sempre é distribuído à parte, com vaga garantida (1 por time) quando o
+  // modo exige — nunca dentro do mesmo snake por nota que os jogadores de linha,
+  // senão a ordenação por nota pode deixar times inteiros sem goleiro por acaso.
+  const hasDedicatedGkPerTeam = mode === 'fixed' || mode === 'court-fixed' || mode === 'separate';
+  // separate: goleiro é vaga extra (bônus) — linha usa a capacidade cheia de playersPerTeam.
+  // fixed/court-fixed: goleiro é 1 dos playersPerTeam — linha usa playersPerTeam-1.
+  // court-queue: não tem goleiro dedicado nenhum — linha usa a capacidade cheia.
+  const lineCapacityPerTeam = (mode === 'fixed' || mode === 'court-fixed') ? playersPerTeam - 1 : playersPerTeam;
+
+  const sorted      = [...outfield].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+  const capacities   = Array.from({ length: totalTeams }, () => lineCapacityPerTeam);
+  const distributed  = snakeDistribute(sorted, capacities);
+  const teams = distributed.map((teamPlayers, i) => ({
     name:    `Time ${String.fromCharCode(65 + i)}`,
-    players: [],
+    players: teamPlayers,
   }));
 
-  sorted.forEach((player, idx) => {
-    const round = Math.floor(idx / totalTeams);
-    const pos   = round % 2 === 0 ? idx % totalTeams : totalTeams - 1 - (idx % totalTeams);
-    if (teams[pos]) teams[pos].players.push(player);
-  });
+  let goalkeeperQueue = [];
+  let gkReserves      = [];
+  if (mode === 'court-queue') {
+    // Goleiros não entram no sorteio de time nenhum — ficam numa fila própria,
+    // vinculada à quadra (índices 0/1 = ativos, resto = banco). StepMatch.jsx
+    // gira essa fila em paralelo com a fila de times (ver handleMatchEnd).
+    goalkeeperQueue = [...gks].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+  } else if (hasDedicatedGkPerTeam) {
+    const sortedGks    = [...gks].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+    const gkCapacities = Array.from({ length: totalTeams }, () => 1);
+    snakeDistribute(sortedGks, gkCapacities).forEach((assigned, i) => teams[i].players.push(...assigned));
+    gkReserves = sortedGks.slice(totalTeams); // goleiros excedentes (mais goleiro que time)
+  }
 
   const getTeamOf = (pid) => teams.findIndex(t => t.players.some(p => p.id === pid));
 
@@ -70,10 +125,10 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
   });
 
   const reserves = strategy === 'reserve'
-    ? sorted.slice(totalTeams * playersPerTeam)
-    : [];
+    ? [...sorted.slice(totalTeams * lineCapacityPerTeam), ...gkReserves]
+    : gkReserves;
 
-  return { teams, reserves };
+  return { teams, reserves, goalkeeperQueue };
 };
 
 // ─── StepConfig ───────────────────────────────────────────────────────────────
@@ -163,7 +218,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
 
       if (existing?.teams?.length >= 2) {
         Sounds.unlock();
-        onNext({ teams: existing.teams, reserves: existing.reserves || [] });
+        onNext({ teams: existing.teams, reserves: existing.reserves || [], goalkeeperQueue: existing.goalkeeper_queue || [] });
         return;
       }
 
@@ -179,11 +234,12 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         .filter(p => confirmedIds.includes(p.id))
         .map(p => ({ ...p, balance_level: p.is_guest ? (p.guest_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
 
-      const { teams, reserves } = drawTeamsWithConstraints(
+      const { teams, reserves, goalkeeperQueue } = drawTeamsWithConstraints(
         confirmedPlayers,
         safeConfig.playersPerTeam,
         safeConfig.strategy,
         constraints || [],
+        currentBaba.gk_mode || 'fixed',
       );
 
       const avgRatings   = teams.map(t =>
@@ -198,6 +254,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         draw_date:        today,
         teams,
         reserves,
+        goalkeeper_queue: goalkeeperQueue,
         draw_config:      safeConfig,
         algorithm:        'balanced_snake',
         constraints_used: constraints || [],
@@ -208,7 +265,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       // Sprint 3 — som de sorteio
       Sounds.unlock();
       toast.success('Times sorteados! ⚡');
-      onNext({ teams, reserves });
+      onNext({ teams, reserves, goalkeeperQueue });
     } catch (err) {
       console.error('[StepConfig] draw error:', err);
       toast.error('Erro ao sortear. Tente novamente.');
