@@ -5,10 +5,11 @@
 // Estado persiste em localStorage via useDrawWizard.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useDrawWizard, clearDrawWizard } from '../hooks/useDrawWizard';
+import { supabase } from '../services/supabase';
 import { ArrowLeft, Settings2, Users, Play } from 'lucide-react';
 
 const StepConfig = lazy(() => import('./draw/StepConfig'));
@@ -71,6 +72,31 @@ const DrawPage = () => {
     setStep, setDrawConfig, setDrawResult, setMatchState, reset,
   } = useDrawWizard(currentBaba?.id);
 
+  const [checkingAutoDraw, setCheckingAutoDraw] = useState(false);
+  const [showManualOverride, setShowManualOverride] = useState(false);
+
+  // Sorteio automático ligado: configurações já estão prontas, o presidente não
+  // precisa passar pelo assistente (Config/Times) — só entra direto na Partida,
+  // desde que o cron já tenha sorteado hoje. Se ainda não sorteou, mostra um
+  // aviso em vez do assistente manual (ver render abaixo).
+  useEffect(() => {
+    if (!currentBaba?.id || !currentBaba.auto_draw_enabled) return;
+    if (step !== 1 || drawResult || matchState) return; // já passou dessa etapa
+    setCheckingAutoDraw(true);
+    (async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('draw_results').select('*')
+        .eq('baba_id', currentBaba.id).eq('draw_date', today)
+        .limit(1).maybeSingle();
+      if (data?.teams?.length >= 2) {
+        setDrawResult({ teams: data.teams, reserves: data.reserves || [], goalkeeperQueue: data.goalkeeper_queue || [] });
+        setStep(3);
+      }
+      setCheckingAutoDraw(false);
+    })();
+  }, [currentBaba?.id, currentBaba?.auto_draw_enabled, step, drawResult, matchState]);
+
   const handleBack = () => {
     if (step === 1) navigate('/dashboard');
     else setStep(step - 1);
@@ -109,7 +135,25 @@ const DrawPage = () => {
 
         {/* Conteúdo do step ativo */}
         <Suspense fallback={<StepLoader />}>
-          {step === 1 && (
+          {step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
+            <div className="text-center py-16 rounded-3xl bg-surface-1 border border-dashed border-border-mid space-y-3 px-6">
+              <Settings2 size={28} className={`text-cyan-electric mx-auto ${checkingAutoDraw ? 'animate-spin' : ''}`} />
+              <p className="text-[11px] font-black uppercase tracking-widest text-white">
+                Sorteio automático ligado
+              </p>
+              <p className="text-[10px] text-text-low font-bold leading-relaxed">
+                {currentBaba.auto_draw_time
+                  ? `O sorteio roda sozinho às ${String(currentBaba.auto_draw_time).substring(0, 5)}. Volte aqui depois desse horário.`
+                  : 'O sorteio roda sozinho no horário configurado. Volte aqui depois desse horário.'}
+              </p>
+              <button
+                onClick={() => setShowManualOverride(true)}
+                className="text-[9px] font-black uppercase text-text-muted underline underline-offset-2 hover:text-text-low"
+              >
+                Sortear manualmente agora mesmo
+              </button>
+            </div>
+          ) : step === 1 && (
             <StepConfig
               drawConfig={drawConfig}
               setDrawConfig={setDrawConfig}
