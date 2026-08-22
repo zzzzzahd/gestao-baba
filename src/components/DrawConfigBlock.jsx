@@ -4,9 +4,11 @@
 // Extraído do DashboardPage (Fase 2, Tarefa 2.4).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React from 'react';
-import { Settings2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings2, UserPlus, X } from 'lucide-react';
 import Tooltip from './Tooltip';
+import { supabase } from '../services/supabase';
+import toast from 'react-hot-toast';
 
 const STRATEGIES = [
   {
@@ -27,6 +29,8 @@ const DrawConfigBlock = ({
   gameConfirmations,
   isDrawing,
   nextGameDay,
+  currentBaba,
+  onReload,
 }) => {
   const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
   const confirmedCount = gameConfirmations?.length || 0;
@@ -35,6 +39,59 @@ const DrawConfigBlock = ({
   const totalMatches   = Math.floor(totalTeams / 2);
   const reserves       = confirmedCount % safeConfig.playersPerTeam
     + (totalTeams % 2) * safeConfig.playersPerTeam;
+
+  const guests = (gameConfirmations || []).filter(c => c.player?.is_guest);
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [guestName,     setGuestName]     = useState('');
+  const [guestPosition, setGuestPosition] = useState('linha');
+  const [guestLevel,    setGuestLevel]    = useState(2);
+  const [addingGuest,   setAddingGuest]   = useState(false);
+
+  const handleAddGuest = async () => {
+    if (!currentBaba || !nextGameDay) return;
+    setAddingGuest(true);
+    try {
+      const n     = guests.length + 1;
+      const label = guestName.trim()
+        ? `${guestName.trim()} - Convidado ${n}`
+        : `Convidado ${String(n).padStart(2, '0')}`;
+
+      const { data: newPlayer, error: playerErr } = await supabase
+        .from('players')
+        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, guest_level: guestLevel }])
+        .select().single();
+      if (playerErr) throw playerErr;
+
+      const { error: confirmErr } = await supabase
+        .from('game_confirmations')
+        .insert([{ baba_id: currentBaba.id, player_id: newPlayer.id, game_date: nextGameDay.dateStr, status: 'confirmed' }]);
+      if (confirmErr) throw confirmErr;
+
+      await onReload?.();
+      setGuestName('');
+      setGuestPosition('linha');
+      setGuestLevel(2);
+      setShowGuestForm(false);
+      toast.success(`${label} adicionado!`);
+    } catch (err) {
+      console.error('[DrawConfigBlock] addGuest error:', err);
+      toast.error('Erro ao adicionar convidado');
+    } finally {
+      setAddingGuest(false);
+    }
+  };
+
+  const handleRemoveGuest = async (confirmation) => {
+    try {
+      await supabase.from('game_confirmations').delete().eq('id', confirmation.id);
+      await supabase.from('players').delete().eq('id', confirmation.player_id);
+      await onReload?.();
+      toast.success('Convidado removido');
+    } catch (err) {
+      console.error('[DrawConfigBlock] removeGuest error:', err);
+      toast.error('Erro ao remover convidado');
+    }
+  };
 
   // Horário do sorteio automático (deadline = 30 min antes do jogo)
   const deadlineStr = nextGameDay?.deadline
@@ -116,6 +173,72 @@ const DrawConfigBlock = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Convidados — funciona tanto no sorteio manual quanto no automático,
+          já que quando o automático está ligado o presidente não passa mais
+          pelo assistente de sorteio (StepConfig) pra chegar aqui. */}
+      <div className="rounded-2xl bg-surface-2 border border-border-subtle overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-[10px] font-black uppercase text-text-mid">
+            Convidados {guests.length > 0 && `(${guests.length})`}
+          </span>
+          <button
+            onClick={() => setShowGuestForm(v => !v)}
+            className="flex items-center gap-1 text-[10px] font-black uppercase text-cyan-electric"
+          >
+            <UserPlus size={12} /> Adicionar
+          </button>
+        </div>
+
+        {guests.length > 0 && (
+          <div className="px-4 pb-3 space-y-1.5">
+            {guests.map(g => (
+              <div key={g.id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface-3 text-[10px] font-bold">
+                <span className="truncate">{g.player?.name}</span>
+                <button onClick={() => handleRemoveGuest(g)} className="text-text-low hover:text-red-400">
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showGuestForm && (
+          <div className="px-4 pb-4 space-y-2.5 border-t border-border-subtle pt-3">
+            <input
+              value={guestName}
+              onChange={e => setGuestName(e.target.value)}
+              placeholder="Nome (opcional)"
+              className="w-full bg-surface-3 border border-border-mid rounded-xl px-3 py-2 text-[11px] font-bold text-white placeholder:text-text-muted outline-none focus:border-cyan-electric"
+            />
+            <div className="flex gap-2">
+              {['linha', 'goleiro'].map(pos => (
+                <button
+                  key={pos}
+                  onClick={() => setGuestPosition(pos)}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase border ${
+                    guestPosition === pos
+                      ? 'bg-cyan-electric text-black border-cyan-electric'
+                      : 'bg-surface-3 text-text-low border-border-mid'
+                  }`}
+                >
+                  {pos === 'linha' ? 'Linha' : 'Goleiro'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleAddGuest}
+              disabled={addingGuest}
+              className="w-full py-2.5 bg-cyan-electric text-black rounded-xl font-black text-[10px] uppercase disabled:opacity-50"
+            >
+              {addingGuest ? 'Adicionando...' : 'Confirmar convidado'}
+            </button>
+            <p className="text-[8px] text-text-muted font-bold text-center">
+              Convidado sempre entra marcado como convidado — não conta pro ranking.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Prévia do sorteio — só quando tem quórum */}
