@@ -116,6 +116,9 @@ export default function BabaSettings() {
     confirmation_deadline:  '20:00',
     theme_color:            '#06b6d4',
     pix_key:                '',
+    players_per_team:       5,
+    gk_mode:                'fixed',
+    gk_fallback:            'lineplayer',
   });
 
   // Verificar se é coordenador
@@ -159,6 +162,9 @@ export default function BabaSettings() {
       confirmation_deadline:  currentBaba.confirmation_deadline  ?? '20:00',
       theme_color:            currentBaba.theme_color            ?? '#06b6d4',
       pix_key:                currentBaba.pix_key                ?? '',
+      players_per_team:       currentBaba.players_per_team       ?? 5,
+      gk_mode:                currentBaba.gk_mode                ?? 'fixed',
+      gk_fallback:            currentBaba.gk_fallback            ?? 'lineplayer',
     });
   }, [currentBaba?.id]);
 
@@ -209,6 +215,9 @@ export default function BabaSettings() {
           rating_enabled:    form.rating_enabled,
           rating_open_hours: Number(form.rating_open_hours) || 24,
           theme_color:       form.theme_color,
+          players_per_team:  Number(form.players_per_team) || 5,
+          gk_mode:           form.gk_mode,
+          gk_fallback:       form.gk_fallback,
         } : {}),
       };
 
@@ -446,7 +455,7 @@ export default function BabaSettings() {
       {/* Sorteio Automático */}
       <Section title="Sorteio Automático" expanded={sections.draw} onToggle={() => toggle('draw')}>
         <p className="text-[10px] text-text-low font-bold leading-relaxed -mt-1">
-          Define se e quando o sorteio roda sozinho. Jogadores por time e estratégia de suplentes ficam no card "Sorteio de Hoje", na Visão Geral, e valem só para a partida do dia.
+          Define se e quando o sorteio roda sozinho. O card "Sorteio de Hoje", na Visão Geral, deixa ajustar jogadores por time só para a partida do dia — aqui embaixo fica o padrão usado sempre que o sorteio automático rodar sozinho.
         </p>
         <Toggle
           label="Sorteio automático"
@@ -461,6 +470,67 @@ export default function BabaSettings() {
             value={form.auto_draw_time}
             onChange={set('auto_draw_time')}
           />
+        )}
+
+        {canEditAll && (
+          <>
+            <Field
+              label="Jogadores por time (padrão)"
+              type="number" min="3" max="11"
+              value={form.players_per_team}
+              onChange={set('players_per_team')}
+            />
+
+            <div>
+              <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+                Goleiro no sorteio
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'fixed',    label: 'Conta no time',  sub: 'Goleiro é 1 dos jogadores por time' },
+                  { id: 'separate', label: 'Vaga à parte',   sub: 'Goleiro não entra na conta de linha' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => set('gk_mode')(opt.id)}
+                    className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                      form.gk_mode === opt.id
+                        ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
+                        : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
+                    }`}
+                  >
+                    <p className="text-[10px] font-black uppercase">{opt.label}</p>
+                    <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+                Se faltar goleiro pra algum time
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'lineplayer', label: 'Vira jogador de linha', sub: 'Um jogador de linha joga no gol' },
+                  { id: 'incomplete', label: 'Time fica incompleto',  sub: 'Time joga sem goleiro dedicado' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => set('gk_fallback')(opt.id)}
+                    className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                      form.gk_fallback === opt.id
+                        ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
+                        : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
+                    }`}
+                  >
+                    <p className="text-[10px] font-black uppercase">{opt.label}</p>
+                    <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </Section>
 
