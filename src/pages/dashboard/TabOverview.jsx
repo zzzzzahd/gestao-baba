@@ -23,6 +23,7 @@ const TabOverview = ({
   setDrawConfig,
   isDrawing,
   isPresident,
+  canManage,
   loading,
 }) => {
   const navigate        = useNavigate();
@@ -58,13 +59,15 @@ const TabOverview = ({
             </div>
           )}
 
-          {isPresident && canConfirm && (
+          {canManage && canConfirm && (
             <DrawConfigBlock
               drawConfig={drawConfig}
               setDrawConfig={setDrawConfig}
               gameConfirmations={gameConfirmations}
               isDrawing={isDrawing}
               nextGameDay={nextGameDay}
+              currentBaba={currentBaba}
+              onReload={reloadConfirmations}
             />
           )}
 
