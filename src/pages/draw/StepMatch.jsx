@@ -51,6 +51,17 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [dailyStandings,   setDailyStandings]   = useState([]);
   const [showStandings,    setShowStandings]    = useState(false);
 
+  // Ponto 4 do fluxo real do baba: fila de goleiro própria da quadra (só quando
+  // drawResult.goalkeeperQueue tem gente — ou seja, faltou goleiro pra 1 por time).
+  // Índice 0 = goleiro ativo do lado "Time A" da quadra, índice 1 = "Time B";
+  // resto = banco. Gira em paralelo à fila de times (mesmas operações, ver handleMatchEnd).
+  const [goalkeeperQueue,  setGoalkeeperQueue]  = useState(matchState?.goalkeeperQueue || []);
+  // Substituição temporária por cansaço/lesão: { A: jogador|null, B: jogador|null }.
+  // Fica valendo pro lado da quadra até o titular voltar (não é por partida só).
+  const [gkOverride,       setGkOverride]       = useState(matchState?.gkOverride || { A: null, B: null });
+  const [showGkSubModal,   setShowGkSubModal]   = useState(false);
+  const [gkSubSlot,        setGkSubSlot]        = useState(null);
+
   // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
     setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
@@ -63,6 +74,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       setCurrentMatch(matchState.currentMatch);
       setTimer(matchState.timer ?? 600);
       setMatchId(matchState.matchId);
+      setGoalkeeperQueue(matchState.goalkeeperQueue || []);
+      setGkOverride(matchState.gkOverride || { A: null, B: null });
       setLoading(false);
       return;
     }
@@ -71,7 +84,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     const match = { teamA: teams[0], teamB: teams[1], scoreA: 0, scoreB: 0 };
     setAllTeams(teams);
     setCurrentMatch(match);
-    loadOrCreateMatch(teams[0], teams[1]);
+    setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
+    loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || []);
     setLoading(false);
     setShowIntro(true);
   }, []);
@@ -79,8 +93,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   // Persistir estado no wizard
   useEffect(() => {
     if (!currentMatch) return;
-    setMatchState({ allTeams, currentMatch, timer, matchId });
-  }, [allTeams, currentMatch, timer, matchId]);
+    setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride });
+  }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride]);
 
   // Timer
   useEffect(() => {
@@ -121,7 +135,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
   useEffect(() => { loadDailyStandings(); }, [loadDailyStandings]);
 
-  const loadOrCreateMatch = useCallback(async (teamA, teamB) => {
+  const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }) => {
     if (!currentBaba) return;
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -149,9 +163,16 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       }
       setMatchId(mid);
 
+      // Goleiro ativo da quadra pra cada lado (fila própria): override manual
+      // (cansaço/lesão) tem prioridade; senão é o goleiro na frente da fila.
+      const gkA = gkOv?.A || gkQueue[0] || null;
+      const gkB = gkOv?.B || gkQueue[1] || null;
+
       const mps = [
         ...teamA.players.map(p => ({ match_id: mid, player_id: p.id, team: 'A', position: p.position || 'linha', goals: 0, assists: 0 })),
         ...teamB.players.map(p => ({ match_id: mid, player_id: p.id, team: 'B', position: p.position || 'linha', goals: 0, assists: 0 })),
+        ...(gkA ? [{ match_id: mid, player_id: gkA.id, team: 'A', position: 'goleiro', goals: 0, assists: 0 }] : []),
+        ...(gkB ? [{ match_id: mid, player_id: gkB.id, team: 'B', position: 'goleiro', goals: 0, assists: 0 }] : []),
       ];
       const { data: exPs } = await supabase.from('match_players').select('player_id').eq('match_id', mid);
       const exIds = (exPs || []).map(p => p.player_id);
@@ -159,12 +180,29 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       if (newPs.length > 0) await supabase.from('match_players').insert(newPs);
 
       // Buscar jogadores para reações
-      const allP = [...(teamA.players || []), ...(teamB.players || [])];
+      const allP = [...(teamA.players || []), ...(teamB.players || []), ...(gkA ? [gkA] : []), ...(gkB ? [gkB] : [])];
       setAllMatchPlayers(allP);
     } catch (err) {
       console.error('[StepMatch] loadOrCreateMatch:', err);
     }
   }, [currentBaba]);
+
+  const openGkSubModal = (slot) => { setGkSubSlot(slot); setShowGkSubModal(true); };
+
+  const handleGkSub = (player) => {
+    const next = { ...gkOverride, [gkSubSlot]: player };
+    setGkOverride(next);
+    setShowGkSubModal(false);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
+    toast.success(`${player.name} no gol até o titular voltar`);
+  };
+
+  const handleGkReturn = (slot) => {
+    const next = { ...gkOverride, [slot]: null };
+    setGkOverride(next);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
+    toast.success('Titular de volta ao gol');
+  };
 
   const handleGoalClick = (team) => {
     setGoalTeam(team); setSelectedScorer(''); setSelectedAssist(''); setShowGoalModal(true);
@@ -230,18 +268,25 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     Sounds.whistle();
     const { scoreA, scoreB, teamA, teamB } = currentMatch;
     let queue = [...allTeams];
+    let gkQueue = [...goalkeeperQueue];
     let winnerName = null;
     let winnerTeam = null;
 
+    // Espelha exatamente a mesma operação na fila de goleiro (se houver) que na
+    // fila de times — mantém o goleiro vinculado ao lado da quadra, não ao time.
     if (scoreA > scoreB) {
       winnerName = teamA.name; winnerTeam = 'A';
       const l = queue.splice(1, 1)[0]; queue.push(l);
+      if (gkQueue.length) { const gl = gkQueue.splice(1, 1)[0]; gkQueue.push(gl); }
     } else if (scoreB > scoreA) {
       winnerName = teamB.name; winnerTeam = 'B';
       const l = queue.splice(0, 1)[0]; queue.push(l);
+      if (gkQueue.length) { const gl = gkQueue.splice(0, 1)[0]; gkQueue.push(gl); }
     } else {
       const t1 = queue.shift(); const t2 = queue.shift(); queue.push(t1, t2);
+      if (gkQueue.length) { const g1 = gkQueue.shift(); const g2 = gkQueue.shift(); gkQueue.push(g1, g2); }
     }
+    setGoalkeeperQueue(gkQueue);
 
     if (matchId) {
       await supabase.from('matches').update({
@@ -262,7 +307,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     if (winnerName && matchId) {
       setWinnerInfo({ name: winnerName, matchId });
     }
-  }, [currentMatch, allTeams, matchId, loadDailyStandings]);
+  }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings]);
 
   const continueAfterMatch = useCallback(async (queue) => {
     setShowPostGame(false);
@@ -282,9 +327,9 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setCurrentMatch(match);
     setMatchId(null);
     setFinishedMatch(null);
-    await loadOrCreateMatch(queue[0], queue[1]);
+    await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride);
     setShowIntro(true);
-  }, [loadOrCreateMatch, onReset]);
+  }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, onReset]);
 
   if (loading || !currentMatch) return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -391,6 +436,32 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
             Finalizar Partida
           </button>
         </div>
+
+        {/* Goleiros da quadra — só aparece quando o baba usa fila de goleiro (falta goleiro pra 1 por time) */}
+        {goalkeeperQueue.length > 0 && (
+          <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-2">
+            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Goleiros da quadra</p>
+            <div className="grid grid-cols-2 gap-2">
+              {['A', 'B'].map((slot, idx) => {
+                const active = gkOverride[slot] || goalkeeperQueue[idx];
+                const isTemp = !!gkOverride[slot];
+                return (
+                  <div key={slot} className="p-2.5 rounded-xl bg-surface-2 border border-border-subtle">
+                    <p className="text-[8px] font-black text-text-muted uppercase">Time {slot}</p>
+                    <p className="text-[11px] font-black text-white truncate">{active?.name || '—'}</p>
+                    {isTemp && <p className="text-[8px] font-bold text-yellow-500 uppercase mt-0.5">Emprestado</p>}
+                    <button
+                      onClick={() => isTemp ? handleGkReturn(slot) : openGkSubModal(slot)}
+                      className="mt-1.5 w-full py-1 rounded-lg bg-surface-3 text-[8px] font-black uppercase text-text-low hover:text-white transition-colors"
+                    >
+                      {isTemp ? 'Titular voltou' : 'Cansou / se machucou'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Classificação do dia */}
         {dailyStandings.length > 0 && (
@@ -629,6 +700,36 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
               >
                 {savingCard ? 'Salvando...' : 'Confirmar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGkSubModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black uppercase">Quem vai pro gol?</h3>
+              <button onClick={() => setShowGkSubModal(false)} className="text-text-low hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+            <p className="text-[10px] font-bold text-text-low leading-relaxed">
+              Escolha um jogador do time que está esperando na fila — assim ninguém do time atual perde a vez de jogar na linha.
+            </p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {(allTeams[2]?.players || []).length === 0 && (
+                <p className="text-[10px] font-bold text-text-muted text-center py-4">Não tem time esperando na fila agora.</p>
+              )}
+              {(allTeams[2]?.players || []).map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleGkSub(p)}
+                  className="w-full text-left px-3 py-2.5 rounded-xl bg-surface-2 border border-border-subtle hover:border-cyan-electric/40 transition-colors text-[11px] font-bold text-white"
+                >
+                  {p.name}
+                </button>
+              ))}
             </div>
           </div>
         </div>
