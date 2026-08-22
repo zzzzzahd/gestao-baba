@@ -104,7 +104,11 @@ export default function BabaSettings() {
     name:                    '',
     location:               '',
     selectedDays:           [], // [{ day, time, location }]
-    max_players:            '',
+    max_line_players:       '',
+    max_goalkeepers:        5,
+    max_substitutes:        5,
+    confirmation_open_weekday: 5,
+    confirmation_open_time: '11:59',
     allow_reserves:         false,
     auto_draw_enabled:      false,
     auto_draw_time:         '20:00',
@@ -150,7 +154,11 @@ export default function BabaSettings() {
       name:                    currentBaba.name                   ?? '',
       location:               currentBaba.location               ?? '',
       selectedDays:           selectedDays.sort((a, b) => a.day - b.day),
-      max_players:            currentBaba.max_players            ?? '',
+      max_line_players:       currentBaba.max_line_players       ?? currentBaba.max_players ?? '',
+      max_goalkeepers:        currentBaba.max_goalkeepers        ?? 5,
+      max_substitutes:        currentBaba.max_substitutes        ?? 5,
+      confirmation_open_weekday: currentBaba.confirmation_open_weekday ?? 5,
+      confirmation_open_time: currentBaba.confirmation_open_time ?? '11:59',
       allow_reserves:         currentBaba.allow_reserves         ?? false,
       auto_draw_enabled:      currentBaba.auto_draw_enabled      ?? false,
       auto_draw_time:         currentBaba.auto_draw_time         ?? '20:00',
@@ -204,7 +212,11 @@ export default function BabaSettings() {
     try {
       // 1. Salvar via RPC (campos avançados)
       const rpcSettings = {
-        max_players:            form.max_players ? Number(form.max_players) : null,
+        max_line_players:       form.max_line_players ? Number(form.max_line_players) : null,
+        max_goalkeepers:        Number(form.max_goalkeepers) || 0,
+        max_substitutes:        Number(form.max_substitutes) || 0,
+        confirmation_open_weekday: Number(form.confirmation_open_weekday),
+        confirmation_open_time: form.confirmation_open_time,
         auto_draw_enabled:      form.auto_draw_enabled,
         auto_draw_time:         form.auto_draw_time,
         confirmation_open_days: Number(form.confirmation_open_days) || 3,
@@ -411,11 +423,23 @@ export default function BabaSettings() {
       {/* Jogo e Confirmações */}
       <Section title="Jogo e Confirmações" expanded={sections.game} onToggle={() => toggle('game')}>
         <Field
-          label="Máx. jogadores confirmados"
+          label="Máx. jogadores de linha"
           type="number" min="2" max="50"
-          value={form.max_players}
-          onChange={set('max_players')}
+          value={form.max_line_players}
+          onChange={set('max_line_players')}
           placeholder="Ilimitado"
+        />
+        <Field
+          label="Máx. goleiros"
+          type="number" min="0" max="20"
+          value={form.max_goalkeepers}
+          onChange={set('max_goalkeepers')}
+        />
+        <Field
+          label="Máx. suplentes (fila de linha)"
+          type="number" min="0" max="20"
+          value={form.max_substitutes}
+          onChange={set('max_substitutes')}
         />
         <Toggle
           label="Permitir lista de espera"
@@ -438,11 +462,25 @@ export default function BabaSettings() {
             onChange={set('guest_limit')}
           />
         )}
+        <div>
+          <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+            Lista abre toda(o)
+          </label>
+          <select
+            value={form.confirmation_open_weekday}
+            onChange={e => set('confirmation_open_weekday')(e.target.value)}
+            className="w-full bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-[11px] font-bold text-text-high"
+          >
+            {['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'].map((d, i) => (
+              <option key={i} value={i}>{d}</option>
+            ))}
+          </select>
+        </div>
         <Field
-          label="Abrir confirmações X dias antes"
-          type="number" min="1" max="7"
-          value={form.confirmation_open_days}
-          onChange={set('confirmation_open_days')}
+          label="Horário de abertura"
+          type="time"
+          value={form.confirmation_open_time}
+          onChange={set('confirmation_open_time')}
         />
         <Field
           label="Encerrar confirmações às"
@@ -485,10 +523,11 @@ export default function BabaSettings() {
               <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
                 Goleiro no sorteio
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 {[
-                  { id: 'fixed',    label: 'Conta no time',  sub: 'Goleiro é 1 dos jogadores por time' },
-                  { id: 'separate', label: 'Vaga à parte',   sub: 'Goleiro não entra na conta de linha' },
+                  { id: 'court',    label: 'Fila da quadra',  sub: 'Time fixo se a conta bater (1 por time); senão o goleiro é da quadra, não do time — troca sozinho quando o time perde' },
+                  { id: 'fixed',    label: 'Conta no time',   sub: 'Goleiro é sempre 1 dos jogadores por time, o dia todo' },
+                  { id: 'separate', label: 'Vaga à parte',    sub: 'Goleiro nunca entra na conta de linha' },
                 ].map(opt => (
                   <button
                     key={opt.id}
@@ -506,30 +545,32 @@ export default function BabaSettings() {
               </div>
             </div>
 
-            <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
-                Se faltar goleiro pra algum time
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'lineplayer', label: 'Vira jogador de linha', sub: 'Um jogador de linha joga no gol' },
-                  { id: 'incomplete', label: 'Time fica incompleto',  sub: 'Time joga sem goleiro dedicado' },
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => set('gk_fallback')(opt.id)}
-                    className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
-                      form.gk_fallback === opt.id
-                        ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
-                        : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
-                    }`}
-                  >
-                    <p className="text-[10px] font-black uppercase">{opt.label}</p>
-                    <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
-                  </button>
-                ))}
+            {form.gk_mode !== 'court' && (
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+                  Se faltar goleiro pra algum time
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'lineplayer', label: 'Vira jogador de linha', sub: 'Um jogador de linha joga no gol' },
+                    { id: 'incomplete', label: 'Time fica incompleto',  sub: 'Time joga sem goleiro dedicado' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => set('gk_fallback')(opt.id)}
+                      className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                        form.gk_fallback === opt.id
+                          ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
+                          : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
+                      }`}
+                    >
+                      <p className="text-[10px] font-black uppercase">{opt.label}</p>
+                      <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </Section>
