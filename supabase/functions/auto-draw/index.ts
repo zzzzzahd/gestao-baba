@@ -1,7 +1,9 @@
 // supabase/functions/auto-draw/index.ts
 // Fase 5 — Auto-sorteio: chamado pelo pg_cron de hora em hora.
-// Algoritmo v2: goleiro separado + snake draft balanceado.
+// Algoritmo v3: goleiro configurável (separado/fixo, com fallback) + snake draft balanceado.
 // Validação Zod + dedup por baba+data + notifica jogadores via send-push.
+// Corrigido: select de babas usava colunas (players_per_team, draw_config) que não existiam
+// na tabela — provavelmente fazia essa função falhar em toda execução do cron.
 
 import { serve }        from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -76,20 +78,79 @@ function getDrawableGame(baba: Record<string, unknown>, now: Date, forceDate?: s
   return null;
 }
 
-// ─── Algoritmo de sorteio balanceado v2 ──────────────────────────────────────
+// ─── Algoritmo de sorteio balanceado v3 ──────────────────────────────────────
+// v3: goleiro configurável por baba (gk_mode: separate | fixed) com fallback
+// configurável (gk_fallback: incomplete | lineplayer) para quando faltam
+// goleiros pra cobrir todos os times. Corrige o bug da v2 onde
+// floor(goleiros/times) zerava e jogava TODOS os goleiros pro pool de linha
+// quando havia menos goleiros que times.
 
 interface Player { id: string; name: string; position?: string; final_rating?: number; [k: string]: unknown; }
 interface Team   { name: string; players: Player[]; }
+type GkMode     = "separate" | "fixed";
+type GkFallback = "incomplete" | "lineplayer";
 
-function drawTeamsV2(players: Player[], playersPerTeam: number, iterations = 8): { teams: Team[]; reserves: Player[]; balance_score: number } {
-  const totalTeams = Math.max(2, Math.floor(players.length / playersPerTeam));
-  const totalSlots = totalTeams * playersPerTeam;
+/** Distribui um pool (já ordenado por prioridade) em times respeitando a capacidade de cada um, em formato serpentina (cobra). */
+function snakeDistribute<T>(pool: T[], capacities: number[]): T[][] {
+  const teams: T[][] = capacities.map(() => []);
+  let dir = 1;
+  let poolIdx = 0;
+  while (poolIdx < pool.length) {
+    const order = dir === 1
+      ? capacities.map((_, i) => i)
+      : capacities.map((_, i) => i).reverse();
+    let placedAny = false;
+    for (const t of order) {
+      if (poolIdx >= pool.length) break;
+      if (teams[t].length < capacities[t]) {
+        teams[t].push(pool[poolIdx]);
+        poolIdx++;
+        placedAny = true;
+      }
+    }
+    if (!placedAny) break; // todos os times já bateram a capacidade
+    dir *= -1;
+  }
+  return teams;
+}
 
-  const gks      = players.filter(p => p.position === "goleiro");
-  const outfield = players.filter(p => p.position !== "goleiro");
-  const gkPerTeam = Math.min(Math.floor(gks.length / totalTeams), 1);
-  const gkPool    = [...gks].slice(0, gkPerTeam * totalTeams).sort((a, b) => (b.final_rating ?? 5) - (a.final_rating ?? 5));
-  const linePool  = [...outfield, ...gks.slice(gkPerTeam * totalTeams)].sort((a, b) => (b.final_rating ?? 5) - (a.final_rating ?? 5));
+function drawTeamsV3(
+  players: Player[], // já vem ordenado por ordem de confirmação (created_at asc)
+  playersPerTeam: number,
+  gkMode: GkMode,
+  gkFallback: GkFallback,
+  iterations = 8,
+): { teams: Team[]; reserves: Player[]; balance_score: number; teams_incomplete: boolean[] } {
+  const gksAll      = players.filter(p => p.position === "goleiro");
+  const outfieldAll = players.filter(p => p.position !== "goleiro");
+
+  const totalTeams = gkMode === "separate"
+    ? Math.max(2, Math.floor(outfieldAll.length / playersPerTeam))
+    : Math.max(2, Math.floor(players.length / playersPerTeam));
+
+  const teamsWithGk = Math.min(gksAll.length, totalTeams);
+
+  // Quantas vagas de LINHA cada time tem (varia conforme modo/fallback quando falta goleiro)
+  const lineCapacity: number[] = Array.from({ length: totalTeams }, (_, i) => {
+    if (gkMode === "separate") {
+      // Goleiro é sempre vaga à parte nesse modo — time tem playersPerTeam de linha
+      // sempre, tenha ou não um goleiro real. O fallback aqui só decide se um jogador
+      // de linha é marcado como goleiro improvisado pra aquela partida (ver match_players
+      // abaixo), não quantos jogadores o time tem.
+      return playersPerTeam;
+    }
+    // fixed: goleiro conta como 1 dos playersPerTeam
+    if (i < teamsWithGk) return playersPerTeam - 1;
+    return gkFallback === "lineplayer" ? playersPerTeam : playersPerTeam - 1;
+  });
+
+  // Times que ficam sem goleiro real (metadado — em modo fixo isso reduz o time quando
+  // fallback=incomplete; em modo separado é só informativo, o time continua com playersPerTeam)
+  const teamsIncomplete = Array.from({ length: totalTeams }, (_, i) => i >= teamsWithGk && gkFallback === "incomplete");
+
+  const gkPool     = [...gksAll].slice(0, teamsWithGk).sort((a, b) => (b.final_rating ?? 5) - (a.final_rating ?? 5));
+  const leftoverGk = gksAll.slice(teamsWithGk); // goleiros excedentes (mais goleiros do que times) -> disputam vaga de linha
+  const linePoolBase = [...outfieldAll, ...leftoverGk];
 
   const teamAvg = (t: Team) => t.players.length ? t.players.reduce((s, p) => s + (p.final_rating ?? 5), 0) / t.players.length : 0;
   const score   = (teams: Team[]) => {
@@ -106,24 +167,16 @@ function drawTeamsV2(players: Player[], playersPerTeam: number, iterations = 8):
       name: `Time ${String.fromCharCode(65 + i)}`, players: [],
     }));
 
-    // 1. Goleiros — snake
-    gkPool.forEach((gk, idx) => {
-      const round = Math.floor(idx / totalTeams);
-      const pos   = round % 2 === 0 ? idx % totalTeams : totalTeams - 1 - (idx % totalTeams);
-      teams[pos]?.players.push(gk);
-    });
+    // 1. Goleiros primeiro, só nos times que têm (capacidade 1 nesses, 0 nos demais)
+    const gkCapacity = Array.from({ length: totalTeams }, (_, i) => (i < teamsWithGk ? 1 : 0));
+    snakeDistribute(gkPool, gkCapacity).forEach((assigned, i) => teams[i].players.push(...assigned));
 
-    // 2. Linha — snake com leve aleatorização a partir iter 2
-    const pool = iter < 2
-      ? linePool
-      : [...linePool].sort((a, b) => ((b.final_rating ?? 5) + (Math.random() - 0.5) * 0.5) - ((a.final_rating ?? 5) + (Math.random() - 0.5) * 0.5));
+    // 2. Linha — snake por nota, com leve aleatorização a partir da 3ª iteração
+    const linePool = iter < 2
+      ? [...linePoolBase].sort((a, b) => (b.final_rating ?? 5) - (a.final_rating ?? 5))
+      : [...linePoolBase].sort((a, b) => ((b.final_rating ?? 5) + (Math.random() - 0.5) * 0.5) - ((a.final_rating ?? 5) + (Math.random() - 0.5) * 0.5));
 
-    const slotsLeft = totalSlots - teams.reduce((s, t) => s + t.players.length, 0);
-    pool.slice(0, slotsLeft).forEach((p, idx) => {
-      const round = Math.floor(idx / totalTeams);
-      const pos   = round % 2 === 0 ? idx % totalTeams : totalTeams - 1 - (idx % totalTeams);
-      teams[pos]?.players.push(p);
-    });
+    snakeDistribute(linePool, lineCapacity).forEach((assigned, i) => teams[i].players.push(...assigned));
 
     const s = score(teams);
     if (s < bestScore) { bestScore = s; bestTeams = teams.map(t => ({ ...t, players: [...t.players] })); }
@@ -132,7 +185,13 @@ function drawTeamsV2(players: Player[], playersPerTeam: number, iterations = 8):
 
   const usedIds  = new Set((bestTeams ?? []).flatMap(t => t.players.map(p => p.id)));
   const reserves = players.filter(p => !usedIds.has(p.id));
-  return { teams: bestTeams ?? [], reserves, balance_score: Math.round(bestScore * 100) / 100 };
+  return {
+    teams: bestTeams ?? [],
+    reserves,
+    balance_score: Math.round(bestScore * 100) / 100,
+    teams_incomplete: teamsIncomplete,
+    teams_with_gk: teamsWithGk, // times de índice < teamsWithGk têm goleiro real; os demais usam o fallback
+  };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -163,7 +222,7 @@ serve(async (req) => {
   // Buscar babas (filtrado se force_baba_id)
   let babasQuery = supabase
     .from("babas")
-    .select("id, name, game_days_config, game_days, game_time, max_players, players_per_team, draw_config");
+    .select("id, name, game_days_config, game_days, game_time, max_players, players_per_team, gk_mode, gk_fallback");
   if (force_baba_id) babasQuery = babasQuery.eq("id", force_baba_id);
 
   const { data: babas, error: bErr } = await babasQuery;
@@ -188,13 +247,18 @@ serve(async (req) => {
       continue;
     }
 
-    // Buscar jogadores confirmados
+    // Buscar jogadores confirmados — status=confirmed já exclui quem está na fila de
+    // espera (a RPC confirm_presence, chamada pelo PresenceBlock.jsx, decide status
+    // 'confirmed' vs 'waitlist' no momento da confirmação, respeitando max_players e
+    // a ordem de chegada). Ordena por created_at pra manter a ordem de confirmação em
+    // qualquer corte que sobre aqui (ex: total não é múltiplo exato de playersPerTeam).
     const { data: confs } = await supabase
       .from("game_confirmations")
-      .select("player_id, player:players(id, name, position, user_id, final_rating:player_rating_summary(final_rating))")
+      .select("player_id, created_at, player:players(id, name, position, user_id, final_rating:player_rating_summary(final_rating))")
       .eq("baba_id", baba.id)
       .eq("game_date", dateStr)
-      .eq("status", "confirmed");
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: true });
 
     const players: Player[] = (confs ?? [])
       .map((c: any) => ({
@@ -203,8 +267,10 @@ serve(async (req) => {
       }))
       .filter((p: any) => p.id);
 
-    const playersPerTeam = baba.draw_config?.playersPerTeam ?? baba.players_per_team ?? 5;
-    const minNeeded      = playersPerTeam * 2;
+    const playersPerTeam = baba.players_per_team ?? 5;
+    const gkMode: "separate" | "fixed"       = baba.gk_mode ?? "fixed";
+    const gkFallback: "incomplete" | "lineplayer" = baba.gk_fallback ?? "lineplayer";
+    const minNeeded = playersPerTeam * 2;
 
     if (players.length < minNeeded) {
       results.push({ baba: baba.name, status: "jogadores_insuficientes", count: players.length, needed: minNeeded });
@@ -217,7 +283,7 @@ serve(async (req) => {
     }
 
     // ── Sortear ─────────────────────────────────────────────────────────────
-    const { teams, reserves, balance_score } = drawTeamsV2(players, playersPerTeam);
+    const { teams, reserves, balance_score, teams_incomplete, teams_with_gk } = drawTeamsV3(players, playersPerTeam, gkMode, gkFallback);
 
     // ── Persistir draw_result ────────────────────────────────────────────────
     const { data: drawRes, error: dErr } = await supabase
@@ -227,8 +293,8 @@ serve(async (req) => {
         draw_date:     dateStr,
         teams,
         reserves,
-        draw_config:   { playersPerTeam, strategy: "reserve" },
-        algorithm:     "balanced_snake_v2",
+        draw_config:   { playersPerTeam, gkMode, gkFallback, teams_incomplete },
+        algorithm:     "balanced_snake_v3",
         balance_score,
         teams_snapshot: teams,
       })
@@ -271,14 +337,25 @@ serve(async (req) => {
     }
 
     // ── Criar match_players ─────────────────────────────────────────────────
-    const matchPlayers = teams.slice(0, 2).flatMap((t, ti) =>
-      t.players.map(p => ({
-        match_id:  match.id,
-        player_id: p.id,
-        team:      ti === 0 ? "A" : "B",
-        position:  p.position ?? "linha",
-      }))
-    );
+    const matchPlayers = teams.slice(0, 2).flatMap((t, ti) => {
+      const teamIdx        = ti; // índice real do time no array `teams` original
+      const noRealGk        = teamIdx >= teams_with_gk;
+      const needsMakeshift  = gkMode === "separate" && gkFallback === "lineplayer" && noRealGk
+        && !t.players.some(p => p.position === "goleiro");
+      let makeshiftAssigned = false;
+
+      return t.players.map(p => {
+        // último jogador de linha do time vira goleiro improvisado só pra essa partida
+        const isLast = needsMakeshift && !makeshiftAssigned && p === t.players[t.players.length - 1];
+        if (isLast) makeshiftAssigned = true;
+        return {
+          match_id:  match.id,
+          player_id: p.id,
+          team:      ti === 0 ? "A" : "B",
+          position:  isLast ? "goleiro" : (p.position ?? "linha"),
+        };
+      });
+    });
     await supabase.from("match_players").insert(matchPlayers);
 
     // ── Notificar jogadores ─────────────────────────────────────────────────
