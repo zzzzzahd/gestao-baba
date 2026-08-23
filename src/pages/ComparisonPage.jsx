@@ -47,6 +47,25 @@ const CompBar = ({ labelA, valA, labelB, valB, unit = '' }) => {
   );
 };
 
+// ── Seletor de jogador (nível de módulo — precisa ter referência estável entre
+// renders, senão o React remonta o <select> a cada render do componente pai e
+// o menu nativo fecha sozinho antes de dar tempo de escolher) ─────────────────
+const PlayerSelect = ({ value, onChange, exclude, players }) => (
+  <select
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-[11px] font-bold text-white appearance-none"
+    aria-label="Selecionar jogador"
+  >
+    <option value="">Escolher jogador…</option>
+    {(players ?? [])
+      .filter(p => p.id !== exclude)
+      .map(p => (
+        <option key={p.id} value={p.id}>{p.name}</option>
+      ))}
+  </select>
+);
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ComparisonPage() {
   const [searchParams]         = useSearchParams();
@@ -81,22 +100,6 @@ export default function ComparisonPage() {
     });
   }, [selA, selB, loadProfile]);
 
-  const PlayerSelect = ({ value, onChange, exclude }) => (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2 text-[11px] font-bold text-white appearance-none"
-      aria-label="Selecionar jogador"
-    >
-      <option value="">Escolher jogador…</option>
-      {(players ?? [])
-        .filter(p => p.id !== exclude)
-        .map(p => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-    </select>
-  );
-
   const canCompare = selA && selB && selA !== selB;
 
   return (
@@ -120,9 +123,9 @@ export default function ComparisonPage() {
 
       {/* Seletores */}
       <div className="flex items-center gap-2 mb-6">
-        <PlayerSelect value={selA} onChange={setSelA} exclude={selB} />
+        <PlayerSelect value={selA} onChange={setSelA} exclude={selB} players={players} />
         <span className="text-cyan-electric font-black text-sm">VS</span>
-        <PlayerSelect value={selB} onChange={setSelB} exclude={selA} />
+        <PlayerSelect value={selB} onChange={setSelB} exclude={selA} players={players} />
       </div>
 
       {!canCompare && (
