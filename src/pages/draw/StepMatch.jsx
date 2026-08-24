@@ -49,6 +49,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [allMatchPlayers,  setAllMatchPlayers]  = useState([]);
   const [dailyStandings,   setDailyStandings]   = useState([]);
   const [showStandings,    setShowStandings]    = useState(false);
+  const [tieChoice, setTieChoice] = useState(null);
   // Ref para garantir que a intro só rode uma vez por carregamento/partida
   const introShownRef = useRef(false);
   // Callback seguro para ocultar a intro
@@ -383,8 +384,26 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       const l = queue.splice(0, 1)[0]; queue.push(l);
       if (gkQueue.length) { const gl = gkQueue.splice(0, 1)[0]; gkQueue.push(gl); }
     } else {
-      const t1 = queue.shift(); const t2 = queue.shift(); queue.push(t1, t2);
-      if (gkQueue.length) { const g1 = gkQueue.shift(); const g2 = gkQueue.shift(); gkQueue.push(g1, g2); }
+      // EMPATE
+      //
+      // Os dois times que estavam jogando saem da frente.
+      // Os próximos times da fila permanecem exatamente onde estão.
+      //
+      // A ordem dos dois times que empataram será decidida
+      // pelo coordenador através do par ou ímpar.
+  
+      toast.error('EMPATE! Saem os dois times.');
+  
+      const rest = queue.slice(2);
+  
+      setTieChoice({
+        teamA,
+        teamB,
+        rest,
+        gkQueue
+      });
+  
+      return;
     }
     setGoalkeeperQueue(gkQueue);
 
@@ -446,6 +465,94 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       </p>
     </div>
   );
+  
+  const handleParImparChoice = useCallback(async (winnerTeam) => {
+    if (!tieChoice) return;
+  
+    const {
+      teamA,
+      teamB,
+      rest,
+      gkQueue
+    } = tieChoice;
+  
+    const loserTeam = winnerTeam === teamA ? teamB : teamA;
+  
+    // Os dois times que empataram vão para o final.
+    // O vencedor do par ou ímpar fica primeiro.
+    const queue = [
+      ...rest,
+      winnerTeam,
+      loserTeam
+    ];
+  
+    // Mesma lógica para os goleiros.
+    let nextGkQueue = [...gkQueue];
+  
+    if (nextGkQueue.length >= 2) {
+      const g1 = nextGkQueue.shift();
+      const g2 = nextGkQueue.shift();
+  
+      // O goleiro do time escolhido primeiro também fica
+      // primeiro entre os dois que retornam à fila.
+      if (winnerTeam === teamA) {
+        nextGkQueue.push(g1, g2);
+      } else {
+        nextGkQueue.push(g2, g1);
+      }
+    }
+  
+    setTieChoice(null);
+    setGoalkeeperQueue(nextGkQueue);
+  
+    // Atualiza o resultado da partida como empate.
+    if (matchId) {
+      await supabase.from('matches').update({
+        status: 'finished',
+        winner_team: null,
+        team_a_score: currentMatch.scoreA,
+        team_b_score: currentMatch.scoreB,
+        finished_at: new Date().toISOString(),
+      }).eq('id', matchId);
+  
+      loadDailyStandings();
+    }
+  
+    // Salva a nova ordem da fila.
+    if (currentBaba) {
+      const today = new Date().toISOString().split('T')[0];
+  
+      await supabase.from('draw_results')
+        .update({
+          teams: queue,
+          goalkeeper_queue: nextGkQueue
+        })
+        .eq('baba_id', currentBaba.id)
+        .eq('draw_date', today);
+    }
+  
+    toast.success(
+      `${winnerTeam.name} venceu no par ou ímpar e fica na frente!`
+    );
+  
+    // Mostra o pós-jogo
+    setFinishedMatch({
+      teamA,
+      teamB,
+      scoreA: currentMatch.scoreA,
+      scoreB: currentMatch.scoreB
+    });
+  
+    setPendingQueue(queue);
+    setShowPostGame(true);
+  
+  }, [
+    tieChoice,
+    matchId,
+    currentMatch,
+    loadDailyStandings,
+    currentBaba
+  ]);
 
   return (
     <>
