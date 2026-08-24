@@ -56,6 +56,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   // Trava com useRef para evitar loop infinito na Intro
   const introShownRef = useRef(false);
 
+  // Trava com useRef para evitar loop infinito na inicialização da partida
+  // (sem isso, setBenchedByTeam/loadOrCreateMatch/matchState formam um ciclo
+  // que refaz o efeito a cada render e re-dispara loadDailyStandings sem parar)
+  const didInitRef = useRef(false);
+
   // Fila de goleiro
   const [goalkeeperQueue,  setGoalkeeperQueue]  = useState(matchState?.goalkeeperQueue || []);
   const [gkOverride,       setGkOverride]       = useState(matchState?.gkOverride || { A: null, B: null });
@@ -162,8 +167,22 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     }
   }, [currentBaba, benchedByTeam, borrowedByTeam]);
 
+  // Carrega a classificação do dia apenas quando o baba muda (não a cada render).
+  // Sempre que uma partida termina, handleMatchEnd chama loadDailyStandings()
+  // diretamente — não é preciso (nem seguro) depender dela aqui.
   useEffect(() => {
     loadDailyStandings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBaba?.id]);
+
+  // Inicializa a partida (a partir do matchState salvo ou do drawResult) UMA ÚNICA VEZ
+  // por montagem do componente. O guard com didInitRef evita o loop infinito que
+  // existia antes: setBenchedByTeam criava um objeto novo a cada execução, o que
+  // recriava loadOrCreateMatch (useCallback depende de benchedByTeam), o que
+  // recriava as dependências deste efeito, fazendo-o rodar de novo indefinidamente.
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
 
     if (matchState?.allTeams && matchState?.currentMatch) {
       setAllTeams(matchState.allTeams);
@@ -188,7 +207,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setAllTeams(teams);
     setCurrentMatch(match);
     setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
-    
+
     const initialBench = {};
     teams.forEach(t => {
       const r = t.players.find(p => p.isReserve);
@@ -202,7 +221,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       introShownRef.current = true;
       setShowIntro(true);
     }
-  }, [drawResult, matchState, loadDailyStandings, loadOrCreateMatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawResult, matchState]);
 
   useEffect(() => {
     if (!currentMatch) return;
