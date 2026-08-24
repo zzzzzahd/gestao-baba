@@ -49,7 +49,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [allMatchPlayers,  setAllMatchPlayers]  = useState([]);
   const [dailyStandings,   setDailyStandings]   = useState([]);
   const [showStandings,    setShowStandings]    = useState(false);
-
+  // Ref para garantir que a intro só rode uma vez por carregamento/partida
+  const introShownRef = useRef(false);
   // Ponto 4 do fluxo real do baba: fila de goleiro própria da quadra (só quando
   // drawResult.goalkeeperQueue tem gente — ou seja, faltou goleiro pra 1 por time).
   // Índice 0 = goleiro ativo do lado "Time A" da quadra, índice 1 = "Time B";
@@ -449,7 +450,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         <MatchIntro
           teamA={currentMatch.teamA}
           teamB={currentMatch.teamB}
-          onDone={() => setShowIntro(false)}
+          onDone={handleIntroDone}
         />
       )}
 
