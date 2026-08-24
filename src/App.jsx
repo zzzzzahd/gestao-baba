@@ -29,6 +29,7 @@ const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
 const CreatePage           = lazy(() => import('./pages/CreatePage'));
 const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
 const DrawPage              = lazy(() => import('./pages/DrawPage'));
+const WatchPage              = lazy(() => import('./pages/WatchPage'));
 const PrivacyPage          = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage            = lazy(() => import('./pages/TermsPage'));
 const AboutPage            = lazy(() => import('./pages/AboutPage'));
@@ -175,7 +176,7 @@ const AppInner = () => {
           <Route path="/torneio/:id/partida/:matchId" element={<ProtectedRoute><PageWrapper><TournamentMatchPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/dpstore" element={<ProtectedRoute><PageWrapper><DpStorePage /></PageWrapper></ProtectedRoute>} />
           <Route path="/tournament" element={<Navigate to="/home" replace />} />
-          <Route path="/teams" element={<Navigate to="/draw" replace />} />
+          <Route path="/teams" element={<ProtectedRoute><PageWrapper><WatchPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/match" element={<Navigate to="/draw" replace />} />
         </Routes>
       </Suspense>

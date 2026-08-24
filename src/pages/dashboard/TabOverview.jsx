@@ -1,15 +1,16 @@
 // src/pages/dashboard/TabOverview.jsx
 // Sprint 13 — InvitesPanel + Sprint 7 — ActivityFeed visível
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Link2, RefreshCw, Activity } from 'lucide-react';
+import { Calendar, Link2, RefreshCw, Activity, Radio } from 'lucide-react';
 import PresenceBlock       from '../../components/PresenceBlock';
 import DrawConfigBlock     from '../../components/DrawConfigBlock';
 import WaitlistPanel       from '../../components/WaitlistPanel';
 import InvitesPanel        from '../../components/InvitesPanel';
 import ActivityFeed        from '../../components/ActivityFeed';
 import DailyRecapPanel     from '../../components/DailyRecapPanel';
+import { supabase }        from '../../services/supabase';
 
 const TabOverview = ({
   currentBaba,
@@ -29,10 +30,34 @@ const TabOverview = ({
   const navigate        = useNavigate();
   const [showInvites,  setShowInvites]  = useState(!nextGameDay);
   const [showActivity, setShowActivity] = useState(true);
+  const [activeSession, setActiveSession] = useState(false);
 
+  // Ponto 6: sinaliza quando já tem um baba em andamento hoje (sorteio ativo,
+  // ainda não encerrado) — isso é o que trava um novo sorteio simultâneo.
+  useEffect(() => {
+    if (!currentBaba?.id) return;
+    const today = new Date().toISOString().split('T')[0];
+    supabase.from('draw_results').select('status')
+      .eq('baba_id', currentBaba.id).eq('draw_date', today)
+      .limit(1).maybeSingle()
+      .then(({ data }) => setActiveSession(data?.status === 'active'));
+  }, [currentBaba?.id]);
 
   return (
     <div className="space-y-5">
+
+      {activeSession && (
+        <button
+          onClick={() => navigate(canManage ? '/draw' : '/teams')}
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 transition-colors"
+        >
+          <Radio size={16} className="text-red-400 animate-pulse shrink-0" />
+          <div className="flex-1 text-left">
+            <p className="text-[11px] font-black uppercase text-red-400">Partidas em andamento</p>
+            <p className="text-[9px] font-bold text-text-low">Toque pra acompanhar</p>
+          </div>
+        </button>
+      )}
 
       {/* Presença + Waitlist + Sorteio */}
       {nextGameDay ? (

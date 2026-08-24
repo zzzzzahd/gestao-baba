@@ -1,22 +1,16 @@
 // src/components/PostGameScreen.jsx
 // Sprint 3 — Tela pós-jogo: resumo do placar, MVP e CTA de compartilhamento.
 
-import React, { useState } from 'react';
-import { Trophy, Share2, Star, X, Crown } from 'lucide-react';
-import MVPScreen from './MVPScreen';
+import React from 'react';
+import { Trophy, Share2, X } from 'lucide-react';
 import { fmt, WIN_MESSAGES, DRAW_MESSAGES } from '../utils/messages';
 
 const PostGameScreen = ({
   match,        // { teamA, teamB, scoreA, scoreB }
-  players = [],
-  matchId,
-  babaId,
   babaName,
   standings = [],
   onClose,
 }) => {
-  const [showMVP, setShowMVP] = useState(false);
-
   if (!match) return null;
 
   const { teamA, teamB, scoreA = 0, scoreB = 0 } = match;
@@ -42,9 +36,8 @@ const PostGameScreen = ({
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-        <div className="w-full max-w-xs bg-[#0a0a0a] border border-border-mid rounded-[2.5rem] p-6 space-y-5 shadow-2xl animate-slide-up">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+      <div className="w-full max-w-xs bg-[#0a0a0a] border border-border-mid rounded-[2.5rem] p-6 space-y-5 shadow-2xl animate-slide-up">
 
           {/* Fechar */}
           <div className="flex justify-end">
@@ -98,12 +91,6 @@ const PostGameScreen = ({
           {/* Botões */}
           <div className="space-y-3">
             <button
-              onClick={() => setShowMVP(true)}
-              className="w-full py-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
-            >
-              <Crown size={15} /> Votar no MVP
-            </button>
-            <button
               onClick={handleShare}
               className="w-full py-4 rounded-2xl bg-surface-2 border border-border-mid text-text-low font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all hover:text-white"
             >
@@ -118,16 +105,6 @@ const PostGameScreen = ({
           </div>
         </div>
       </div>
-
-      {showMVP && (
-        <MVPScreen
-          matchId={matchId}
-          babaId={babaId}
-          players={players}
-          onClose={() => setShowMVP(false)}
-        />
-      )}
-    </>
   );
 };
 

@@ -4,10 +4,11 @@
 // Exibe os times balanceados + reservas + CTA para iniciar partida.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Users, Play, RefreshCw, ChevronLeft } from 'lucide-react';
 import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
 import { POSITION_LABEL } from '../../utils/constants';
 import PresenceCheckModal from '../../components/PresenceCheckModal';
 import TeamsShareButton from '../../components/TeamsShareButton';
@@ -24,10 +25,29 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
   const { currentBaba } = useBaba();
   const { profile }     = useAuth();
   const [showPresenceCheck, setShowPresenceCheck] = useState(false);
+  const [isCoordinator, setIsCoordinator] = useState(false);
+
+  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
+  const canManage    = isPresident || isCoordinator;
+
+  // Coordenador (role='admin' em user_roles) tem os mesmos poderes do presidente
+  // aqui — antes só o presidente literal via o botão de iniciar partida.
+  useEffect(() => {
+    if (!currentBaba?.id || !profile?.id || isPresident) return;
+    (async () => {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('baba_id', currentBaba.id)
+        .eq('user_id', profile.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsCoordinator(!!data);
+    })();
+  }, [currentBaba?.id, profile?.id, isPresident]);
 
   const teams    = drawResult?.teams    || [];
   const reserves = drawResult?.reserves || [];
-  const isPresident = String(currentBaba?.president_id) === String(profile?.id);
   const totalPlayers = teams.reduce((s, t) => s + (t.players?.length || 0), 0);
   const gameDate = new Date().toISOString().split('T')[0];
 
@@ -128,7 +148,7 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
       {/* Ações */}
       <div className="space-y-3 pt-2">
         <TeamsShareButton teams={teams} reserves={reserves} babaName={currentBaba?.name} />
-        {isPresident ? (
+        {canManage ? (
           <button
             onClick={() => setShowPresenceCheck(true)}
             className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all"

@@ -113,6 +113,7 @@ export default function BabaSettings() {
     auto_draw_enabled:      false,
     auto_draw_time:         '20:00',
     rating_enabled:         true,
+    mvp_scope:              'all',
     rating_open_hours:      24,
     allow_guests:           false,
     guest_limit:            2,
@@ -163,6 +164,7 @@ export default function BabaSettings() {
       auto_draw_enabled:      currentBaba.auto_draw_enabled      ?? false,
       auto_draw_time:         currentBaba.auto_draw_time         ?? '20:00',
       rating_enabled:         currentBaba.rating_enabled         ?? true,
+      mvp_scope:              currentBaba.mvp_scope              ?? 'all',
       rating_open_hours:      currentBaba.rating_open_hours      ?? 24,
       allow_guests:           currentBaba.allow_guests           ?? false,
       guest_limit:            currentBaba.guest_limit            ?? 2,
@@ -226,6 +228,7 @@ export default function BabaSettings() {
         ...(canEditAll ? {
           rating_enabled:    form.rating_enabled,
           rating_open_hours: Number(form.rating_open_hours) || 24,
+          mvp_scope:         form.mvp_scope,
           theme_color:       form.theme_color,
           players_per_team:  Number(form.players_per_team) || 5,
           gk_mode:           form.gk_mode,
@@ -592,6 +595,31 @@ export default function BabaSettings() {
               onChange={set('rating_open_hours')}
             />
           )}
+
+          <div>
+            <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+              Quem pode ser MVP do dia
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                { id: 'all',          label: 'Todos que jogaram',        sub: 'Qualquer jogador do dia entra na votação' },
+                { id: 'winning_team', label: 'Só o time que mais ganhou', sub: 'Só os jogadores do time com mais pontos no dia' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => set('mvp_scope')(opt.id)}
+                  className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                    form.mvp_scope === opt.id
+                      ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
+                      : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
+                  }`}
+                >
+                  <p className="text-[10px] font-black uppercase">{opt.label}</p>
+                  <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </Section>
       )}
 

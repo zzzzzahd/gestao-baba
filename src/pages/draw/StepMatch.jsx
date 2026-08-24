@@ -7,6 +7,7 @@ import { useBaba }           from '../../contexts/BabaContext';
 import { useAuth }           from '../../contexts/AuthContext';
 import { supabase }          from '../../services/supabase';
 import WinnerPhotoModal      from '../../components/WinnerPhotoModal';
+import DailyMVPScreen        from '../../components/DailyMVPScreen';
 import MatchShareButton      from '../../components/MatchShareButton';
 import MatchIntro            from '../../components/MatchIntro';
 import PostGameScreen        from '../../components/PostGameScreen';
@@ -41,8 +42,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [selectedCardPlayer, setSelectedCardPlayer] = useState('');
   const [selectedCardType,   setSelectedCardType]   = useState('yellow');
   const [savingCard,       setSavingCard]       = useState(false);
-  const [showWinnerPhoto,  setShowWinnerPhoto]  = useState(false);
-  const [winnerInfo,       setWinnerInfo]       = useState({ name: '', matchId: null });
   const [pendingQueue,     setPendingQueue]     = useState([]);
   const [showIntro,        setShowIntro]        = useState(false);
   const [showPostGame,     setShowPostGame]     = useState(false);
@@ -61,6 +60,28 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [gkOverride,       setGkOverride]       = useState(matchState?.gkOverride || { A: null, B: null });
   const [showGkSubModal,   setShowGkSubModal]   = useState(false);
   const [gkSubSlot,        setGkSubSlot]        = useState(null);
+<<<<<<< Updated upstream
+=======
+  const [showFinishDay,    setShowFinishDay]    = useState(false);
+  const [finishingDay,     setFinishingDay]     = useState(false);
+  // Sequência do fim de baba: 'confirm' -> 'photo' (time que mais pontuou) -> 'mvp' -> encerra de vez
+  const [finishPhase,      setFinishPhase]      = useState(null);
+
+  // Ponto 1a: reserva PRÓPRIA do time (isReserve) pode trocar de lugar com
+  // qualquer titular do mesmo time, a qualquer momento, até o fim do baba.
+  // { [teamName]: playerId } — quem do time de 6 está NO BANCO agora (default:
+  // o marcado isReserve no sorteio).
+  const [benchedByTeam,    setBenchedByTeam]    = useState(matchState?.benchedByTeam || {});
+  const [showBenchModal,   setShowBenchModal]   = useState(false);
+  const [benchModalTeam,   setBenchModalTeam]   = useState(null);
+
+  // Ponto 1b: time incompleto (estratégia 'substitute') pode puxar gente de
+  // qualquer outro time do sorteio — menos do adversário da vez — pra completar
+  // as vagas que faltam. { [teamName]: [player, ...] }
+  const [borrowedByTeam,   setBorrowedByTeam]   = useState(matchState?.borrowedByTeam || {});
+  const [showBorrowModal,  setShowBorrowModal]  = useState(false);
+  const [borrowModalTeam,  setBorrowModalTeam]  = useState(null);
+>>>>>>> Stashed changes
 
   // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
@@ -76,6 +97,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       setMatchId(matchState.matchId);
       setGoalkeeperQueue(matchState.goalkeeperQueue || []);
       setGkOverride(matchState.gkOverride || { A: null, B: null });
+<<<<<<< Updated upstream
+=======
+      setBenchedByTeam(matchState.benchedByTeam || {});
+      setBorrowedByTeam(matchState.borrowedByTeam || {});
+>>>>>>> Stashed changes
       setLoading(false);
       return;
     }
@@ -85,7 +111,18 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setAllTeams(teams);
     setCurrentMatch(match);
     setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
+<<<<<<< Updated upstream
     loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || []);
+=======
+    // Banco inicial: quem foi marcado isReserve no sorteio começa no banco.
+    const initialBench = {};
+    teams.forEach(t => {
+      const r = t.players.find(p => p.isReserve);
+      if (r) initialBench[t.name] = r.id;
+    });
+    setBenchedByTeam(initialBench);
+    loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || [], { A: null, B: null }, initialBench, {});
+>>>>>>> Stashed changes
     setLoading(false);
     setShowIntro(true);
   }, []);
@@ -93,8 +130,23 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   // Persistir estado no wizard
   useEffect(() => {
     if (!currentMatch) return;
+<<<<<<< Updated upstream
     setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride });
   }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride]);
+=======
+    setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam });
+  }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam]);
+
+  // Time de linha ativo (titulares) de um time: todos menos quem está no banco,
+  // mais qualquer jogador emprestado (ponto 1b, time incompleto).
+  const getActiveLineup = useCallback((team) => {
+    if (!team) return [];
+    const benchedId = benchedByTeam[team.name];
+    const base = benchedId ? team.players.filter(p => p.id !== benchedId) : team.players;
+    const borrowed = borrowedByTeam[team.name] || [];
+    return [...base, ...borrowed];
+  }, [benchedByTeam, borrowedByTeam]);
+>>>>>>> Stashed changes
 
   // Timer
   useEffect(() => {
@@ -135,7 +187,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
   useEffect(() => { loadDailyStandings(); }, [loadDailyStandings]);
 
+<<<<<<< Updated upstream
   const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }) => {
+=======
+  const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }, benchMap = benchedByTeam, borrowMap = borrowedByTeam) => {
+>>>>>>> Stashed changes
     if (!currentBaba) return;
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -168,9 +224,21 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       const gkA = gkOv?.A || gkQueue[0] || null;
       const gkB = gkOv?.B || gkQueue[1] || null;
 
+<<<<<<< Updated upstream
       const mps = [
         ...teamA.players.map(p => ({ match_id: mid, player_id: p.id, team: 'A', position: p.position || 'linha', goals: 0, assists: 0 })),
         ...teamB.players.map(p => ({ match_id: mid, player_id: p.id, team: 'B', position: p.position || 'linha', goals: 0, assists: 0 })),
+=======
+      // Titulares (banco + empréstimo já aplicados — ver getActiveLineup)
+      const benchedA = benchMap[teamA.name];
+      const benchedB = benchMap[teamB.name];
+      const activeA  = [...(benchedA ? teamA.players.filter(p => p.id !== benchedA) : teamA.players), ...(borrowMap[teamA.name] || [])];
+      const activeB  = [...(benchedB ? teamB.players.filter(p => p.id !== benchedB) : teamB.players), ...(borrowMap[teamB.name] || [])];
+
+      const mps = [
+        ...activeA.map(p => ({ match_id: mid, player_id: p.id, team: 'A', position: p.position || 'linha', goals: 0, assists: 0 })),
+        ...activeB.map(p => ({ match_id: mid, player_id: p.id, team: 'B', position: p.position || 'linha', goals: 0, assists: 0 })),
+>>>>>>> Stashed changes
         ...(gkA ? [{ match_id: mid, player_id: gkA.id, team: 'A', position: 'goleiro', goals: 0, assists: 0 }] : []),
         ...(gkB ? [{ match_id: mid, player_id: gkB.id, team: 'B', position: 'goleiro', goals: 0, assists: 0 }] : []),
       ];
@@ -180,12 +248,85 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       if (newPs.length > 0) await supabase.from('match_players').insert(newPs);
 
       // Buscar jogadores para reações
+<<<<<<< Updated upstream
       const allP = [...(teamA.players || []), ...(teamB.players || []), ...(gkA ? [gkA] : []), ...(gkB ? [gkB] : [])];
+=======
+      const allP = [...activeA, ...activeB, ...(gkA ? [gkA] : []), ...(gkB ? [gkB] : [])];
+>>>>>>> Stashed changes
       setAllMatchPlayers(allP);
     } catch (err) {
       console.error('[StepMatch] loadOrCreateMatch:', err);
     }
-  }, [currentBaba]);
+  }, [currentBaba, benchedByTeam, borrowedByTeam]);
+
+  const winningTeamOfDay = dailyStandings[0]
+    ? allTeams.find(t => t.name === dailyStandings[0].name)
+    : null;
+
+  const handleConfirmFinishDay = () => {
+    setShowFinishDay(false);
+    // Time que mais pontuou no dia merece o registro — só ele, não mais toda partida.
+    setFinishPhase(winningTeamOfDay ? 'photo' : 'mvp');
+  };
+
+  const handleReallyFinish = async () => {
+    if (!currentBaba) return;
+    setFinishingDay(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase.rpc('finish_baba_day', {
+        p_baba_id: currentBaba.id,
+        p_draw_date: today,
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      toast.success('Baba do dia encerrado!');
+      onReset();
+    } catch (err) {
+      console.error('[StepMatch] finishDay:', err);
+      toast.error('Erro ao encerrar o baba');
+      setFinishPhase(null);
+    } finally {
+      setFinishingDay(false);
+    }
+  };
+
+  const openGkSubModal = (slot) => { setGkSubSlot(slot); setShowGkSubModal(true); };
+
+  const handleGkSub = (player) => {
+    const next = { ...gkOverride, [gkSubSlot]: player };
+    setGkOverride(next);
+    setShowGkSubModal(false);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
+    toast.success(`${player.name} no gol até o titular voltar`);
+  };
+
+  const handleGkReturn = (slot) => {
+    const next = { ...gkOverride, [slot]: null };
+    setGkOverride(next);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
+    toast.success('Titular de volta ao gol');
+  };
+
+  const openBenchModal = (team) => { setBenchModalTeam(team); setShowBenchModal(true); };
+
+  const handleBenchSwap = (playerId) => {
+    const next = { ...benchedByTeam, [benchModalTeam.name]: playerId };
+    setBenchedByTeam(next);
+    setShowBenchModal(false);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, gkOverride, next, borrowedByTeam);
+    const swapped = benchModalTeam.players.find(p => p.id === playerId);
+    toast.success(`${swapped?.name} entrou no lugar do titular`);
+  };
+
+  const openBorrowModal = (team) => { setBorrowModalTeam(team); setShowBorrowModal(true); };
+
+  const handleBorrow = (player) => {
+    const next = { ...borrowedByTeam, [borrowModalTeam.name]: [...(borrowedByTeam[borrowModalTeam.name] || []), player] };
+    setBorrowedByTeam(next);
+    setShowBorrowModal(false);
+    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, gkOverride, benchedByTeam, next);
+    toast.success(`${player.name} completando o time por essa partida`);
+  };
 
   const openGkSubModal = (slot) => { setGkSubSlot(slot); setShowGkSubModal(true); };
 
@@ -299,24 +440,33 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       loadDailyStandings();
     }
 
+    // Ponto 7: grava a fila atualizada no banco pra quem está só acompanhando
+    // (não controlando a partida) ver a ordem real, não só quem tem o celular na mão.
+    if (currentBaba) {
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('draw_results')
+        .update({ teams: queue, goalkeeper_queue: gkQueue })
+        .eq('baba_id', currentBaba.id).eq('draw_date', today);
+    }
+
     // Mostrar tela pós-jogo
     setFinishedMatch({ teamA, teamB, scoreA, scoreB });
     setPendingQueue(queue);
     setShowPostGame(true);
+<<<<<<< Updated upstream
 
     if (winnerName && matchId) {
       setWinnerInfo({ name: winnerName, matchId });
     }
   }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings]);
+=======
+  }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings, currentBaba]);
+>>>>>>> Stashed changes
 
   const continueAfterMatch = useCallback(async (queue) => {
     setShowPostGame(false);
-    if (winnerInfo.name && matchId) {
-      setShowWinnerPhoto(true);
-      return;
-    }
     proceedToNextMatch(queue);
-  }, [winnerInfo, matchId]);
+  }, []);
 
   const proceedToNextMatch = useCallback(async (queue) => {
     if (queue.length < 2) { toast.success('Fim das partidas!'); onReset(); return; }
@@ -327,9 +477,21 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setCurrentMatch(match);
     setMatchId(null);
     setFinishedMatch(null);
+<<<<<<< Updated upstream
     await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride);
     setShowIntro(true);
   }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, onReset]);
+=======
+    // Empréstimo é decidido na hora — some ao trocar de partida (o banco do
+    // time, esse sim, continua valendo até o fim do baba).
+    const nextBorrowed = { ...borrowedByTeam };
+    delete nextBorrowed[queue[0].name];
+    delete nextBorrowed[queue[1].name];
+    setBorrowedByTeam(nextBorrowed);
+    await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride, benchedByTeam, nextBorrowed);
+    setShowIntro(true);
+  }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam, onReset]);
+>>>>>>> Stashed changes
 
   if (loading || !currentMatch) return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -355,9 +517,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       {showPostGame && finishedMatch && (
         <PostGameScreen
           match={finishedMatch}
-          players={allMatchPlayers}
-          matchId={matchId}
-          babaId={currentBaba?.id}
           babaName={currentBaba?.name}
           standings={dailyStandings}
           onClose={() => continueAfterMatch(pendingQueue)}
@@ -435,6 +594,13 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           >
             Finalizar Partida
           </button>
+
+          <button
+            onClick={() => setShowFinishDay(true)}
+            className="w-full py-2.5 text-[9px] font-black uppercase tracking-widest text-red-400/70 hover:text-red-400 transition-colors"
+          >
+            Encerrar o baba de hoje
+          </button>
         </div>
 
         {/* Goleiros da quadra — só aparece quando o baba usa fila de goleiro (falta goleiro pra 1 por time) */}
@@ -463,6 +629,63 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           </div>
         )}
 
+<<<<<<< Updated upstream
+=======
+        {/* Banco do time — reserva próprio (estratégia 'reserva') pode trocar com
+            qualquer titular do mesmo time, valendo até o fim do baba */}
+        {[currentMatch.teamA, currentMatch.teamB].some(t => t.players.some(p => p.isReserve)) && (
+          <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-2">
+            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Banco do time</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[currentMatch.teamA, currentMatch.teamB].map((team, i) => {
+                if (!team.players.some(p => p.isReserve)) return <div key={i} />;
+                const benchedId = benchedByTeam[team.name];
+                const benched   = team.players.find(p => p.id === benchedId) || team.players.find(p => p.isReserve);
+                return (
+                  <div key={team.name} className="p-2.5 rounded-xl bg-surface-2 border border-border-subtle">
+                    <p className="text-[8px] font-black text-text-muted uppercase">{team.name}</p>
+                    <p className="text-[10px] font-bold text-text-low truncate">No banco: {benched?.name || '—'}</p>
+                    <button
+                      onClick={() => openBenchModal(team)}
+                      className="mt-1.5 w-full py-1 rounded-lg bg-surface-3 text-[8px] font-black uppercase text-text-low hover:text-white transition-colors"
+                    >
+                      Trocar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Completar time — time incompleto (estratégia 'incompleto') pode puxar
+            alguém de qualquer outro time do sorteio, menos do adversário da vez */}
+        {(() => {
+          const expectedSize = Math.max(...allTeams.map(t => t.players.length), 0);
+          const incompleteTeams = [currentMatch.teamA, currentMatch.teamB]
+            .filter(t => getActiveLineup(t).length < expectedSize);
+          if (incompleteTeams.length === 0) return null;
+          return (
+            <div className="p-4 rounded-2xl bg-surface-1 border border-border-subtle space-y-2">
+              <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Time incompleto</p>
+              {incompleteTeams.map(team => (
+                <div key={team.name} className="p-2.5 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold text-text-low">
+                    {team.name} — {getActiveLineup(team).length}/{expectedSize} jogadores
+                  </p>
+                  <button
+                    onClick={() => openBorrowModal(team)}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-electric text-black text-[8px] font-black uppercase shrink-0"
+                  >
+                    Completar
+                  </button>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+>>>>>>> Stashed changes
         {/* Classificação do dia */}
         {dailyStandings.length > 0 && (
           <div className="rounded-2xl bg-surface-1 border border-border-subtle overflow-hidden">
@@ -705,6 +928,104 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </div>
       )}
 
+<<<<<<< Updated upstream
+=======
+      {showFinishDay && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-lg font-black uppercase text-red-400">Encerrar o baba de hoje?</h3>
+            <p className="text-[11px] font-bold text-text-low leading-relaxed">
+              Isso finaliza as partidas de hoje pra valer — ninguém mais vai poder marcar placar ou continuar a fila. Um novo sorteio só fica liberado depois disso.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowFinishDay(false)}
+                className="flex-1 py-3 rounded-xl bg-surface-2 border border-border-mid font-black text-[10px] uppercase text-text-low"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmFinishDay}
+                disabled={finishingDay}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-black text-[10px] uppercase disabled:opacity-50"
+              >
+                {finishingDay ? 'Encerrando...' : 'Encerrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBenchModal && benchModalTeam && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black uppercase">Quem fica no banco?</h3>
+              <button onClick={() => setShowBenchModal(false)} className="text-text-low hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+            <p className="text-[10px] font-bold text-text-low leading-relaxed">
+              Escolha quem senta — os outros 5 de {benchModalTeam.name} entram em quadra.
+            </p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {benchModalTeam.players.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleBenchSwap(p.id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors text-[11px] font-bold ${
+                    benchedByTeam[benchModalTeam.name] === p.id
+                      ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400'
+                      : 'bg-surface-2 border-border-subtle hover:border-cyan-electric/40 text-white'
+                  }`}
+                >
+                  {p.name} {p.isReserve && '(reserva original)'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBorrowModal && borrowModalTeam && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black uppercase">Puxar quem?</h3>
+              <button onClick={() => setShowBorrowModal(false)} className="text-text-low hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+            <p className="text-[10px] font-bold text-text-low leading-relaxed">
+              Vale gente de qualquer outro time do sorteio, menos do adversário de agora. Só vale pra essa partida.
+            </p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {(() => {
+                const opponent = borrowModalTeam.name === currentMatch.teamA.name ? currentMatch.teamB : currentMatch.teamA;
+                const alreadyBorrowed = new Set((borrowedByTeam[borrowModalTeam.name] || []).map(p => p.id));
+                const eligible = allTeams
+                  .filter(t => t.name !== borrowModalTeam.name && t.name !== opponent.name)
+                  .flatMap(t => getActiveLineup(t))
+                  .filter(p => !alreadyBorrowed.has(p.id));
+                if (eligible.length === 0) {
+                  return <p className="text-[10px] font-bold text-text-muted text-center py-4">Não tem ninguém disponível pra puxar agora.</p>;
+                }
+                return eligible.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleBorrow(p)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl bg-surface-2 border border-border-subtle hover:border-cyan-electric/40 transition-colors text-[11px] font-bold text-white"
+                  >
+                    {p.name}
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+>>>>>>> Stashed changes
       {showGkSubModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
@@ -735,6 +1056,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </div>
       )}
 
+<<<<<<< Updated upstream
       <WinnerPhotoModal
         isOpen={showWinnerPhoto}
         onClose={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
@@ -743,6 +1065,33 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         winnerName={winnerInfo.name}
         onSaved={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
       />
+=======
+      {finishPhase === 'photo' && winningTeamOfDay && (
+        <WinnerPhotoModal
+          isOpen={true}
+          onClose={() => setFinishPhase('mvp')}
+          matchId={matchId}
+          babaId={currentBaba?.id}
+          winnerName={winningTeamOfDay.name}
+          onSaved={() => setFinishPhase('mvp')}
+        />
+      )}
+
+      {finishPhase === 'mvp' && (
+        <DailyMVPScreen
+          babaId={currentBaba?.id}
+          drawDate={new Date().toISOString().split('T')[0]}
+          candidates={
+            currentBaba?.mvp_scope === 'winning_team' && winningTeamOfDay
+              ? winningTeamOfDay.players
+              : allTeams.flatMap(t => t.players)
+          }
+          myPlayerId={allMatchPlayers.find(p => p.user_id === user?.id)?.id}
+          onClose={handleReallyFinish}
+          onSkip={handleReallyFinish}
+        />
+      )}
+>>>>>>> Stashed changes
     </>
   );
 };
