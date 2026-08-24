@@ -827,6 +827,48 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </button>
       </div>
 
+      {/* Modal de empate (par ou impar)*/}
+      {tieChoice && (
+  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-5">
+
+      <div className="text-center space-y-2">
+        <Trophy
+          className="mx-auto text-yellow-500"
+          size={32}
+        />
+
+        <h3 className="text-xl font-black uppercase text-white">
+          Empate!
+        </h3>
+
+        <p className="text-[10px] font-bold text-text-low uppercase tracking-wide">
+          Quem venceu no par ou ímpar?
+        </p>
+      </div>
+
+      <div className="space-y-3">
+
+        <button
+          onClick={() => handleParImparChoice(tieChoice.teamA)}
+          className="w-full py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
+        >
+          {tieChoice.teamA.name}
+        </button>
+
+        <button
+          onClick={() => handleParImparChoice(tieChoice.teamB)}
+          className="w-full py-4 rounded-2xl bg-yellow-500 text-black font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
+        >
+          {tieChoice.teamB.name}
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
+
       {/* Modal de gol */}
       {showGoalModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
