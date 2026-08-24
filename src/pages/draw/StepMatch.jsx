@@ -33,6 +33,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [timer,            setTimer]            = useState(matchState?.timer ?? 600);
   const [isActive,         setIsActive]         = useState(false);
   const [matchId,          setMatchId]          = useState(matchState?.matchId || null);
+  
+  // Modais de Gol e Cartão
   const [showGoalModal,    setShowGoalModal]    = useState(false);
   const [goalTeam,         setGoalTeam]         = useState(null);
   const [selectedScorer,   setSelectedScorer]   = useState('');
@@ -42,6 +44,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [selectedCardPlayer, setSelectedCardPlayer] = useState('');
   const [selectedCardType,   setSelectedCardType]   = useState('yellow');
   const [savingCard,       setSavingCard]       = useState(false);
+
   const [pendingQueue,     setPendingQueue]     = useState([]);
   const [showIntro,        setShowIntro]        = useState(false);
   const [showPostGame,     setShowPostGame]     = useState(false);
@@ -50,10 +53,10 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [dailyStandings,   setDailyStandings]   = useState([]);
   const [showStandings,    setShowStandings]    = useState(false);
 
-  // Ref para garantir que a intro só rode uma vez por carregamento/partida
+  // Trava com useRef para evitar loop infinito na Intro
   const introShownRef = useRef(false);
 
-  // Ponto 4 do fluxo real do baba: fila de goleiro própria da quadra
+  // Fila de goleiro
   const [goalkeeperQueue,  setGoalkeeperQueue]  = useState(matchState?.goalkeeperQueue || []);
   const [gkOverride,       setGkOverride]       = useState(matchState?.gkOverride || { A: null, B: null });
   const [showGkSubModal,   setShowGkSubModal]   = useState(false);
@@ -62,96 +65,31 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [finishingDay,     setFinishingDay]     = useState(false);
   const [finishPhase,      setFinishPhase]      = useState(null);
 
-  // Ponto 1a: reserva PRÓPRIA do time
+  // Reserva do time
   const [benchedByTeam,    setBenchedByTeam]    = useState(matchState?.benchedByTeam || {});
   const [showBenchModal,   setShowBenchModal]   = useState(false);
   const [benchModalTeam,   setBenchModalTeam]   = useState(null);
 
-  // Ponto 1b: time incompleto
+  // Time incompleto
   const [borrowedByTeam,   setBorrowedByTeam]   = useState(matchState?.borrowedByTeam || {});
   const [showBorrowModal,  setShowBorrowModal]  = useState(false);
   const [borrowModalTeam,  setBorrowModalTeam]  = useState(null);
 
-  // Callback seguro para ocultar a intro
   const handleIntroDone = useCallback(() => {
     setShowIntro(false);
   }, []);
 
-  // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
     setCurrentMatch(prev => prev ? { ...prev, scoreA, scoreB } : prev);
   }, { enabled: !!matchId });
 
-  // Carregar ao montar
-  useEffect(() => {
-    if (matchState?.allTeams) {
-      setAllTeams(matchState.allTeams);
-      setCurrentMatch(matchState.currentMatch);
-      setTimer(matchState.timer ?? 600);
-      setMatchId(matchState.matchId);
-      setGoalkeeperQueue(matchState.goalkeeperQueue || []);
-      setGkOverride(matchState.gkOverride || { A: null, B: null });
-      setBenchedByTeam(matchState.benchedByTeam || {});
-      setBorrowedByTeam(matchState.borrowedByTeam || {});
-      setLoading(false);
-      return;
-    }
-    if (!drawResult?.teams?.length) return;
-    const teams = drawResult.teams;
-    const match = { teamA: teams[0], teamB: teams[1], scoreA: 0, scoreB: 0 };
-    setAllTeams(teams);
-    setCurrentMatch(match);
-    setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
-    
-    const initialBench = {};
-    teams.forEach(t => {
-      const r = t.players.find(p => p.isReserve);
-      if (r) initialBench[t.name] = r.id;
-    });
-    setBenchedByTeam(initialBench);
-    loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || [], { A: null, B: null }, initialBench, {});
-    setLoading(false);
-
-    // Só dispara a intro se ainda não foi exibida
-    if (!introShownRef.current) {
-      introShownRef.current = true;
-      setShowIntro(true);
-    }
-  }, []);
-
-  // Persistir estado no wizard
-  useEffect(() => {
-    if (!currentMatch) return;
-    setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam });
-  }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam]);
-
   const getActiveLineup = useCallback((team) => {
-    if (!team) return [];
+    if (!team || !team.players) return [];
     const benchedId = benchedByTeam[team.name];
     const base = benchedId ? team.players.filter(p => p.id !== benchedId) : team.players;
     const borrowed = borrowedByTeam[team.name] || [];
     return [...base, ...borrowed];
   }, [benchedByTeam, borrowedByTeam]);
-
-  // Timer
-  useEffect(() => {
-    let iv = null;
-    if (isActive && timer > 0) {
-      iv = setInterval(() => setTimer(p => p - 1), 1000);
-    } else if (timer === 0 && isActive) {
-      setIsActive(false);
-      handleMatchEnd();
-    }
-    return () => clearInterval(iv);
-  }, [isActive, timer]);
-
-  // Auto-fim por placar (2 gols)
-  useEffect(() => {
-    if (currentMatch && (currentMatch.scoreA >= 2 || currentMatch.scoreB >= 2)) {
-      setIsActive(false);
-      handleMatchEnd();
-    }
-  }, [currentMatch?.scoreA, currentMatch?.scoreB]);
 
   const loadDailyStandings = useCallback(async () => {
     if (!currentBaba) return;
@@ -169,8 +107,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       console.error('[StepMatch] loadDailyStandings:', err);
     }
   }, [currentBaba]);
-
-  useEffect(() => { loadDailyStandings(); }, [loadDailyStandings]);
 
   const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }, benchMap = benchedByTeam, borrowMap = borrowedByTeam) => {
     if (!currentBaba) return;
@@ -225,6 +161,71 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       console.error('[StepMatch] loadOrCreateMatch:', err);
     }
   }, [currentBaba, benchedByTeam, borrowedByTeam]);
+
+  useEffect(() => {
+    loadDailyStandings();
+
+    if (matchState?.allTeams && matchState?.currentMatch) {
+      setAllTeams(matchState.allTeams);
+      setCurrentMatch(matchState.currentMatch);
+      setTimer(matchState.timer ?? 600);
+      setMatchId(matchState.matchId);
+      setGoalkeeperQueue(matchState.goalkeeperQueue || []);
+      setGkOverride(matchState.gkOverride || { A: null, B: null });
+      setBenchedByTeam(matchState.benchedByTeam || {});
+      setBorrowedByTeam(matchState.borrowedByTeam || {});
+      setLoading(false);
+      return;
+    }
+
+    if (!drawResult?.teams?.length) {
+      setLoading(false);
+      return;
+    }
+
+    const teams = drawResult.teams;
+    const match = { teamA: teams[0], teamB: teams[1], scoreA: 0, scoreB: 0 };
+    setAllTeams(teams);
+    setCurrentMatch(match);
+    setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
+    
+    const initialBench = {};
+    teams.forEach(t => {
+      const r = t.players.find(p => p.isReserve);
+      if (r) initialBench[t.name] = r.id;
+    });
+    setBenchedByTeam(initialBench);
+    loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || [], { A: null, B: null }, initialBench, {});
+    setLoading(false);
+
+    if (!introShownRef.current) {
+      introShownRef.current = true;
+      setShowIntro(true);
+    }
+  }, [drawResult, matchState, loadDailyStandings, loadOrCreateMatch]);
+
+  useEffect(() => {
+    if (!currentMatch) return;
+    setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam });
+  }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam, setMatchState]);
+
+  useEffect(() => {
+    let iv = null;
+    if (isActive && timer > 0) {
+      iv = setInterval(() => setTimer(p => p - 1), 1000);
+    } else if (timer === 0 && isActive) {
+      setIsActive(false);
+      handleMatchEnd();
+    }
+    return () => clearInterval(iv);
+  }, [isActive, timer]);
+
+  useEffect(() => {
+    if (currentMatch && (currentMatch.scoreA >= 2 || currentMatch.scoreB >= 2)) {
+      setIsActive(false);
+      handleMatchEnd();
+    }
+  }, [currentMatch?.scoreA, currentMatch?.scoreB]);
 
   const winningTeamOfDay = dailyStandings[0]
     ? allTeams.find(t => t.name === dailyStandings[0].name)
@@ -399,11 +400,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setShowPostGame(true);
   }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings, currentBaba]);
 
-  const continueAfterMatch = useCallback(async (queue) => {
-    setShowPostGame(false);
-    proceedToNextMatch(queue);
-  }, []);
-
   const proceedToNextMatch = useCallback(async (queue) => {
     if (queue.length < 2) { toast.success('Fim das partidas!'); onReset(); return; }
     setAllTeams(queue);
@@ -420,10 +416,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setBorrowedByTeam(nextBorrowed);
     await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride, benchedByTeam, nextBorrowed);
 
-    // Permite exibir a intro para a próxima partida
     introShownRef.current = false;
     setShowIntro(true);
   }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam, onReset]);
+
+  const continueAfterMatch = useCallback(async (queue) => {
+    setShowPostGame(false);
+    proceedToNextMatch(queue);
+  }, [proceedToNextMatch]);
 
   if (loading || !currentMatch) return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -436,7 +436,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
   return (
     <>
-      {/* Intro dos times */}
       {showIntro && (
         <MatchIntro
           teamA={currentMatch.teamA}
@@ -445,7 +444,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         />
       )}
 
-      {/* Tela pós-jogo */}
       {showPostGame && finishedMatch && (
         <PostGameScreen
           match={finishedMatch}
@@ -453,6 +451,212 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           standings={dailyStandings}
           onClose={() => continueAfterMatch(pendingQueue)}
         />
+      )}
+
+      {/* Modal de Gol */}
+      {showGoalModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black uppercase text-cyan-electric">Registrar Gol</h3>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-text-muted">Quem marcou?</label>
+              <select
+                value={selectedScorer}
+                onChange={e => setSelectedScorer(e.target.value)}
+                className="w-full bg-surface-2 border border-border-mid rounded-xl p-3 text-xs text-white"
+              >
+                <option value="">Selecione o artilheiro</option>
+                {getActiveLineup(goalTeam === 'A' ? currentMatch.teamA : currentMatch.teamB).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-text-muted">Assistência (Opcional)</label>
+              <select
+                value={selectedAssist}
+                onChange={e => setSelectedAssist(e.target.value)}
+                className="w-full bg-surface-2 border border-border-mid rounded-xl p-3 text-xs text-white"
+              >
+                <option value="">Nenhuma</option>
+                {getActiveLineup(goalTeam === 'A' ? currentMatch.teamA : currentMatch.teamB).filter(p => p.id !== selectedScorer).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowGoalModal(false)}
+                className="flex-1 py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveGoal}
+                className="flex-1 py-3 bg-cyan-electric text-black rounded-xl text-xs font-black uppercase"
+              >
+                Confirmar Gol
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cartão */}
+      {showCardModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black uppercase text-yellow-500">Registrar Cartão</h3>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-text-muted">Jogador</label>
+              <select
+                value={selectedCardPlayer}
+                onChange={e => setSelectedCardPlayer(e.target.value)}
+                className="w-full bg-surface-2 border border-border-mid rounded-xl p-3 text-xs text-white"
+              >
+                <option value="">Selecione o jogador</option>
+                {getActiveLineup(cardTeam === 'A' ? currentMatch.teamA : currentMatch.teamB).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-text-muted">Tipo de Cartão</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setSelectedCardType('yellow')}
+                  className={`py-3 rounded-xl font-black text-xs uppercase ${selectedCardType === 'yellow' ? 'bg-yellow-500 text-black' : 'bg-surface-2 text-yellow-500 border border-yellow-500/30'}`}
+                >
+                  Amarelo
+                </button>
+                <button
+                  onClick={() => setSelectedCardType('red')}
+                  className={`py-3 rounded-xl font-black text-xs uppercase ${selectedCardType === 'red' ? 'bg-red-500 text-white' : 'bg-surface-2 text-red-500 border border-red-500/30'}`}
+                >
+                  Vermelho
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowCardModal(false)}
+                className="flex-1 py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveCard}
+                disabled={savingCard}
+                className="flex-1 py-3 bg-yellow-500 text-black rounded-xl text-xs font-black uppercase"
+              >
+                {savingCard ? 'Salvando...' : 'Salvar Cartão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sub Goleiro */}
+      {showGkSubModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black uppercase text-cyan-electric">Substituir Goleiro (Time {gkSubSlot})</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {allTeams.flatMap(t => t.players).map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleGkSub(p)}
+                  className="w-full p-3 bg-surface-2 rounded-xl text-left text-xs font-bold text-white hover:bg-surface-3 transition-colors"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowGkSubModal(false)}
+              className="w-full py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Banco */}
+      {showBenchModal && benchModalTeam && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black uppercase text-cyan-electric">Trocar Jogador ({benchModalTeam.name})</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {benchModalTeam.players.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleBenchSwap(p.id)}
+                  className="w-full p-3 bg-surface-2 rounded-xl text-left text-xs font-bold text-white hover:bg-surface-3 transition-colors flex justify-between items-center"
+                >
+                  <span>{p.name}</span>
+                  {p.isReserve && <span className="text-[9px] text-yellow-500 uppercase font-black">Reserva</span>}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowBenchModal(false)}
+              className="w-full py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Completar Time */}
+      {showBorrowModal && borrowModalTeam && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-sm font-black uppercase text-cyan-electric">Completar {borrowModalTeam.name}</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {allTeams.filter(t => t.name !== borrowModalTeam.name).flatMap(t => t.players).map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleBorrow(p)}
+                  className="w-full p-3 bg-surface-2 rounded-xl text-left text-xs font-bold text-white hover:bg-surface-3 transition-colors"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowBorrowModal(false)}
+              className="w-full py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Encerrar Dia */}
+      {showFinishDay && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-surface-1 border border-border-mid rounded-3xl p-6 w-full max-w-sm space-y-4 text-center">
+            <h3 className="text-sm font-black uppercase text-red-500">Encerrar Baba de Hoje?</h3>
+            <p className="text-xs text-text-muted">Isso finalizará todas as estatísticas e partidas pendentes do dia.</p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowFinishDay(false)}
+                className="flex-1 py-3 bg-surface-2 rounded-xl text-xs font-black uppercase text-text-low"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleConfirmFinishDay}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl text-xs font-black uppercase"
+              >
+                Sim, Encerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="space-y-5">
