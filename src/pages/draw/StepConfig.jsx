@@ -43,17 +43,12 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
   const gks      = players.filter(p => p.position === 'goleiro');
   const outfield = players.filter(p => p.position !== 'goleiro');
 
-<<<<<<< Updated upstream
-  const totalTeamsIfFixed    = Math.floor(players.length / playersPerTeam);
-  const totalTeamsIfLineOnly = Math.floor(outfield.length / playersPerTeam);
-=======
   const totalTeamsIfFixed    = strategy === 'reserve'
     ? Math.floor(players.length / (playersPerTeam + 1))
     : Math.ceil(players.length / playersPerTeam);
   const totalTeamsIfLineOnly = strategy === 'reserve'
     ? Math.floor(outfield.length / (playersPerTeam + 1))
     : Math.ceil(outfield.length / playersPerTeam);
->>>>>>> Stashed changes
 
   // court: decide sozinho — goleiro fixo no time se a conta bate exatamente
   // (1 goleiro por time), senão vira fila própria da quadra (goalkeeperQueue)
@@ -72,16 +67,6 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
   // separate: goleiro é vaga extra (bônus) — linha usa a capacidade cheia de playersPerTeam.
   // fixed/court-fixed: goleiro é 1 dos playersPerTeam — linha usa playersPerTeam-1.
   // court-queue: não tem goleiro dedicado nenhum — linha usa a capacidade cheia.
-<<<<<<< Updated upstream
-  const lineCapacityPerTeam = (mode === 'fixed' || mode === 'court-fixed') ? playersPerTeam - 1 : playersPerTeam;
-
-  const sorted      = [...outfield].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
-  const capacities   = Array.from({ length: totalTeams }, () => lineCapacityPerTeam);
-  const distributed  = snakeDistribute(sorted, capacities);
-  const teams = distributed.map((teamPlayers, i) => ({
-    name:    `Time ${String.fromCharCode(65 + i)}`,
-    players: teamPlayers,
-=======
   let lineCapacityPerTeam = (mode === 'fixed' || mode === 'court-fixed') ? playersPerTeam - 1 : playersPerTeam;
   // 'reserve': cada time ganha +1 vaga própria de reserva (fica marcado isReserve),
   // que pode entrar pra substituir qualquer titular DO MESMO TIME até o fim do baba.
@@ -112,7 +97,6 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
     players: strategy === 'reserve' && teamPlayers.length === lineCapacityPerTeam
       ? teamPlayers.map((p, idx) => idx === teamPlayers.length - 1 ? { ...p, isReserve: true } : p)
       : teamPlayers,
->>>>>>> Stashed changes
   }));
 
   let goalkeeperQueue = [];
