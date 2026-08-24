@@ -60,8 +60,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [gkOverride,       setGkOverride]       = useState(matchState?.gkOverride || { A: null, B: null });
   const [showGkSubModal,   setShowGkSubModal]   = useState(false);
   const [gkSubSlot,        setGkSubSlot]        = useState(null);
-<<<<<<< Updated upstream
-=======
   const [showFinishDay,    setShowFinishDay]    = useState(false);
   const [finishingDay,     setFinishingDay]     = useState(false);
   // Sequência do fim de baba: 'confirm' -> 'photo' (time que mais pontuou) -> 'mvp' -> encerra de vez
@@ -81,7 +79,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [borrowedByTeam,   setBorrowedByTeam]   = useState(matchState?.borrowedByTeam || {});
   const [showBorrowModal,  setShowBorrowModal]  = useState(false);
   const [borrowModalTeam,  setBorrowModalTeam]  = useState(null);
->>>>>>> Stashed changes
 
   // Realtime
   useRealtimeMatch(matchId, ({ scoreA, scoreB }) => {
@@ -97,11 +94,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       setMatchId(matchState.matchId);
       setGoalkeeperQueue(matchState.goalkeeperQueue || []);
       setGkOverride(matchState.gkOverride || { A: null, B: null });
-<<<<<<< Updated upstream
-=======
       setBenchedByTeam(matchState.benchedByTeam || {});
       setBorrowedByTeam(matchState.borrowedByTeam || {});
->>>>>>> Stashed changes
       setLoading(false);
       return;
     }
@@ -111,9 +105,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setAllTeams(teams);
     setCurrentMatch(match);
     setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
-<<<<<<< Updated upstream
-    loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || []);
-=======
     // Banco inicial: quem foi marcado isReserve no sorteio começa no banco.
     const initialBench = {};
     teams.forEach(t => {
@@ -122,7 +113,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     });
     setBenchedByTeam(initialBench);
     loadOrCreateMatch(teams[0], teams[1], drawResult.goalkeeperQueue || [], { A: null, B: null }, initialBench, {});
->>>>>>> Stashed changes
     setLoading(false);
     setShowIntro(true);
   }, []);
@@ -130,10 +120,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   // Persistir estado no wizard
   useEffect(() => {
     if (!currentMatch) return;
-<<<<<<< Updated upstream
-    setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride });
-  }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride]);
-=======
     setMatchState({ allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam });
   }, [allTeams, currentMatch, timer, matchId, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam]);
 
@@ -146,7 +132,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     const borrowed = borrowedByTeam[team.name] || [];
     return [...base, ...borrowed];
   }, [benchedByTeam, borrowedByTeam]);
->>>>>>> Stashed changes
 
   // Timer
   useEffect(() => {
@@ -187,11 +172,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
   useEffect(() => { loadDailyStandings(); }, [loadDailyStandings]);
 
-<<<<<<< Updated upstream
-  const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }) => {
-=======
   const loadOrCreateMatch = useCallback(async (teamA, teamB, gkQueue = [], gkOv = { A: null, B: null }, benchMap = benchedByTeam, borrowMap = borrowedByTeam) => {
->>>>>>> Stashed changes
     if (!currentBaba) return;
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -224,11 +205,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       const gkA = gkOv?.A || gkQueue[0] || null;
       const gkB = gkOv?.B || gkQueue[1] || null;
 
-<<<<<<< Updated upstream
-      const mps = [
-        ...teamA.players.map(p => ({ match_id: mid, player_id: p.id, team: 'A', position: p.position || 'linha', goals: 0, assists: 0 })),
-        ...teamB.players.map(p => ({ match_id: mid, player_id: p.id, team: 'B', position: p.position || 'linha', goals: 0, assists: 0 })),
-=======
       // Titulares (banco + empréstimo já aplicados — ver getActiveLineup)
       const benchedA = benchMap[teamA.name];
       const benchedB = benchMap[teamB.name];
@@ -238,7 +214,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       const mps = [
         ...activeA.map(p => ({ match_id: mid, player_id: p.id, team: 'A', position: p.position || 'linha', goals: 0, assists: 0 })),
         ...activeB.map(p => ({ match_id: mid, player_id: p.id, team: 'B', position: p.position || 'linha', goals: 0, assists: 0 })),
->>>>>>> Stashed changes
         ...(gkA ? [{ match_id: mid, player_id: gkA.id, team: 'A', position: 'goleiro', goals: 0, assists: 0 }] : []),
         ...(gkB ? [{ match_id: mid, player_id: gkB.id, team: 'B', position: 'goleiro', goals: 0, assists: 0 }] : []),
       ];
@@ -248,11 +223,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       if (newPs.length > 0) await supabase.from('match_players').insert(newPs);
 
       // Buscar jogadores para reações
-<<<<<<< Updated upstream
-      const allP = [...(teamA.players || []), ...(teamB.players || []), ...(gkA ? [gkA] : []), ...(gkB ? [gkB] : [])];
-=======
       const allP = [...activeA, ...activeB, ...(gkA ? [gkA] : []), ...(gkB ? [gkB] : [])];
->>>>>>> Stashed changes
       setAllMatchPlayers(allP);
     } catch (err) {
       console.error('[StepMatch] loadOrCreateMatch:', err);
@@ -326,23 +297,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setShowBorrowModal(false);
     if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, gkOverride, benchedByTeam, next);
     toast.success(`${player.name} completando o time por essa partida`);
-  };
-
-  const openGkSubModal = (slot) => { setGkSubSlot(slot); setShowGkSubModal(true); };
-
-  const handleGkSub = (player) => {
-    const next = { ...gkOverride, [gkSubSlot]: player };
-    setGkOverride(next);
-    setShowGkSubModal(false);
-    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
-    toast.success(`${player.name} no gol até o titular voltar`);
-  };
-
-  const handleGkReturn = (slot) => {
-    const next = { ...gkOverride, [slot]: null };
-    setGkOverride(next);
-    if (currentMatch) loadOrCreateMatch(currentMatch.teamA, currentMatch.teamB, goalkeeperQueue, next);
-    toast.success('Titular de volta ao gol');
   };
 
   const handleGoalClick = (team) => {
@@ -453,15 +407,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setFinishedMatch({ teamA, teamB, scoreA, scoreB });
     setPendingQueue(queue);
     setShowPostGame(true);
-<<<<<<< Updated upstream
-
-    if (winnerName && matchId) {
-      setWinnerInfo({ name: winnerName, matchId });
-    }
-  }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings]);
-=======
   }, [currentMatch, allTeams, goalkeeperQueue, matchId, loadDailyStandings, currentBaba]);
->>>>>>> Stashed changes
 
   const continueAfterMatch = useCallback(async (queue) => {
     setShowPostGame(false);
@@ -477,11 +423,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setCurrentMatch(match);
     setMatchId(null);
     setFinishedMatch(null);
-<<<<<<< Updated upstream
-    await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride);
-    setShowIntro(true);
-  }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, onReset]);
-=======
     // Empréstimo é decidido na hora — some ao trocar de partida (o banco do
     // time, esse sim, continua valendo até o fim do baba).
     const nextBorrowed = { ...borrowedByTeam };
@@ -491,7 +432,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     await loadOrCreateMatch(queue[0], queue[1], goalkeeperQueue, gkOverride, benchedByTeam, nextBorrowed);
     setShowIntro(true);
   }, [loadOrCreateMatch, goalkeeperQueue, gkOverride, benchedByTeam, borrowedByTeam, onReset]);
->>>>>>> Stashed changes
 
   if (loading || !currentMatch) return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -629,8 +569,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           </div>
         )}
 
-<<<<<<< Updated upstream
-=======
         {/* Banco do time — reserva próprio (estratégia 'reserva') pode trocar com
             qualquer titular do mesmo time, valendo até o fim do baba */}
         {[currentMatch.teamA, currentMatch.teamB].some(t => t.players.some(p => p.isReserve)) && (
@@ -685,7 +623,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           );
         })()}
 
->>>>>>> Stashed changes
         {/* Classificação do dia */}
         {dailyStandings.length > 0 && (
           <div className="rounded-2xl bg-surface-1 border border-border-subtle overflow-hidden">
@@ -928,8 +865,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </div>
       )}
 
-<<<<<<< Updated upstream
-=======
       {showFinishDay && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
@@ -1025,7 +960,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </div>
       )}
 
->>>>>>> Stashed changes
       {showGkSubModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0d0d] border border-border-mid rounded-3xl p-6 max-w-sm w-full space-y-4">
@@ -1056,16 +990,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         </div>
       )}
 
-<<<<<<< Updated upstream
-      <WinnerPhotoModal
-        isOpen={showWinnerPhoto}
-        onClose={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
-        matchId={winnerInfo.matchId}
-        babaId={currentBaba?.id}
-        winnerName={winnerInfo.name}
-        onSaved={() => { setShowWinnerPhoto(false); proceedToNextMatch(pendingQueue); }}
-      />
-=======
       {finishPhase === 'photo' && winningTeamOfDay && (
         <WinnerPhotoModal
           isOpen={true}
@@ -1091,7 +1015,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           onSkip={handleReallyFinish}
         />
       )}
->>>>>>> Stashed changes
     </>
   );
 };
