@@ -275,13 +275,15 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         ? Math.max(...avgRatings) - Math.min(...avgRatings)
         : 0;
 
-      await supabase.from('draw_results').upsert({
+      const { error: upsertError } = await supabase.from('draw_results').upsert({
         baba_id:          currentBaba.id,
         draw_date:        today,
         teams,
         reserves,
         goalkeeper_queue: goalkeeperQueue,
         draw_config:      safeConfig,
+        players_per_team: safeConfig.playersPerTeam,
+        strategy:         safeConfig.strategy,
         algorithm:        'balanced_snake',
         constraints_used: constraints || [],
         balance_score:    Math.round(balanceScore * 100) / 100,
@@ -290,6 +292,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         finished_at:      null,
         finished_by:      null,
       }, { onConflict: 'baba_id,draw_date' });
+      if (upsertError) throw upsertError;
 
       // Sprint 3 — som de sorteio
       Sounds.unlock();

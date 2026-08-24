@@ -75,13 +75,11 @@ const DrawPage = () => {
   const [checkingAutoDraw, setCheckingAutoDraw] = useState(false);
   const [showManualOverride, setShowManualOverride] = useState(false);
 
-  // Sorteio automático ligado: configurações já estão prontas, o presidente não
-  // precisa passar pelo assistente (Config/Times) — só entra direto na Partida,
-  // desde que o cron já tenha sorteado hoje. Se ainda não sorteou, mostra um
-  // aviso em vez do assistente manual (ver render abaixo).
+  // Se já existe sorteio ativo hoje, /draw vai direto pra partida — evita
+  // abrir configuração nova em paralelo (e também cobre o sorteio automático).
   useEffect(() => {
-    if (!currentBaba?.id || !currentBaba.auto_draw_enabled) return;
-    if (step !== 1 || drawResult || matchState) return; // já passou dessa etapa
+    if (!currentBaba?.id) return;
+    if (step !== 1 || drawResult || matchState) return;
     setCheckingAutoDraw(true);
     (async () => {
       const today = new Date().toISOString().split('T')[0];
@@ -89,13 +87,13 @@ const DrawPage = () => {
         .from('draw_results').select('*')
         .eq('baba_id', currentBaba.id).eq('draw_date', today)
         .limit(1).maybeSingle();
-      if (data?.teams?.length >= 2) {
+      if (data?.teams?.length >= 2 && data.status !== 'finished') {
         setDrawResult({ teams: data.teams, reserves: data.reserves || [], goalkeeperQueue: data.goalkeeper_queue || [] });
         setStep(3);
       }
       setCheckingAutoDraw(false);
     })();
-  }, [currentBaba?.id, currentBaba?.auto_draw_enabled, step, drawResult, matchState]);
+  }, [currentBaba?.id, step, drawResult, matchState]);
 
   const handleBack = () => {
     if (step === 1) navigate('/dashboard');
