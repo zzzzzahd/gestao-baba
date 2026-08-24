@@ -1,7 +1,7 @@
 // src/pages/draw/StepMatch.jsx
 // Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback , useRef } from 'react';
 import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown, Square } from 'lucide-react';
 import { useBaba }           from '../../contexts/BabaContext';
 import { useAuth }           from '../../contexts/AuthContext';
