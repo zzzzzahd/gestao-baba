@@ -1,5 +1,5 @@
 // supabase/functions/narrate-match/index.ts
-// Sprint 5 — Gera narrativa cômica/dramática da partida usando Gemini 1.5 Flash.
+// Sprint 5 — Gera narrativa cômica/dramática da partida usando Gemini 3.5 Flash.
 // Chamada pelo presidente após finalizar uma partida.
 
 import { serve }        from "https://deno.land/std@0.177.0/http/server.ts";
@@ -91,13 +91,13 @@ Use gírias do futebol brasileiro, seja dramático e bem-humorado. Máximo 3 fra
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 200, temperature: 0.9 },
+          generationConfig: { maxOutputTokens: 1024, temperature: 0.9 },
         }),
       }
     );
@@ -110,7 +110,7 @@ Use gírias do futebol brasileiro, seja dramático e bem-humorado. Máximo 3 fra
       match_id:  body.match_id,
       baba_id:   body.baba_id,
       narrative,
-      model:     "gemini-1.5-flash",
+      model:     "gemini-3.5-flash",
     });
 
     return json({ narrative, cached: false });
