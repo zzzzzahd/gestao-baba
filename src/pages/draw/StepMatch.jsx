@@ -1,7 +1,11 @@
 // src/pages/draw/StepMatch.jsx
 // Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
 
+<<<<<<< ours
 import React, { useState, useEffect, useCallback } from 'react';
+=======
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+>>>>>>> theirs
 import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown, Square } from 'lucide-react';
 import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,6 +55,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [showStandings, setShowStandings] = useState(false);
   const [tieChoice, setTieChoice] = useState(null);
 
+<<<<<<< ours
+=======
+  // Ref para garantir que a intro só rode uma vez por carregamento/partida
+  const introShownRef = useRef(false);
+
+>>>>>>> theirs
   // Callback seguro para ocultar a intro
   const handleIntroDone = useCallback(() => {
     setShowIntro(false);
@@ -160,6 +170,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   // Persistir estado no wizard
   useEffect(() => {
     if (!currentMatch) return;
+<<<<<<< ours
 
     setMatchState({
       allTeams,
@@ -191,6 +202,36 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     team => {
       if (!team) return [];
 
+=======
+
+    setMatchState({
+      allTeams,
+      currentMatch,
+      timer,
+      matchId,
+      goalkeeperQueue,
+      gkOverride,
+      benchedByTeam,
+      borrowedByTeam
+    });
+  }, [
+    allTeams,
+    currentMatch,
+    timer,
+    matchId,
+    goalkeeperQueue,
+    gkOverride,
+    benchedByTeam,
+    borrowedByTeam,
+    setMatchState
+  ]);
+
+  // Time de linha ativo
+  const getActiveLineup = useCallback(
+    team => {
+      if (!team) return [];
+
+>>>>>>> theirs
       const benchedId = benchedByTeam[team.name];
 
       const base = benchedId
@@ -535,6 +576,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     toast.success(
       `${swapped?.name} entrou no lugar do titular`
     );
+<<<<<<< ours
   };
 
   const openBorrowModal = team => {
@@ -542,6 +584,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setShowBorrowModal(true);
   };
 
+=======
+  };
+
+  const openBorrowModal = team => {
+    setBorrowModalTeam(team);
+    setShowBorrowModal(true);
+  };
+
+>>>>>>> theirs
   const handleBorrow = player => {
     const next = {
       ...borrowedByTeam,
@@ -616,12 +667,20 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           .eq('player_id', selectedAssist);
       }
 
+<<<<<<< ours
       // Corrigido: buscava o nome só no roster bruto (currentMatch.teamX.players),
       // que não inclui jogador emprestado (time incompleto) — usa a escalação
       // ativa agora, senão o toast mostrava "Jogador" pra quem foi puxado de outro time.
       const scorer = getActiveLineup(
         goalTeam === 'A' ? currentMatch.teamA : currentMatch.teamB
       ).find(p => p.id === selectedScorer);
+=======
+      const scorer = (
+        goalTeam === 'A'
+          ? currentMatch.teamA.players
+          : currentMatch.teamB.players
+      )?.find(p => p.id === selectedScorer);
+>>>>>>> theirs
 
       const scorerName =
         scorer?.name ?? 'Jogador';
@@ -1034,11 +1093,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     );
   }
 
+<<<<<<< ours
   // Escalações ativas das duas equipes da partida atual — usadas nos modais de
   // gol/cartão e na exibição "Em campo" (ver correções marcadas abaixo).
   const activeTeamA = getActiveLineup(currentMatch.teamA);
   const activeTeamB = getActiveLineup(currentMatch.teamB);
 
+=======
+>>>>>>> theirs
   return (
     <>
       {/* Intro dos times */}
@@ -1302,6 +1364,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         {/* Completar time */}
         {(() => {
 
+<<<<<<< ours
           // Corrigido: usava o tamanho BRUTO do roster (team.players.length),
           // que em modo "reserva" inclui o banco (ex: 6 = 5 titulares + 1
           // reserva) — isso fazia TODO time em modo reserva aparecer como
@@ -1310,6 +1373,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           const expectedSize = Math.max(
             ...allTeams.map(
               t => getActiveLineup(t).length
+=======
+          const expectedSize = Math.max(
+            ...allTeams.map(
+              t => t.players.length
+>>>>>>> theirs
             ),
             0
           );
@@ -1473,17 +1541,27 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
             {[
               {
                 team: currentMatch.teamA,
+<<<<<<< ours
                 active: activeTeamA,
+=======
+>>>>>>> theirs
                 color: 'text-cyan-electric',
                 dot: 'bg-cyan-electric'
               },
               {
                 team: currentMatch.teamB,
+<<<<<<< ours
                 active: activeTeamB,
                 color: 'text-yellow-500',
                 dot: 'bg-yellow-500'
               }
             ].map(({ team, active, color, dot }) => (
+=======
+                color: 'text-yellow-500',
+                dot: 'bg-yellow-500'
+              }
+            ].map(({ team, color, dot }) => (
+>>>>>>> theirs
 
               <div key={team.name}>
 
@@ -1495,10 +1573,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
                 <div className="space-y-1">
 
+<<<<<<< ours
                   {/* Corrigido: mostrava o roster bruto (incluía quem tá no
                       banco e não incluía quem foi emprestado) — agora mostra
                       quem realmente está jogando essa partida. */}
                   {active.map((p, i) => (
+=======
+                  {team.players?.map((p, i) => (
+>>>>>>> theirs
 
                     <div
                       key={i}
@@ -1589,6 +1671,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
             </div>
 
             <div className="space-y-3">
+<<<<<<< ours
 
               <button
                 onClick={() =>
@@ -1612,6 +1695,31 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 {tieChoice.teamB.name}
               </button>
 
+=======
+
+              <button
+                onClick={() =>
+                  handleParImparChoice(
+                    tieChoice.teamA
+                  )
+                }
+                className="w-full py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
+              >
+                {tieChoice.teamA.name}
+              </button>
+
+              <button
+                onClick={() =>
+                  handleParImparChoice(
+                    tieChoice.teamB
+                  )
+                }
+                className="w-full py-4 rounded-2xl bg-yellow-500 text-black font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
+              >
+                {tieChoice.teamB.name}
+              </button>
+
+>>>>>>> theirs
             </div>
 
           </div>
@@ -1669,9 +1777,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 Quem fez o gol? *
               </label>
 
+<<<<<<< ours
               {/* Corrigido: listava o roster bruto (deixava escolher quem
                   tá no banco, e não deixava escolher quem foi emprestado
                   pro time incompleto) — agora usa a escalação ativa. */}
+=======
+>>>>>>> theirs
               <select
                 value={selectedScorer}
                 onChange={e =>
@@ -1686,7 +1797,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                   Selecione...
                 </option>
 
+<<<<<<< ours
                 {(goalTeam === 'A' ? activeTeamA : activeTeamB).map(p => (
+=======
+                {(
+                  goalTeam === 'A'
+                    ? currentMatch.teamA.players
+                    : currentMatch.teamB.players
+                )?.map(p => (
+>>>>>>> theirs
 
                   <option
                     key={p.id}
@@ -1725,8 +1844,17 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                   Nenhuma
                 </option>
 
+<<<<<<< ours
                 {(goalTeam === 'A' ? activeTeamA : activeTeamB)
                   .filter(
+=======
+                {(
+                  goalTeam === 'A'
+                    ? currentMatch.teamA.players
+                    : currentMatch.teamB.players
+                )
+                  ?.filter(
+>>>>>>> theirs
                     p => p.id !== selectedScorer
                   )
                   .map(p => (
@@ -1818,8 +1946,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 Jogador *
               </label>
 
+<<<<<<< ours
               {/* Corrigido: mesma questão do modal de gol — agora usa
                   escalação ativa em vez do roster bruto. */}
+=======
+>>>>>>> theirs
               <select
                 value={selectedCardPlayer}
                 onChange={e =>
@@ -1834,7 +1965,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                   Selecione...
                 </option>
 
+<<<<<<< ours
                 {(cardTeam === 'A' ? activeTeamA : activeTeamB).map(p => (
+=======
+                {(
+                  cardTeam === 'A'
+                    ? currentMatch.teamA.players
+                    : currentMatch.teamB.players
+                )?.map(p => (
+>>>>>>> theirs
 
                   <option
                     key={p.id}
