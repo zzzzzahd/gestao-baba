@@ -18,6 +18,8 @@ import { usePullToRefresh }    from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator  from '../components/PullToRefreshIndicator';
 import MatchShareButton        from '../components/MatchShareButton';
 import MatchGallery            from '../components/MatchGallery';
+import MatchReactionsBar       from '../components/MatchReactionsBar';
+import PostBabaVotePanel       from '../components/PostBabaVotePanel';
 import { usePlan }             from '../hooks/usePlan';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,7 +44,7 @@ const statusLabel = {
 
 // ─── MatchCard ────────────────────────────────────────────────────────────────
 
-const MatchCard = ({ match }) => {
+const MatchCard = ({ match, myPlayerId }) => {
   const [open,           setOpen]           = useState(false);
   const [players,        setPlayers]        = useState([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
@@ -126,6 +128,12 @@ const MatchCard = ({ match }) => {
         {match.winner_photo_url && (
           <div className="mt-4">
             <img src={match.winner_photo_url} alt="Time vencedor" className="w-full rounded-2xl object-cover max-h-48 border border-border-mid" />
+          </div>
+        )}
+
+        {match.status === 'finished' && (
+          <div className="mt-3 pt-3 border-t border-border-subtle">
+            <MatchReactionsBar matchId={match.id} babaId={match.baba_id} myPlayerId={myPlayerId} />
           </div>
         )}
 
@@ -438,13 +446,26 @@ const HistoryPage = () => {
               ))}
             </div>
 
+            {/* Votação de craque/goleiro do dia (janela após o baba encerrar) */}
+            {myPlayer?.id && (
+              <PostBabaVotePanel
+                babaId={currentBaba?.id}
+                myPlayerId={myPlayer.id}
+                ratingEnabled={currentBaba?.rating_enabled ?? true}
+                ratingOpenHours={currentBaba?.rating_open_hours ?? 1}
+                mvpScope={currentBaba?.mvp_scope ?? 'all'}
+              />
+            )}
+
             {/* Lista */}
             <div className="space-y-4">
               {loading && matches.length === 0 ? (
                 <MatchCardSkeleton count={3} />
               ) : matches.length > 0 ? (
                 <>
-                  {matches.map(match => <MatchCard key={match.id} match={match} />)}
+                  {matches.map(match => (
+                    <MatchCard key={match.id} match={match} myPlayerId={myPlayer?.id} />
+                  ))}
                   {hasMore && (
                     <button
                       onClick={() => setPage(p => p + 1)}

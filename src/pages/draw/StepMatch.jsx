@@ -7,7 +7,6 @@ import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import WinnerPhotoModal from '../../components/WinnerPhotoModal';
-import DailyMVPScreen from '../../components/DailyMVPScreen';
 import MatchShareButton from '../../components/MatchShareButton';
 import MatchIntro from '../../components/MatchIntro';
 import PostGameScreen from '../../components/PostGameScreen';
@@ -409,9 +408,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const handleConfirmFinishDay = () => {
     setShowFinishDay(false);
 
-    setFinishPhase(
-      winningTeamOfDay ? 'photo' : 'mvp'
-    );
+    // A votação de craque/goleiro do dia saiu daqui — agora acontece de
+    // forma assíncrona no Histórico (PostBabaVotePanel), com janela de
+    // horas após o encerramento, pra todo mundo poder votar (não só quem
+    // está com a tela de partida aberta na hora de encerrar).
+    if (winningTeamOfDay) {
+      setFinishPhase('photo');
+    } else {
+      handleReallyFinish();
+    }
   };
 
   const handleReallyFinish = async () => {
@@ -2183,46 +2188,13 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         winningTeamOfDay && (
           <WinnerPhotoModal
             isOpen={true}
-            onClose={() =>
-              setFinishPhase('mvp')
-            }
+            onClose={handleReallyFinish}
             matchId={matchId}
             babaId={currentBaba?.id}
             winnerName={winningTeamOfDay.name}
-            onSaved={() =>
-              setFinishPhase('mvp')
-            }
+            onSaved={handleReallyFinish}
           />
         )}
-
-      {/* MVP */}
-      {finishPhase === 'mvp' && (
-        <DailyMVPScreen
-          babaId={currentBaba?.id}
-          drawDate={
-            new Date()
-              .toISOString()
-              .split('T')[0]
-          }
-          candidates={
-            currentBaba?.mvp_scope ===
-              'winning_team' &&
-            winningTeamOfDay
-              ? winningTeamOfDay.players
-              : allTeams.flatMap(
-                  t => t.players
-                )
-          }
-          myPlayerId={
-            allMatchPlayers.find(
-              p =>
-                p.user_id === user?.id
-            )?.id
-          }
-          onClose={handleReallyFinish}
-          onSkip={handleReallyFinish}
-        />
-      )}
 
     </>
   );

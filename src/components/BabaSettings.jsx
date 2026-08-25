@@ -578,18 +578,18 @@ export default function BabaSettings() {
         )}
       </Section>
 
-      {/* Avaliações — apenas presidente */}
+      {/* Votação de craque/goleiro do dia — apenas presidente */}
       {canEditAll && (
-        <Section title="Avaliações" expanded={sections.rating} onToggle={() => toggle('rating')}>
+        <Section title="Votação do dia" expanded={sections.rating} onToggle={() => toggle('rating')}>
           <Toggle
-            label="Habilitar avaliações"
-            sub="Jogadores avaliam uns aos outros após a partida"
+            label="Habilitar votação de craque e goleiro"
+            sub="Jogadores votam no craque e no goleiro do dia pelo Histórico, depois que o baba encerra"
             value={form.rating_enabled}
             onChange={set('rating_enabled')}
           />
           {form.rating_enabled && (
             <Field
-              label="Janela de avaliação (horas após jogo)"
+              label="Janela de votação (horas após encerrar o baba)"
               type="number" min="1" max="72"
               value={form.rating_open_hours}
               onChange={set('rating_open_hours')}
@@ -598,7 +598,7 @@ export default function BabaSettings() {
 
           <div>
             <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
-              Quem pode ser MVP do dia
+              Quem pode ser craque/goleiro do dia
             </label>
             <div className="grid grid-cols-1 gap-2">
               {[
