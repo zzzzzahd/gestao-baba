@@ -1,27 +1,44 @@
-import React, { useState, useEffect } from 'react';
+// src/components/MatchIntro.jsx
+// Sprint 3 — Tela de introdução da partida com animação de 3 segundos.
+// Exibe os dois times se confrontando antes do cronômetro iniciar.
+//
+// Corrigido: o useEffect de dismiss dependia de `onDone`, uma função inline
+// recriada a cada render do componente pai (StepMatch), o que fazia o timer
+// reiniciar do zero toda vez que o pai re-renderizava (ex: contador do
+// cronômetro rodando por trás) — na prática a tela nunca chegava a fechar
+// sozinha. Agora o efeito roda só uma vez (guardando a versão mais recente de
+// onDone numa ref) e ainda dá pra tocar na tela pra pular, por garantia.
+
+import React, { useEffect, useState, useRef } from 'react';
 import { Swords } from 'lucide-react';
 
-export default function MatchIntro({ teamA, teamB, onDone }) {
+const MatchIntro = ({ teamA, teamB, onDone }) => {
   const [phase, setPhase] = useState(0);
+  // phase 0 = fade-in times | 1 = VS brilha | 2 = fade-out
+
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone; // sempre a versão mais recente, sem precisar re-disparar o efeito
+
+  const doneRef = useRef(false);
+  const finish = () => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onDoneRef.current?.();
+  };
 
   useEffect(() => {
-    // Avança as fases da animação
-    const timer1 = setTimeout(() => setPhase(1), 800);
-    const timer2 = setTimeout(() => setPhase(2), 2200);
-    const timer3 = setTimeout(() => {
-      if (onDone) onDone();
-    }, 2800);
-
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, [onDone]);
+    const t1 = setTimeout(() => setPhase(1), 800);
+    const t2 = setTimeout(() => setPhase(2), 2000);
+    const t3 = setTimeout(finish, 2800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []); // roda uma única vez — não reinicia com re-renders do pai
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black transition-opacity duration-500 ${
+      onClick={finish}
+      role="button"
+      aria-label="Pular introdução"
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black transition-opacity duration-500 cursor-pointer ${
         phase === 2 ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -71,7 +88,12 @@ export default function MatchIntro({ teamA, teamB, onDone }) {
           </p>
         </div>
 
+        <p className="text-[9px] font-black uppercase tracking-widest text-white/20 animate-pulse">
+          Boa bola! (toque pra pular)
+        </p>
       </div>
     </div>
   );
-}
+};
+
+export default MatchIntro;

@@ -39,6 +39,19 @@ const snakeDistribute = (pool, capacities) => {
   return teams;
 };
 
+/** Fisher-Yates — usado antes de ordenar por nota pra empates não caírem sempre
+ * pra ordem alfabética do nome (era isso que fazia "Zharick" ficar sempre por
+ * último: todo mundo empatado em nota 2, e a query de players vem ordenada por
+ * nome — sem embaralhar, o desempate é sempre alfabético, sempre no mesmo sentido). */
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = [], gkMode = 'fixed') => {
   const gks      = players.filter(p => p.position === 'goleiro');
   const outfield = players.filter(p => p.position !== 'goleiro');
@@ -72,7 +85,7 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
   // que pode entrar pra substituir qualquer titular DO MESMO TIME até o fim do baba.
   if (strategy === 'reserve') lineCapacityPerTeam += 1;
 
-  const sorted      = [...outfield].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+  const sorted      = shuffle(outfield).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
   const capacities   = Array.from({ length: totalTeams }, () => lineCapacityPerTeam);
   let distributed;
   if (strategy === 'substitute' && totalTeams > 0) {
@@ -105,9 +118,9 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
     // Goleiros não entram no sorteio de time nenhum — ficam numa fila própria,
     // vinculada à quadra (índices 0/1 = ativos, resto = banco). StepMatch.jsx
     // gira essa fila em paralelo com a fila de times (ver handleMatchEnd).
-    goalkeeperQueue = [...gks].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+    goalkeeperQueue = shuffle(gks).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
   } else if (hasDedicatedGkPerTeam) {
-    const sortedGks    = [...gks].sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
+    const sortedGks    = shuffle(gks).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
     const gkCapacities = Array.from({ length: totalTeams }, () => 1);
     snakeDistribute(sortedGks, gkCapacities).forEach((assigned, i) => teams[i].players.push(...assigned));
     gkReserves = sortedGks.slice(totalTeams); // goleiros excedentes (mais goleiro que time)
@@ -275,15 +288,13 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         ? Math.max(...avgRatings) - Math.min(...avgRatings)
         : 0;
 
-      const { error: upsertError } = await supabase.from('draw_results').upsert({
+      await supabase.from('draw_results').upsert({
         baba_id:          currentBaba.id,
         draw_date:        today,
         teams,
         reserves,
         goalkeeper_queue: goalkeeperQueue,
         draw_config:      safeConfig,
-        players_per_team: safeConfig.playersPerTeam,
-        strategy:         safeConfig.strategy,
         algorithm:        'balanced_snake',
         constraints_used: constraints || [],
         balance_score:    Math.round(balanceScore * 100) / 100,
@@ -292,7 +303,6 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         finished_at:      null,
         finished_by:      null,
       }, { onConflict: 'baba_id,draw_date' });
-      if (upsertError) throw upsertError;
 
       // Sprint 3 — som de sorteio
       Sounds.unlock();
