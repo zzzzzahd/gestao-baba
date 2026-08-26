@@ -112,7 +112,7 @@ export default function DailyRecapPanel({ babaId, isPresident }) {
         </p>
       ) : (
         <>
-          <p className="text-xs font-bold text-white leading-relaxed">{recap.content}</p>
+          <p className="text-xs font-bold text-white leading-relaxed whitespace-pre-line">{recap.content}</p>
 
           {stats && (
             <div className="grid grid-cols-2 gap-2">
