@@ -7,6 +7,7 @@ import { useBaba } from '../../contexts/BabaContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import WinnerPhotoModal from '../../components/WinnerPhotoModal';
+import DailyMVPScreen from '../../components/DailyMVPScreen';
 import MatchShareButton from '../../components/MatchShareButton';
 import MatchIntro from '../../components/MatchIntro';
 import PostGameScreen from '../../components/PostGameScreen';
@@ -115,7 +116,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       return;
     }
 
-    if (!drawResult?.teams?.length) return;
+    if (!drawResult?.teams || drawResult.teams.length < 2) return;
 
     const teams = drawResult.teams;
 
@@ -246,6 +247,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       borrowMap = borrowedByTeam
     ) => {
       if (!currentBaba) return;
+
+      if (!teamA || !teamB) {
+        console.error(
+          '[StepMatch] loadOrCreateMatch chamado sem os dois times:',
+          { teamA, teamB }
+        );
+        return;
+      }
 
       try {
         const today = new Date()
@@ -408,15 +417,9 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const handleConfirmFinishDay = () => {
     setShowFinishDay(false);
 
-    // A votação de craque/goleiro do dia saiu daqui — agora acontece de
-    // forma assíncrona no Histórico (PostBabaVotePanel), com janela de
-    // horas após o encerramento, pra todo mundo poder votar (não só quem
-    // está com a tela de partida aberta na hora de encerrar).
-    if (winningTeamOfDay) {
-      setFinishPhase('photo');
-    } else {
-      handleReallyFinish();
-    }
+    setFinishPhase(
+      winningTeamOfDay ? 'photo' : 'mvp'
+    );
   };
 
   const handleReallyFinish = async () => {
@@ -715,12 +718,27 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
     Sounds.whistle();
 
-    const {
-      scoreA,
-      scoreB,
-      teamA,
-      teamB
-    } = currentMatch;
+    const { teamA, teamB } = currentMatch;
+
+    // Recalcula o placar a partir de match_players (fonte da verdade) em vez
+    // de confiar só no estado local — achado um caso real em produção onde
+    // uma partida tinha 3 gols registrados em match_players mas foi salva com
+    // placar final 0x0 porque o estado local (currentMatch.scoreA/scoreB)
+    // ficou dessincronizado.
+    let scoreA = currentMatch.scoreA;
+    let scoreB = currentMatch.scoreB;
+
+    if (matchId) {
+      const { data: mp } = await supabase
+        .from('match_players')
+        .select('team, goals')
+        .eq('match_id', matchId);
+
+      if (mp) {
+        scoreA = mp.filter(p => ['A', 'a'].includes(p.team)).reduce((s, p) => s + (p.goals || 0), 0);
+        scoreB = mp.filter(p => ['B', 'b'].includes(p.team)).reduce((s, p) => s + (p.goals || 0), 0);
+      }
+    }
 
     let queue = [...allTeams];
     let gkQueue = [...goalkeeperQueue];
@@ -777,7 +795,9 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         teamA,
         teamB,
         rest,
-        gkQueue
+        gkQueue,
+        scoreA,
+        scoreB
       });
 
       return;
@@ -874,7 +894,9 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         teamA,
         teamB,
         rest,
-        gkQueue
+        gkQueue,
+        scoreA,
+        scoreB
       } = tieChoice;
 
       const loserTeam =
@@ -914,8 +936,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           .update({
             status: 'finished',
             winner_team: null,
-            team_a_score: currentMatch.scoreA,
-            team_b_score: currentMatch.scoreB,
+            team_a_score: scoreA,
+            team_b_score: scoreB,
             finished_at: new Date().toISOString()
           })
           .eq('id', matchId);
@@ -946,8 +968,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       setFinishedMatch({
         teamA,
         teamB,
-        scoreA: currentMatch.scoreA,
-        scoreB: currentMatch.scoreB
+        scoreA,
+        scoreB
       });
 
       setPendingQueue(queue);
@@ -2188,13 +2210,46 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         winningTeamOfDay && (
           <WinnerPhotoModal
             isOpen={true}
-            onClose={handleReallyFinish}
+            onClose={() =>
+              setFinishPhase('mvp')
+            }
             matchId={matchId}
             babaId={currentBaba?.id}
             winnerName={winningTeamOfDay.name}
-            onSaved={handleReallyFinish}
+            onSaved={() =>
+              setFinishPhase('mvp')
+            }
           />
         )}
+
+      {/* MVP */}
+      {finishPhase === 'mvp' && (
+        <DailyMVPScreen
+          babaId={currentBaba?.id}
+          drawDate={
+            new Date()
+              .toISOString()
+              .split('T')[0]
+          }
+          candidates={
+            currentBaba?.mvp_scope ===
+              'winning_team' &&
+            winningTeamOfDay
+              ? winningTeamOfDay.players
+              : allTeams.flatMap(
+                  t => t.players
+                )
+          }
+          myPlayerId={
+            allMatchPlayers.find(
+              p =>
+                p.user_id === user?.id
+            )?.id
+          }
+          onClose={handleReallyFinish}
+          onSkip={handleReallyFinish}
+        />
+      )}
 
     </>
   );

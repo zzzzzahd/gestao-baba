@@ -244,7 +244,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
     Sounds.click();
   };
 
-  const handleDraw = async () => {
+  const handleDraw = async (force = false) => {
     if (!canDraw) return;
     setDrawing(true);
     try {
@@ -255,10 +255,20 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         .eq('baba_id', currentBaba.id).eq('draw_date', today)
         .limit(1).maybeSingle();
 
-      if (existing?.teams?.length >= 2 && existing.status !== 'finished') {
+      if (!force && existing?.teams?.length >= 2 && existing.status !== 'finished') {
         Sounds.unlock();
-        onNext({ teams: existing.teams, reserves: existing.reserves || [], goalkeeperQueue: existing.goalkeeper_queue || [] });
+        onNext({ teams: existing.teams, reserves: existing.reserves || [], goalkeeperQueue: existing.goalkeeper_queue || [], drawResultId: existing.id });
         return;
+      }
+
+      // Sortear de novo descarta as partidas da sessão anterior (mesmo dia) —
+      // senão a classificação/fila do dia ficaria misturando placares de
+      // sorteios diferentes. match_players e cards apagam em cascata.
+      if (force) {
+        await supabase.from('matches').delete()
+          .eq('baba_id', currentBaba.id)
+          .gte('match_date', `${today}T00:00:00`)
+          .lte('match_date', `${today}T23:59:59`);
       }
 
       const { data: constraints } = await supabase.rpc('get_draw_constraints', {
@@ -288,7 +298,10 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         ? Math.max(...avgRatings) - Math.min(...avgRatings)
         : 0;
 
-      await supabase.from('draw_results').upsert({
+      // Sortear de novo (force=true) gera uma NOVA sessão de sorteio — importante
+      // pra fila/pontuação do dia não se misturar com testes/sorteios anteriores
+      // (ver draw_result_id em StepMatch.jsx e loadDailyStandings).
+      const { data: drawRes, error: drawErr } = await supabase.from('draw_results').upsert({
         baba_id:          currentBaba.id,
         draw_date:        today,
         teams,
@@ -302,12 +315,14 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         status:           'active',
         finished_at:      null,
         finished_by:      null,
-      }, { onConflict: 'baba_id,draw_date' });
+      }, { onConflict: 'baba_id,draw_date' }).select().single();
+
+      if (drawErr) throw drawErr;
 
       // Sprint 3 — som de sorteio
       Sounds.unlock();
       toast.success('Times sorteados! ⚡');
-      onNext({ teams, reserves, goalkeeperQueue });
+      onNext({ teams, reserves, goalkeeperQueue, drawResultId: drawRes?.id });
     } catch (err) {
       console.error('[StepConfig] draw error:', err);
       toast.error('Erro ao sortear. Tente novamente.');
@@ -537,7 +552,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
 
       {/* Botão sortear */}
       <button
-        onClick={handleDraw}
+        onClick={() => handleDraw(false)}
         disabled={!canDraw}
         className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
@@ -548,6 +563,24 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
           <><RefreshCw size={18} /> Sortear Times <ChevronRight size={18} /></>
         )}
       </button>
+
+      {/* Se já existe um sorteio de hoje em andamento, o botão principal só
+          reabre ele (evita sorteio duplicado sem querer). Esse aqui força um
+          sorteio novo de verdade — útil pra testar ou pra corrigir um sorteio
+          errado sem precisar encerrar o baba primeiro. */}
+      {canDraw && (
+        <button
+          onClick={() => {
+            if (window.confirm('Isso apaga as partidas já jogadas hoje (placar, fila, gols) e sorteia um time novo do zero. Continuar?')) {
+              handleDraw(true);
+            }
+          }}
+          disabled={drawing}
+          className="w-full py-2.5 text-[9px] font-black uppercase tracking-widest text-text-muted hover:text-cyan-electric transition-colors disabled:opacity-30"
+        >
+          Sortear de novo (ignora o sorteio atual)
+        </button>
+      )}
     </div>
   );
 };
