@@ -15,6 +15,22 @@ import { CYAN_GRADIENT } from '../utils/constants';
 import { maskPix } from '../utils/securityUtils';
 import PixCopyButton from '../components/PixCopyButton';
 
+// O bucket "payment-proofs" é privado (comprovantes de PIX são dados
+// sensíveis). O valor salvo em proof_url é gerado por getPublicUrl() só
+// para termos um jeito estável de recuperar o path do arquivo dentro do
+// bucket — ele NUNCA deve ser usado como link direto. Toda visualização
+// passa por uma signed URL de curta duração, gerada na hora e sujeita às
+// policies de RLS (só membro do baba ou presidente conseguem gerar uma).
+const PROOF_URL_MARKER = '/object/public/payment-proofs/';
+const SIGNED_URL_TTL_SECONDS = 60 * 5; // 5 minutos
+
+const getProofStoragePath = (proofUrl) => {
+  if (!proofUrl) return null;
+  const idx = proofUrl.indexOf(PROOF_URL_MARKER);
+  if (idx === -1) return null;
+  return proofUrl.slice(idx + PROOF_URL_MARKER.length);
+};
+
 const FinancialPage = () => {
   const navigate = useNavigate();
   const { currentBaba, loading: babaLoading } = useBaba();
@@ -31,6 +47,8 @@ const FinancialPage = () => {
   const [isPresident, setIsPresident] = useState(false);
   // Tarefa 1.2 — substitui window.confirm()
   const [confirmState, setConfirmState] = useState({ open: false, message: '', description: '', onConfirm: null });
+  // Controla qual comprovante está sendo aberto no momento (spinner no botão)
+  const [openingProofKey, setOpeningProofKey] = useState(null);
 
   const [newFinancial, setNewFinancial] = useState({
     title: '', description: '', amount: '', due_date: '', pix_key: ''
@@ -174,6 +192,33 @@ const FinancialPage = () => {
     });
   };
 
+  // Gera uma signed URL de curta duração pro comprovante e abre em nova aba.
+  // A geração da signed URL passa pela RLS de storage.objects — só membro
+  // do baba (ou presidente) consegue de fato criar o link.
+  const openProof = async (proofUrl, key) => {
+    const path = getProofStoragePath(proofUrl);
+    if (!path) {
+      toast.error('Comprovante inválido');
+      return;
+    }
+
+    try {
+      setOpeningProofKey(key);
+      const { data, error } = await supabase.storage
+        .from('payment-proofs')
+        .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+
+      if (error || !data?.signedUrl) throw error || new Error('signed url vazia');
+
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Erro ao abrir comprovante:', error);
+      toast.error('Não foi possível abrir o comprovante');
+    } finally {
+      setOpeningProofKey(null);
+    }
+  };
+
   const handleUploadProof = async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedFinancial) return;
@@ -197,6 +242,8 @@ const FinancialPage = () => {
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
+      // Bucket é privado: isso não gera um link público de verdade, só um
+      // identificador estável do path — a exibição sempre usa signed URL.
       const { data: { publicUrl } } = supabase.storage
         .from('payment-proofs')
         .getPublicUrl(filePath);
@@ -279,6 +326,7 @@ const FinancialPage = () => {
           .upload(filePath, expenseProofFile);
         if (uploadError) throw uploadError;
 
+        // Idem: apenas identificador do path, não um link público de verdade.
         const { data: { publicUrl } } = supabase.storage
           .from('payment-proofs')
           .getPublicUrl(filePath);
@@ -398,41 +446,44 @@ const FinancialPage = () => {
               <p className="text-[8px] font-black uppercase opacity-40 ml-1 tracking-widest mb-3">
                 Despesas Lançadas ({expenses.length})
               </p>
-              {expenses.map(exp => (
-                <div
-                  key={exp.id}
-                  className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-border-subtle"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase truncate">{exp.title}</p>
-                    <p className="text-[9px] text-text-low font-bold uppercase mt-0.5">
-                      {new Date(exp.created_at).toLocaleDateString()}
-                      {exp.description ? ` · ${exp.description}` : ''}
-                    </p>
+              {expenses.map(exp => {
+                const proofKey = `expense-${exp.id}`;
+                return (
+                  <div
+                    key={exp.id}
+                    className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-border-subtle"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black uppercase truncate">{exp.title}</p>
+                      <p className="text-[9px] text-text-low font-bold uppercase mt-0.5">
+                        {new Date(exp.created_at).toLocaleDateString()}
+                        {exp.description ? ` · ${exp.description}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-sm font-black text-red-400">- R$ {parseFloat(exp.amount).toFixed(2)}</span>
+                      {exp.proof_url && (
+                        <button
+                          type="button"
+                          onClick={() => openProof(exp.proof_url, proofKey)}
+                          disabled={openingProofKey === proofKey}
+                          className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-white transition-colors disabled:opacity-50"
+                        >
+                          {openingProofKey === proofKey ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                        </button>
+                      )}
+                      {isPresident && (
+                        <button
+                          onClick={() => deleteExpense(exp.id)}
+                          className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-black text-red-400">- R$ {parseFloat(exp.amount).toFixed(2)}</span>
-                    {exp.proof_url && (
-                      <a
-                        href={exp.proof_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-white transition-colors"
-                      >
-                        <Eye size={14} />
-                      </a>
-                    )}
-                    {isPresident && (
-                      <button
-                        onClick={() => deleteExpense(exp.id)}
-                        className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -561,31 +612,34 @@ const FinancialPage = () => {
                     <p className="text-[8px] font-black uppercase text-yellow-500 ml-2 tracking-widest italic">
                       Aprovações Pendentes
                     </p>
-                    {pendingPayments.map(p => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between p-4 bg-surface-2 rounded-2xl border border-border-subtle hover:border-border-mid transition-all"
-                      >
-                        <span className="text-[10px] font-bold uppercase tracking-tight">{p.player?.name}</span>
-                        <div className="flex items-center gap-3">
-                          <a
-                            href={p.proof_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-white transition-colors"
-                          >
-                            <Eye size={18} />
-                          </a>
-                          <button
-                            onClick={() => confirmPayment(p.id)}
-                            className="px-4 py-2 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all"
-                            style={CYAN_GRADIENT}
-                          >
-                            Aprovar
-                          </button>
+                    {pendingPayments.map(p => {
+                      const proofKey = `payment-${p.id}`;
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between p-4 bg-surface-2 rounded-2xl border border-border-subtle hover:border-border-mid transition-all"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-tight">{p.player?.name}</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => openProof(p.proof_url, proofKey)}
+                              disabled={openingProofKey === proofKey}
+                              className="p-2 bg-surface-2 rounded-lg text-text-low hover:text-white transition-colors disabled:opacity-50"
+                            >
+                              {openingProofKey === proofKey ? <Loader2 size={18} className="animate-spin" /> : <Eye size={18} />}
+                            </button>
+                            <button
+                              onClick={() => confirmPayment(p.id)}
+                              className="px-4 py-2 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+                              style={CYAN_GRADIENT}
+                            >
+                              Aprovar
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -28,6 +28,7 @@ const AUTH_ERROR_MAP = {
   'New password should be different from the old password.': 'A nova senha deve ser diferente da senha atual',
   'Password should be at least 6 characters.': 'A senha precisa ter pelo menos 6 caracteres',
   'Auth session missing!':        'Sessão expirada. Faça login novamente',
+  'captcha verification process failed': 'Não foi possível confirmar que você não é um robô. Tente novamente',
 };
 
 const translateAuthError = (msg) => {
@@ -97,12 +98,19 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
-  const signUp = async (email, password, metadata = {}) => {
+  // captchaToken vem do widget Cloudflare Turnstile exibido no cadastro
+  // (LoginPage.jsx). O Supabase Auth valida esse token no servidor contra a
+  // secret key configurada em Authentication → Attack Protection — sem essa
+  // configuração habilitada lá, passar o token aqui não tem efeito nenhum.
+  const signUp = async (email, password, metadata = {}, captchaToken) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: metadata },
+        options: {
+          data: metadata,
+          ...(captchaToken ? { captchaToken } : {}),
+        },
       });
       if (error) throw error;
 
