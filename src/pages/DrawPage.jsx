@@ -89,27 +89,67 @@ const DrawPage = () => {
   // ir direto pra partida ao vivo.
   useEffect(() => {
     if (!currentBaba?.id) return;
-    if (!forceResume && (step !== 1 || drawResult || matchState)) return; // já passou dessa etapa
-    setCheckingSession(true);
-    (async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
-        .from('draw_results').select('*')
-        .eq('baba_id', currentBaba.id).eq('draw_date', today)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1).maybeSingle();
-      if (data?.teams?.length >= 2) {
-        if (forceResume) setMatchState(null); // descarta qualquer estado travado de sessão anterior
-        setDrawResult({ teams: data.teams, reserves: data.reserves || [], goalkeeperQueue: data.goalkeeper_queue || [], drawResultId: data.id });
-        setStep(3);
-      } else if (forceResume) {
-        // Não achou sessão ativa nenhuma — não tem partida pra retomar.
-        setStep(1);
+  
+    // Só consulta o banco quando:
+    // 1. entrou no /draw?resume=1 pelo card de partida em andamento
+    // 2. ainda está no início do wizard
+    if (!forceResume && step !== 1) return;
+  
+    let cancelled = false;
+  
+    const loadActiveSession = async () => {
+      setCheckingSession(true);
+  
+      try {
+        const today = new Date().toISOString().split('T')[0];
+  
+        const { data, error } = await supabase
+          .from('draw_results')
+          .select('*')
+          .eq('baba_id', currentBaba.id)
+          .eq('draw_date', today)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+  
+        if (error) throw error;
+  
+        // Se o componente já saiu da tela, não altera estado
+        if (cancelled) return;
+  
+        if (data?.teams?.length >= 2) {
+          setDrawResult({
+            teams: data.teams,
+            reserves: data.reserves || [],
+            goalkeeperQueue: data.goalkeeper_queue || [],
+            drawResultId: data.id
+          });
+  
+          // Vai direto para a partida atual
+          setStep(3);
+        } else if (forceResume) {
+          // Não existe partida ativa
+          setStep(1);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[DrawPage] erro ao buscar sessão ativa:', err);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
       }
-      setCheckingSession(false);
-    })();
-  }, [currentBaba?.id, step, drawResult, matchState, forceResume]);
+    };
+  
+    loadActiveSession();
+  
+    return () => {
+      cancelled = true;
+    };
+  
+  }, [currentBaba?.id, forceResume]);
 
   const handleBack = () => {
     if (step === 1) navigate('/dashboard');
