@@ -301,7 +301,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       // Sortear de novo (force=true) gera uma NOVA sessão de sorteio — importante
       // pra fila/pontuação do dia não se misturar com testes/sorteios anteriores
       // (ver draw_result_id em StepMatch.jsx e loadDailyStandings).
-      const { data: drawRes, error: drawErr } = await supabase.from('draw_results').upsert({
+      const { data: drawRes, error: drawErr } = await supabase.from('draw_results').insert({
         baba_id:          currentBaba.id,
         draw_date:        today,
         teams,
@@ -315,7 +315,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         status:           'active',
         finished_at:      null,
         finished_by:      null,
-      }, { onConflict: 'baba_id,draw_date' }).select().single();
+      }).select().single();
 
       if (drawErr) throw drawErr;
 
