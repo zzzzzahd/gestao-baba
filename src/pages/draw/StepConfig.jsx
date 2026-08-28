@@ -269,11 +269,25 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       // Sortear de novo descarta as partidas da sessão anterior (mesmo dia) —
       // senão a classificação/fila do dia ficaria misturando placares de
       // sorteios diferentes. match_players e cards apagam em cascata.
-      if (force) {
-        await supabase.from('matches').delete()
-          .eq('baba_id', currentBaba.id)
-          .gte('match_date', `${today}T00:00:00`)
-          .lte('match_date', `${today}T23:59:59`);
+      if (force && existing?.id) {
+        // 1. Encerra a sessão de sorteio anterior
+        const { error: finishErr } = await supabase
+          .from('draw_results')
+          .update({
+            status: 'finished',
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+      
+        if (finishErr) throw finishErr;
+      
+        // 2. Remove as partidas da sessão anterior
+        const { error: deleteMatchesErr } = await supabase
+          .from('matches')
+          .delete()
+          .eq('draw_result_id', existing.id);
+      
+        if (deleteMatchesErr) throw deleteMatchesErr;
       }
 
       const { data: constraints } = await supabase.rpc('get_draw_constraints', {
