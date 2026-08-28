@@ -251,9 +251,14 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       const today = new Date().toISOString().split('T')[0];
 
       const { data: existing } = await supabase
-        .from('draw_results').select('*')
-        .eq('baba_id', currentBaba.id).eq('draw_date', today)
-        .limit(1).maybeSingle();
+       .from('draw_results')
+       .select('*')
+       .eq('baba_id', currentBaba.id)
+       .eq('draw_date', today)
+       .eq('status', 'active')
+       .order('created_at', { ascending: false })
+       .limit(1)
+       .maybeSingle();
 
       if (!force && existing?.teams?.length >= 2 && existing.status !== 'finished') {
         Sounds.unlock();
