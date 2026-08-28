@@ -87,7 +87,7 @@ const DrawPage = () => {
   // sessão anterior (ex: preso na tela de Times) e busca o estado real do
   // banco — sem isso, clicar no card podia cair numa etapa antiga em vez de
   // ir direto pra partida ao vivo.
-  uuseEffect(() => {
+  useEffect(() => {
     if (!currentBaba?.id) return;
 
     let cancelled = false;
