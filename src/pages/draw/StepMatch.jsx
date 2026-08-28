@@ -30,8 +30,22 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [loading, setLoading] = useState(!matchState?.allTeams);
   const [allTeams, setAllTeams] = useState(matchState?.allTeams || []);
   const [currentMatch, setCurrentMatch] = useState(matchState?.currentMatch || null);
-  const [timer, setTimer] = useState(matchState?.timer ?? 600);
-  const [isActive, setIsActive] = useState(false);
+  // Cronômetro baseado em horário real (persistido em matches.clock_*), não
+  // mais um contador só na memória do celular — antes, sair da tela do
+  // StepMatch e voltar fazia o relógio "pausar sozinho" (o estado isActive
+  // nunca era salvo). Agora: clockRunning+clockEndsAt (quando rodando) ou
+  // clockRemaining (quando pausado) vêm do banco, então continuam corretos
+  // não importa quem ou de onde está olhando (inclusive a WatchPage dos
+  // membros comuns).
+  const [clockRunning, setClockRunning] = useState(false);
+  const [clockEndsAt, setClockEndsAt] = useState(null); // timestamp (ms) de quando bate 0
+  const [clockRemaining, setClockRemaining] = useState(matchState?.timer ?? 600); // segundos, quando pausado
+  const [nowTick, setNowTick] = useState(Date.now()); // só pra forçar re-render a cada segundo enquanto roda
+
+  const timer = clockRunning && clockEndsAt
+    ? Math.max(0, Math.round((clockEndsAt - nowTick) / 1000))
+    : clockRemaining;
+  const isActive = clockRunning;
   const [matchId, setMatchId] = useState(matchState?.matchId || null);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalTeam, setGoalTeam] = useState(null);
@@ -48,6 +62,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const [finishedMatch, setFinishedMatch] = useState(null);
   const [allMatchPlayers, setAllMatchPlayers] = useState([]);
   const [dailyStandings, setDailyStandings] = useState([]);
+  const [drawResultId, setDrawResultId] = useState(matchState?.drawResultId || drawResult?.drawResultId || null);
   const [showStandings, setShowStandings] = useState(false);
   const [tieChoice, setTieChoice] = useState(null);
 
@@ -106,12 +121,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     if (matchState?.allTeams) {
       setAllTeams(matchState.allTeams);
       setCurrentMatch(matchState.currentMatch);
-      setTimer(matchState.timer ?? 600);
       setMatchId(matchState.matchId);
       setGoalkeeperQueue(matchState.goalkeeperQueue || []);
       setGkOverride(matchState.gkOverride || { A: null, B: null });
       setBenchedByTeam(matchState.benchedByTeam || {});
       setBorrowedByTeam(matchState.borrowedByTeam || {});
+      setDrawResultId(matchState.drawResultId || null);
       setLoading(false);
       return;
     }
@@ -130,6 +145,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setAllTeams(teams);
     setCurrentMatch(match);
     setGoalkeeperQueue(drawResult.goalkeeperQueue || []);
+    setDrawResultId(drawResult.drawResultId || null);
 
     // Banco inicial
     const initialBench = {};
@@ -164,24 +180,83 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setMatchState({
       allTeams,
       currentMatch,
-      timer,
       matchId,
       goalkeeperQueue,
       gkOverride,
       benchedByTeam,
-      borrowedByTeam
+      borrowedByTeam,
+      drawResultId
     });
   }, [
     allTeams,
     currentMatch,
-    timer,
     matchId,
     goalkeeperQueue,
     gkOverride,
     benchedByTeam,
     borrowedByTeam,
+    drawResultId,
     setMatchState
   ]);
+
+  // Busca o cronômetro real do banco sempre que a partida (matchId) muda —
+  // fonte da verdade é o servidor, não o localStorage de quem abriu a tela.
+  useEffect(() => {
+    if (!matchId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('matches')
+        .select('clock_running, clock_ends_at, clock_remaining_seconds')
+        .eq('id', matchId)
+        .maybeSingle();
+      if (!data) return;
+      if (data.clock_running && data.clock_ends_at) {
+        setClockRunning(true);
+        setClockEndsAt(new Date(data.clock_ends_at).getTime());
+      } else {
+        setClockRunning(false);
+        setClockEndsAt(null);
+        setClockRemaining(data.clock_remaining_seconds ?? 600);
+      }
+    })();
+  }, [matchId]);
+
+  // Tick de 1 em 1 segundo enquanto o cronômetro roda — só força o
+  // recálculo do tempo restante (que é derivado de clockEndsAt), não
+  // decrementa nada diretamente.
+  useEffect(() => {
+    if (!clockRunning) return;
+    const iv = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [clockRunning]);
+
+  const handleToggleClock = useCallback(async () => {
+    if (clockRunning) {
+      // Pausar: congela o tempo restante calculado agora
+      const remaining = clockEndsAt ? Math.max(0, Math.round((clockEndsAt - Date.now()) / 1000)) : clockRemaining;
+      setClockRunning(false);
+      setClockEndsAt(null);
+      setClockRemaining(remaining);
+      if (matchId) {
+        await supabase.from('matches').update({
+          clock_running: false,
+          clock_ends_at: null,
+          clock_remaining_seconds: remaining,
+        }).eq('id', matchId);
+      }
+    } else {
+      Sounds.whistle();
+      const endsAt = Date.now() + clockRemaining * 1000;
+      setClockRunning(true);
+      setClockEndsAt(endsAt);
+      if (matchId) {
+        await supabase.from('matches').update({
+          clock_running: true,
+          clock_ends_at: new Date(endsAt).toISOString(),
+        }).eq('id', matchId);
+      }
+    }
+  }, [clockRunning, clockEndsAt, clockRemaining, matchId]);
 
   // Time de linha ativo (titulares) de um time: todos menos quem está no banco,
   // mais qualquer jogador emprestado (ponto 1b, time incompleto). É a fonte da
@@ -205,20 +280,17 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   );
 
   const loadDailyStandings = useCallback(async () => {
-    if (!currentBaba) return;
+    if (!currentBaba || !drawResultId) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-
       const { data, error } = await supabase
         .from('matches')
         .select(
           'team_a_name, team_b_name, team_a_score, team_b_score, status'
         )
         .eq('baba_id', currentBaba.id)
-        .eq('status', 'finished')
-        .gte('match_date', `${today}T00:00:00`)
-        .lte('match_date', `${today}T23:59:59`);
+        .eq('draw_result_id', drawResultId)
+        .eq('status', 'finished');
 
       if (error) throw error;
 
@@ -231,7 +303,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         err
       );
     }
-  }, [currentBaba]);
+  }, [currentBaba, drawResultId]);
 
   useEffect(() => {
     loadDailyStandings();
@@ -265,8 +337,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           .from('matches')
           .select('id')
           .eq('baba_id', currentBaba.id)
-          .gte('match_date', `${today}T00:00:00`)
-          .lte('match_date', `${today}T23:59:59`)
+          .eq('draw_result_id', drawResultId)
           .eq('status', 'in_progress')
           .limit(1)
           .maybeSingle();
@@ -288,7 +359,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 match_date: `${today}T${gt}:00`,
                 team_a_name: teamA.name,
                 team_b_name: teamB.name,
-                status: 'in_progress'
+                status: 'in_progress',
+                draw_result_id: drawResultId
               }
             ])
             .select()
@@ -404,7 +476,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     [
       currentBaba,
       benchedByTeam,
-      borrowedByTeam
+      borrowedByTeam,
+      drawResultId
     ]
   );
 
@@ -714,7 +787,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
   const handleMatchEnd = useCallback(async () => {
     if (!currentMatch) return;
 
-    setIsActive(false);
+    setClockRunning(false);
+    setClockEndsAt(null);
 
     Sounds.whistle();
 
@@ -826,19 +900,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       loadDailyStandings();
     }
 
-    if (currentBaba) {
-      const today = new Date()
-        .toISOString()
-        .split('T')[0];
-
+    if (currentBaba && drawResultId) {
       await supabase
         .from('draw_results')
         .update({
           teams: queue,
           goalkeeper_queue: gkQueue
         })
-        .eq('baba_id', currentBaba.id)
-        .eq('draw_date', today);
+        .eq('id', drawResultId);
     }
 
     setFinishedMatch({
@@ -856,26 +925,20 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     goalkeeperQueue,
     matchId,
     loadDailyStandings,
-    currentBaba
+    currentBaba,
+    drawResultId
   ]);
 
   // ============================================================
-  // CRONÔMETRO
+  // CRONÔMETRO — finaliza sozinho quando bate 0 (a contagem em si vem do
+  // clockEndsAt/nowTick, ver handleToggleClock e o useEffect de tick acima)
   // ============================================================
   useEffect(() => {
-    let iv = null;
-
-    if (isActive && timer > 0) {
-      iv = setInterval(() => {
-        setTimer(p => p - 1);
-      }, 1000);
-    } else if (timer === 0 && isActive) {
-      setIsActive(false);
+    if (clockRunning && timer === 0) {
+      setClockRunning(false);
       handleMatchEnd();
     }
-
-    return () => clearInterval(iv);
-  }, [isActive, timer, handleMatchEnd]);
+  }, [clockRunning, timer, handleMatchEnd]);
 
   // ============================================================
   // IMPORTANTE:
@@ -946,19 +1009,14 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       }
 
       // Salva a nova fila.
-      if (currentBaba) {
-        const today = new Date()
-          .toISOString()
-          .split('T')[0];
-
+      if (currentBaba && drawResultId) {
         await supabase
           .from('draw_results')
           .update({
             teams: queue,
             goalkeeper_queue: nextGkQueue
           })
-          .eq('baba_id', currentBaba.id)
-          .eq('draw_date', today);
+          .eq('id', drawResultId);
       }
 
       toast.success(
@@ -980,7 +1038,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       matchId,
       currentMatch,
       loadDailyStandings,
-      currentBaba
+      currentBaba,
+      drawResultId
     ]
   );
 
@@ -1001,8 +1060,9 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       }
 
       setAllTeams(queue);
-      setTimer(600);
-      setIsActive(false);
+      setClockRunning(false);
+      setClockEndsAt(null);
+      setClockRemaining(600);
 
       const match = {
         teamA: queue[0],
@@ -1165,13 +1225,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           </div>
 
           <button
-            onClick={() => {
-              setIsActive(a => !a);
-
-              if (!isActive) {
-                Sounds.whistle();
-              }
-            }}
+            onClick={handleToggleClock}
             className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
               isActive
                 ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'

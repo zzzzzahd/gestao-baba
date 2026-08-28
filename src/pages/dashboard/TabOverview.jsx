@@ -37,10 +37,11 @@ const TabOverview = ({
   useEffect(() => {
     if (!currentBaba?.id) return;
     const today = new Date().toISOString().split('T')[0];
-    supabase.from('draw_results').select('status')
+    supabase.from('draw_results').select('id')
       .eq('baba_id', currentBaba.id).eq('draw_date', today)
+      .eq('status', 'active')
       .limit(1).maybeSingle()
-      .then(({ data }) => setActiveSession(data?.status === 'active'));
+      .then(({ data }) => setActiveSession(!!data));
   }, [currentBaba?.id]);
 
   return (
@@ -48,7 +49,7 @@ const TabOverview = ({
 
       {activeSession && (
         <button
-          onClick={() => navigate(canManage ? '/draw' : '/teams')}
+          onClick={() => navigate(canManage ? '/draw?resume=1' : '/teams')}
           className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 transition-colors"
         >
           <Radio size={16} className="text-red-400 animate-pulse shrink-0" />

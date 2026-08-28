@@ -51,6 +51,26 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
   const totalPlayers = teams.reduce((s, t) => s + (t.players?.length || 0), 0);
   const gameDate = new Date().toISOString().split('T')[0];
 
+  // Se a partida já começou (presença já foi confirmada, existe match
+  // in_progress dessa sessão), não faz sentido abrir o checklist de presença
+  // de novo — só reabre a partida ao vivo direto.
+  const [matchAlreadyStarted, setMatchAlreadyStarted] = useState(false);
+  const [checkingMatch, setCheckingMatch] = useState(true);
+
+  useEffect(() => {
+    if (!currentBaba?.id || !drawResult?.drawResultId) { setCheckingMatch(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from('matches').select('id')
+        .eq('baba_id', currentBaba.id)
+        .eq('draw_result_id', drawResult.drawResultId)
+        .eq('status', 'in_progress')
+        .limit(1).maybeSingle();
+      setMatchAlreadyStarted(!!data);
+      setCheckingMatch(false);
+    })();
+  }, [currentBaba?.id, drawResult?.drawResultId]);
+
   const handlePresenceConfirmed = ({ teams: newTeams, reserves: newReserves }) => {
     setShowPresenceCheck(false);
     onUpdateDrawResult?.({ teams: newTeams, reserves: newReserves });
@@ -149,13 +169,24 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
       <div className="space-y-3 pt-2">
         <TeamsShareButton teams={teams} reserves={reserves} babaName={currentBaba?.name} />
         {canManage ? (
-          <button
-            onClick={() => setShowPresenceCheck(true)}
-            className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all"
-            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
-          >
-            <Play size={18} /> Iniciar Partida
-          </button>
+          matchAlreadyStarted ? (
+            <button
+              onClick={onNext}
+              className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+            >
+              <Play size={18} /> Ir pra partida ao vivo
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowPresenceCheck(true)}
+              disabled={checkingMatch}
+              className="w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+            >
+              <Play size={18} /> Iniciar Partida
+            </button>
+          )
         ) : (
           <div className="text-center py-4 border border-dashed border-border-mid rounded-2xl">
             <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">

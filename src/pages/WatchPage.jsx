@@ -1,7 +1,7 @@
 // src/pages/WatchPage.jsx
 // Ponto 7: substitui a antiga "página times" (descontinuada) — qualquer membro
 // do baba pode acompanhar o sorteio do dia sem precisar controlar a partida:
-// times sorteados, ordem da fila e classificação do dia, atualizando sozinho.
+// cronômetro, placar, ordem da fila e classificação do dia, atualizando sozinho.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,37 +12,51 @@ import { computeDailyTeamStandings } from '../utils/bracket';
 
 const POLL_MS = 10000;
 
+const formatTime = (s) =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
 const WatchPage = () => {
   const navigate = useNavigate();
   const { currentBaba } = useBaba();
 
   const [teams,         setTeams]         = useState([]);
   const [goalkeeperQueue, setGoalkeeperQueue] = useState([]);
-  const [liveMatch,     setLiveMatch]     = useState(null); // { team_a_name, team_b_name, team_a_score, team_b_score }
+  const [liveMatch,     setLiveMatch]     = useState(null); // { team_a_name, team_b_name, team_a_score, team_b_score, clock_* }
   const [standings,     setStandings]     = useState([]);
   const [loading,       setLoading]       = useState(true);
-  const [sessionStatus, setSessionStatus] = useState(null); // 'active' | 'finished' | null (sem sorteio hoje)
+  const [sessionStatus, setSessionStatus] = useState(null); // 'active' | null (sem sessão ativa agora)
+  const [nowTick,       setNowTick]       = useState(Date.now());
 
   const load = useCallback(async () => {
     if (!currentBaba?.id) return;
     const today = new Date().toISOString().split('T')[0];
 
-    const [{ data: draw }, { data: matches }] = await Promise.all([
-      supabase.from('draw_results').select('*')
-        .eq('baba_id', currentBaba.id).eq('draw_date', today)
-        .limit(1).maybeSingle(),
-      supabase.from('matches')
-        .select('team_a_name, team_b_name, team_a_score, team_b_score, status')
-        .eq('baba_id', currentBaba.id)
-        .gte('match_date', `${today}T00:00:00`)
-        .lte('match_date', `${today}T23:59:59`),
-    ]);
+    // Sessão ATIVA de hoje (pode ter mais de um sorteio no dia — só o mais
+    // recente ainda ativo interessa aqui).
+    const { data: draw } = await supabase
+      .from('draw_results').select('*')
+      .eq('baba_id', currentBaba.id).eq('draw_date', today)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1).maybeSingle();
 
     setTeams(draw?.teams || []);
     setGoalkeeperQueue(draw?.goalkeeper_queue || []);
     setSessionStatus(draw?.status ?? null);
-    setStandings(computeDailyTeamStandings((matches || []).filter(m => m.status === 'finished')));
-    setLiveMatch((matches || []).find(m => m.status === 'in_progress') || null);
+
+    if (draw?.id) {
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('team_a_name, team_b_name, team_a_score, team_b_score, status, clock_running, clock_ends_at, clock_remaining_seconds')
+        .eq('baba_id', currentBaba.id)
+        .eq('draw_result_id', draw.id);
+
+      setStandings(computeDailyTeamStandings((matches || []).filter(m => m.status === 'finished')));
+      setLiveMatch((matches || []).find(m => m.status === 'in_progress') || null);
+    } else {
+      setStandings([]);
+      setLiveMatch(null);
+    }
     setLoading(false);
   }, [currentBaba?.id]);
 
@@ -51,6 +65,20 @@ const WatchPage = () => {
     const interval = setInterval(load, POLL_MS);
     return () => clearInterval(interval);
   }, [load]);
+
+  // Tick de 1s só pro cronômetro contar certinho entre uma atualização e
+  // outra (o placar/fila em si atualizam pelo poll de 10s acima).
+  useEffect(() => {
+    if (!liveMatch?.clock_running) return;
+    const iv = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [liveMatch?.clock_running]);
+
+  const clockDisplay = liveMatch
+    ? (liveMatch.clock_running && liveMatch.clock_ends_at
+        ? Math.max(0, Math.round((new Date(liveMatch.clock_ends_at).getTime() - nowTick) / 1000))
+        : (liveMatch.clock_remaining_seconds ?? 600))
+    : null;
 
   if (loading) {
     return (
@@ -94,8 +122,13 @@ const WatchPage = () => {
 
             {/* Partida em quadra agora */}
             {liveMatch && (
-              <div className="p-6 rounded-[2rem] bg-surface-1 border border-cyan-electric/30 text-center space-y-2">
+              <div className="p-6 rounded-[2rem] bg-surface-1 border border-cyan-electric/30 text-center space-y-3">
                 <p className="text-[9px] font-black text-cyan-electric uppercase tracking-widest">Em quadra agora</p>
+                <div className={`text-4xl font-black font-mono tabular-nums tracking-tighter ${
+                  clockDisplay !== null && clockDisplay < 60 ? 'text-red-500' : 'text-white'
+                }`}>
+                  {clockDisplay !== null ? formatTime(clockDisplay) : '--:--'}
+                </div>
                 <div className="flex items-center justify-center gap-4">
                   <div className="flex-1 text-right">
                     <p className="text-[10px] font-black uppercase text-cyan-electric/70 mb-1">{liveMatch.team_a_name}</p>

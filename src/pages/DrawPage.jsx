@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useDrawWizard, clearDrawWizard } from '../hooks/useDrawWizard';
 import { supabase } from '../services/supabase';
@@ -65,6 +65,8 @@ const StepLoader = () => (
 
 const DrawPage = () => {
   const navigate        = useNavigate();
+  const [searchParams]  = useSearchParams();
+  const forceResume     = searchParams.get('resume') === '1';
   const { currentBaba } = useBaba();
 
   const {
@@ -72,28 +74,42 @@ const DrawPage = () => {
     setStep, setDrawConfig, setDrawResult, setMatchState, reset,
   } = useDrawWizard(currentBaba?.id);
 
-  const [checkingAutoDraw, setCheckingAutoDraw] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(false);
   const [showManualOverride, setShowManualOverride] = useState(false);
 
-  // Se já existe sorteio ativo hoje, /draw vai direto pra partida — evita
-  // abrir configuração nova em paralelo (e também cobre o sorteio automático).
+  // Enquanto o baba do dia estiver com sessão ATIVA (ninguém finalizou ainda),
+  // pula direto pra Partida — vale tanto pro sorteio automático quanto pro
+  // manual. Isso é o que trava um novo sorteio simultâneo: só dá pra reconfigurar
+  // de novo depois que o presidente/coordenador encerrar o baba do dia.
+  //
+  // forceResume (?resume=1, usado pelo card "Partidas em andamento" do
+  // Dashboard) ignora qualquer step/drawResult travado no localStorage de uma
+  // sessão anterior (ex: preso na tela de Times) e busca o estado real do
+  // banco — sem isso, clicar no card podia cair numa etapa antiga em vez de
+  // ir direto pra partida ao vivo.
   useEffect(() => {
     if (!currentBaba?.id) return;
-    if (step !== 1 || drawResult || matchState) return;
-    setCheckingAutoDraw(true);
+    if (!forceResume && (step !== 1 || drawResult || matchState)) return; // já passou dessa etapa
+    setCheckingSession(true);
     (async () => {
       const today = new Date().toISOString().split('T')[0];
       const { data } = await supabase
         .from('draw_results').select('*')
         .eq('baba_id', currentBaba.id).eq('draw_date', today)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
         .limit(1).maybeSingle();
-      if (data?.teams?.length >= 2 && data.status !== 'finished') {
-        setDrawResult({ teams: data.teams, reserves: data.reserves || [], goalkeeperQueue: data.goalkeeper_queue || [] });
+      if (data?.teams?.length >= 2) {
+        if (forceResume) setMatchState(null); // descarta qualquer estado travado de sessão anterior
+        setDrawResult({ teams: data.teams, reserves: data.reserves || [], goalkeeperQueue: data.goalkeeper_queue || [], drawResultId: data.id });
         setStep(3);
+      } else if (forceResume) {
+        // Não achou sessão ativa nenhuma — não tem partida pra retomar.
+        setStep(1);
       }
-      setCheckingAutoDraw(false);
+      setCheckingSession(false);
     })();
-  }, [currentBaba?.id, step, drawResult, matchState]);
+  }, [currentBaba?.id, step, drawResult, matchState, forceResume]);
 
   const handleBack = () => {
     if (step === 1) navigate('/dashboard');
@@ -133,9 +149,11 @@ const DrawPage = () => {
 
         {/* Conteúdo do step ativo */}
         <Suspense fallback={<StepLoader />}>
-          {step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
+          {forceResume && checkingSession ? (
+            <StepLoader />
+          ) : step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
             <div className="text-center py-16 rounded-3xl bg-surface-1 border border-dashed border-border-mid space-y-3 px-6">
-              <Settings2 size={28} className={`text-cyan-electric mx-auto ${checkingAutoDraw ? 'animate-spin' : ''}`} />
+              <Settings2 size={28} className={`text-cyan-electric mx-auto ${checkingSession ? 'animate-spin' : ''}`} />
               <p className="text-[11px] font-black uppercase tracking-widest text-white">
                 Sorteio automático ligado
               </p>

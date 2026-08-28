@@ -85,7 +85,8 @@ export const persistDrawResultTeams = async (babaId, gameDate, teams, reserves) 
     .from('draw_results')
     .update({ teams, reserves, teams_snapshot: teams })
     .eq('baba_id', babaId)
-    .eq('draw_date', gameDate);
+    .eq('draw_date', gameDate)
+    .eq('status', 'active');
   if (error) throw error;
 };
 
