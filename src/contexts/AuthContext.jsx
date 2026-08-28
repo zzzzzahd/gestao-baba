@@ -98,10 +98,14 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
-  // captchaToken vem do widget Cloudflare Turnstile exibido no cadastro
-  // (LoginPage.jsx). O Supabase Auth valida esse token no servidor contra a
-  // secret key configurada em Authentication → Attack Protection — sem essa
+  // captchaToken vem do widget Cloudflare Turnstile exibido na LoginPage.jsx.
+  // O Supabase Auth valida esse token no servidor contra a secret key
+  // configurada em Authentication → Attack Protection — sem essa
   // configuração habilitada lá, passar o token aqui não tem efeito nenhum.
+  // IMPORTANTE: se "CAPTCHA protection" estiver habilitado no projeto, ele é
+  // exigido em TODOS os endpoints protegidos (/signup, /token, /recover),
+  // não só no cadastro — por isso signIn e resetPasswordForEmail também
+  // recebem captchaToken abaixo.
   const signUp = async (email, password, metadata = {}, captchaToken) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -136,9 +140,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signIn = async (email, password) => {
+  const signIn = async (email, password, captchaToken) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: {
+          ...(captchaToken ? { captchaToken } : {}),
+        },
+      });
       if (error) throw error;
       toast.success('Login realizado com sucesso!');
       return { data, error: null };
@@ -159,10 +169,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Envia o email com o link de recuperação de senha
-  const resetPasswordForEmail = async (email) => {
+  const resetPasswordForEmail = async (email, captchaToken) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/redefinir-senha`,
+        ...(captchaToken ? { captchaToken } : {}),
       });
       if (error) throw error;
       toast.success('Enviamos um link de recuperação para o seu email!');

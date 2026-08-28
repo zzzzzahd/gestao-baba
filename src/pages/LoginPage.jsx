@@ -2,19 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
+import toast from 'react-hot-toast';
 
-// Cloudflare Turnstile — protege o CADASTRO contra bots/scripts automatizados.
-// Escolhido em vez do reCAPTCHA por não depender de conta Google e ter uma
-// postura de privacidade mais simples de justificar sob a LGPD.
+// Cloudflare Turnstile — protege LOGIN, CADASTRO e RECUPERAÇÃO DE SENHA
+// contra bots/scripts automatizados.
+//
+// Estratégia de UX: no LOGIN o widget roda em modo "invisible" — não aparece
+// nada na tela na maioria das vezes, só dispara um desafio visual se o
+// Cloudflare desconfiar do acesso. No CADASTRO e na RECUPERAÇÃO DE SENHA o
+// widget é visível (managed), já que são ações mais sensíveis/raras e o
+// atrito extra é aceitável ali.
+//
+// Importante: o "CAPTCHA protection" do Supabase Auth (Dashboard →
+// Authentication → Attack Protection) é global — se estiver habilitado, ele
+// exige captchaToken em TODOS os endpoints protegidos (/token, /signup,
+// /recover). Por isso os três fluxos abaixo usam um widget Turnstile cada.
 //
 // Pré-requisitos (fora deste arquivo):
 //   1. Criar um site no Cloudflare Turnstile e definir
 //      VITE_TURNSTILE_SITE_KEY no .env / variáveis de ambiente do Vercel.
-//   2. Habilitar "CAPTCHA protection" no Supabase Auth (Dashboard →
-//      Authentication → Attack Protection), colando lá a SECRET key do
-//      Turnstile — é o Supabase Auth que valida o token no servidor.
-//   3. AuthContext.signUp precisa aceitar e repassar o captchaToken em
-//      supabase.auth.signUp({ email, password, options: { data, captchaToken } }).
+//   2. Habilitar "CAPTCHA protection" no Supabase Auth, colando lá a SECRET
+//      key do Turnstile — é o Supabase Auth que valida o token no servidor.
+//   3. AuthContext.signIn / signUp / resetPasswordForEmail precisam aceitar
+//      e repassar o captchaToken pra supabase-js.
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
@@ -55,54 +65,161 @@ const LoginPage = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent]     = useState(false);
 
-  // Turnstile (captcha) — só existe/renderiza na tela de cadastro
   const turnstileReady = useTurnstileScript();
-  const turnstileContainerRef = useRef(null);
-  const turnstileWidgetIdRef = useRef(null);
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaError, setCaptchaError] = useState(false);
+
+  // ── Widget INVISÍVEL — login ──────────────────────────────────────────
+  // Não renderiza nada visível; é disparado sob demanda via execute() no
+  // submit, e resolve/rejeita a Promise abaixo através do callback configurado.
+  const loginContainerRef = useRef(null);
+  const loginWidgetIdRef  = useRef(null);
+  const pendingResolveRef = useRef(null);
+  const pendingRejectRef  = useRef(null);
+
+  useEffect(() => {
+    if (!turnstileReady || !loginContainerRef.current || !TURNSTILE_SITE_KEY) return;
+    if (loginWidgetIdRef.current !== null) return;
+
+    loginWidgetIdRef.current = window.turnstile.render(loginContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: 'dark',
+      size: 'invisible',
+      callback: (token) => {
+        if (pendingResolveRef.current) {
+          pendingResolveRef.current(token);
+          pendingResolveRef.current = null;
+          pendingRejectRef.current = null;
+        }
+      },
+      'error-callback': () => {
+        if (pendingRejectRef.current) {
+          pendingRejectRef.current(new Error('captcha_error'));
+          pendingResolveRef.current = null;
+          pendingRejectRef.current = null;
+        }
+      },
+      'expired-callback': () => {
+        if (pendingRejectRef.current) {
+          pendingRejectRef.current(new Error('captcha_expired'));
+          pendingResolveRef.current = null;
+          pendingRejectRef.current = null;
+        }
+      },
+    });
+
+    return () => {
+      if (loginWidgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(loginWidgetIdRef.current);
+        loginWidgetIdRef.current = null;
+      }
+    };
+  }, [turnstileReady]);
+
+  // Dispara o desafio invisível e devolve uma Promise com o token.
+  // Resolve com '' se o Turnstile não estiver configurado (sem site key).
+  const executeInvisibleCaptcha = () => {
+    if (!TURNSTILE_SITE_KEY) return Promise.resolve('');
+    return new Promise((resolve, reject) => {
+      if (!window.turnstile || loginWidgetIdRef.current === null) {
+        resolve('');
+        return;
+      }
+      pendingResolveRef.current = resolve;
+      pendingRejectRef.current = reject;
+      window.turnstile.execute(loginWidgetIdRef.current);
+
+      // Timeout de segurança — evita ficar preso pra sempre se o callback
+      // nunca disparar por algum motivo de rede/bloqueio.
+      setTimeout(() => {
+        if (pendingResolveRef.current) {
+          pendingResolveRef.current = null;
+          pendingRejectRef.current = null;
+          reject(new Error('captcha_timeout'));
+        }
+      }, 15000);
+    });
+  };
+
+  // ── Widget VISÍVEL — cadastro ─────────────────────────────────────────
+  const signupContainerRef = useRef(null);
+  const signupWidgetIdRef  = useRef(null);
+  const [signupCaptchaToken, setSignupCaptchaToken] = useState('');
+  const [signupCaptchaError, setSignupCaptchaError] = useState(false);
+
+  useEffect(() => {
+    if (isLogin || !turnstileReady || !signupContainerRef.current || !TURNSTILE_SITE_KEY) return;
+    if (signupWidgetIdRef.current !== null) return;
+
+    signupWidgetIdRef.current = window.turnstile.render(signupContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: 'dark',
+      callback: (token) => {
+        setSignupCaptchaToken(token);
+        setSignupCaptchaError(false);
+      },
+      'expired-callback': () => setSignupCaptchaToken(''),
+      'error-callback': () => {
+        setSignupCaptchaToken('');
+        setSignupCaptchaError(true);
+      },
+    });
+
+    return () => {
+      if (signupWidgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(signupWidgetIdRef.current);
+        signupWidgetIdRef.current = null;
+      }
+      setSignupCaptchaToken('');
+    };
+  }, [isLogin, turnstileReady]);
+
+  // ── Widget VISÍVEL — recuperação de senha (dentro do modal) ───────────
+  const forgotContainerRef = useRef(null);
+  const forgotWidgetIdRef  = useRef(null);
+  const [forgotCaptchaToken, setForgotCaptchaToken] = useState('');
+  const [forgotCaptchaError, setForgotCaptchaError] = useState(false);
+
+  useEffect(() => {
+    if (!showForgot || !turnstileReady || !forgotContainerRef.current || !TURNSTILE_SITE_KEY) return;
+    if (forgotWidgetIdRef.current !== null) return;
+
+    forgotWidgetIdRef.current = window.turnstile.render(forgotContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: 'dark',
+      callback: (token) => {
+        setForgotCaptchaToken(token);
+        setForgotCaptchaError(false);
+      },
+      'expired-callback': () => setForgotCaptchaToken(''),
+      'error-callback': () => {
+        setForgotCaptchaToken('');
+        setForgotCaptchaError(true);
+      },
+    });
+
+    return () => {
+      if (forgotWidgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(forgotWidgetIdRef.current);
+        forgotWidgetIdRef.current = null;
+      }
+      setForgotCaptchaToken('');
+    };
+  }, [showForgot, turnstileReady]);
 
   useEffect(() => {
     if (user) navigate('/home');
   }, [user, navigate]);
 
-  // Monta o widget quando entra no modo cadastro; desmonta ao sair dele.
-  useEffect(() => {
-    if (isLogin || !turnstileReady || !turnstileContainerRef.current || !TURNSTILE_SITE_KEY) {
-      return;
-    }
-
-    if (turnstileWidgetIdRef.current !== null) return; // já renderizado
-
-    turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-      sitekey: TURNSTILE_SITE_KEY,
-      theme: 'dark',
-      callback: (token) => {
-        setCaptchaToken(token);
-        setCaptchaError(false);
-      },
-      'expired-callback': () => setCaptchaToken(''),
-      'error-callback': () => {
-        setCaptchaToken('');
-        setCaptchaError(true);
-      },
-    });
-
-    return () => {
-      if (turnstileWidgetIdRef.current !== null && window.turnstile) {
-        window.turnstile.remove(turnstileWidgetIdRef.current);
-        turnstileWidgetIdRef.current = null;
-      }
-      setCaptchaToken('');
-    };
-  }, [isLogin, turnstileReady]);
-
   const handleForgotSubmit = async (e) => {
     e.preventDefault();
     if (!forgotEmail) return;
+    if (TURNSTILE_SITE_KEY && !forgotCaptchaToken) return; // bloquear sem captcha
     setForgotLoading(true);
-    const { error } = await resetPasswordForEmail(forgotEmail);
+    const { error } = await resetPasswordForEmail(forgotEmail, forgotCaptchaToken);
     setForgotLoading(false);
+    if (window.turnstile && forgotWidgetIdRef.current !== null) {
+      window.turnstile.reset(forgotWidgetIdRef.current);
+    }
+    setForgotCaptchaToken('');
     if (!error) setForgotSent(true);
   };
 
@@ -115,35 +232,48 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isLogin && !consent) return; // bloquear sem consentimento
-    if (!isLogin && TURNSTILE_SITE_KEY && !captchaToken) return; // bloquear sem captcha
+    if (!isLogin && TURNSTILE_SITE_KEY && !signupCaptchaToken) return; // bloquear sem captcha (só cadastro)
     setLoading(true);
-    try {
-      if (isLogin) {
-        const { error } = await signIn(formData.email, formData.password);
-        if (error) setLoading(false);
-      } else {
-        const { error } = await signUp(
-          formData.email,
-          formData.password,
-          {
-            name:            formData.name,
-            consent_at:      new Date().toISOString(),
-            consent_version: '1.0',
-          },
-          captchaToken,
-        );
-        if (!error) {
-          setIsLogin(true);
-          setFormData({ email: '', password: '', name: '' });
-          setConsent(false);
-          setCaptchaToken('');
-        } else if (window.turnstile && turnstileWidgetIdRef.current !== null) {
-          // token pode ter sido consumido/rejeitado; força o usuário a resolver de novo
-          window.turnstile.reset(turnstileWidgetIdRef.current);
-          setCaptchaToken('');
-        }
+
+    if (isLogin) {
+      let token = '';
+      try {
+        token = await executeInvisibleCaptcha();
+      } catch {
+        toast.error('Não foi possível confirmar que você não é um robô. Tente novamente.');
         setLoading(false);
+        return;
       }
+      const { error } = await signIn(formData.email, formData.password, token);
+      if (window.turnstile && loginWidgetIdRef.current !== null) {
+        window.turnstile.reset(loginWidgetIdRef.current);
+      }
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await signUp(
+        formData.email,
+        formData.password,
+        {
+          name:            formData.name,
+          consent_at:      new Date().toISOString(),
+          consent_version: '1.0',
+        },
+        signupCaptchaToken,
+      );
+      if (!error) {
+        setIsLogin(true);
+        setFormData({ email: '', password: '', name: '' });
+        setConsent(false);
+        setSignupCaptchaToken('');
+      } else if (window.turnstile && signupWidgetIdRef.current !== null) {
+        // token pode ter sido consumido/rejeitado; força o usuário a resolver de novo
+        window.turnstile.reset(signupWidgetIdRef.current);
+        setSignupCaptchaToken('');
+      }
+      setLoading(false);
     } catch {
       setLoading(false);
     }
@@ -151,7 +281,7 @@ const LoginPage = () => {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const signupBlocked = !isLogin && (!consent || (TURNSTILE_SITE_KEY && !captchaToken));
+  const signupBlocked = !isLogin && (!consent || (TURNSTILE_SITE_KEY && !signupCaptchaToken));
 
   return (
     <div className="min-h-screen flex items-center justify-center p-5 bg-black">
@@ -159,6 +289,9 @@ const LoginPage = () => {
         <div className="mb-16">
           <Logo size="large" />
         </div>
+
+        {/* Container do widget invisível do login — não ocupa espaço visual */}
+        <div ref={loginContainerRef} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
@@ -230,11 +363,11 @@ const LoginPage = () => {
             </label>
           )}
 
-          {/* Captcha — só no cadastro */}
+          {/* Captcha visível — só no cadastro */}
           {!isLogin && TURNSTILE_SITE_KEY && (
             <div className="flex flex-col items-center gap-1 pt-1">
-              <div ref={turnstileContainerRef} />
-              {captchaError && (
+              <div ref={signupContainerRef} />
+              {signupCaptchaError && (
                 <p className="text-[10px] text-red-400 uppercase font-bold tracking-widest">
                   Falha ao carregar verificação, recarregue a página
                 </p>
@@ -252,7 +385,7 @@ const LoginPage = () => {
 
           <button
             type="button"
-            onClick={() => { setIsLogin(!isLogin); setConsent(false); setCaptchaToken(''); }}
+            onClick={() => { setIsLogin(!isLogin); setConsent(false); setSignupCaptchaToken(''); }}
             className="w-full p-2 text-cyan-electric text-sm hover:text-cyan-300 transition-colors"
           >
             {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
@@ -296,6 +429,19 @@ const LoginPage = () => {
                     autoFocus
                     className="w-full p-4 bg-surface-3 border border-border-strong rounded-xl text-white placeholder-text-low"
                   />
+
+                  {/* Captcha visível — recuperação de senha */}
+                  {TURNSTILE_SITE_KEY && (
+                    <div className="flex flex-col items-center gap-1">
+                      <div ref={forgotContainerRef} />
+                      {forgotCaptchaError && (
+                        <p className="text-[10px] text-red-400 uppercase font-bold tracking-widest">
+                          Falha ao carregar verificação, recarregue a página
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -306,7 +452,7 @@ const LoginPage = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={forgotLoading}
+                      disabled={forgotLoading || (TURNSTILE_SITE_KEY && !forgotCaptchaToken)}
                       className="py-4 rounded-2xl bg-cyan-electric text-black font-black uppercase text-[10px] tracking-widest disabled:opacity-40 transition-all"
                     >
                       {forgotLoading ? 'Enviando...' : 'Enviar link'}
