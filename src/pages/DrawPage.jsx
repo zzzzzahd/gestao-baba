@@ -74,7 +74,7 @@ const DrawPage = () => {
     setStep, setDrawConfig, setDrawResult, setMatchState, reset,
   } = useDrawWizard(currentBaba?.id);
 
-  const [checkingSession, setCheckingSession] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [showManualOverride, setShowManualOverride] = useState(false);
 
   // Enquanto o baba do dia estiver com sessão ATIVA (ninguém finalizou ainda),
@@ -90,10 +90,12 @@ const DrawPage = () => {
   useEffect(() => {
     if (!currentBaba?.id) return;
   
-    // Só consulta o banco quando:
-    // 1. entrou no /draw?resume=1 pelo card de partida em andamento
-    // 2. ainda está no início do wizard
-    if (!forceResume && step !== 1) return;
+    // Se não estamos retomando uma partida e já avançamos no wizard,
+    // não precisamos consultar a sessão ativa.
+    if (!forceResume && step !== 1) {
+      setCheckingSession(false);
+      return;
+    }
   
     let cancelled = false;
   
@@ -114,24 +116,35 @@ const DrawPage = () => {
           .maybeSingle();
   
         if (error) throw error;
-  
-        // Se o componente já saiu da tela, não altera estado
         if (cancelled) return;
   
         if (data?.teams?.length >= 2) {
+          console.log('[DrawPage] Sessão ativa encontrada:', data.id);
+  
+          // Primeiro carrega o sorteio REAL do banco.
           setDrawResult({
             teams: data.teams,
             reserves: data.reserves || [],
             goalkeeperQueue: data.goalkeeper_queue || [],
-            drawResultId: data.id
+            drawResultId: data.id,
           });
   
-          // Vai direto para a partida atual
+          // Não reutiliza o matchState antigo salvo pelo wizard.
+          setMatchState(null);
+  
+          // Retoma diretamente a partida.
           setStep(3);
-        } else if (forceResume) {
-          // Não existe partida ativa
+  
+          return;
+        }
+  
+        // Se veio pelo botão "Partidas em andamento",
+        // mas não existe sessão ativa, volta para configuração.
+        if (forceResume) {
+          console.log('[DrawPage] Nenhuma sessão ativa encontrada.');
           setStep(1);
         }
+  
       } catch (err) {
         if (!cancelled) {
           console.error('[DrawPage] erro ao buscar sessão ativa:', err);
@@ -148,7 +161,6 @@ const DrawPage = () => {
     return () => {
       cancelled = true;
     };
-  
   }, [currentBaba?.id, forceResume]);
 
   const handleBack = () => {
