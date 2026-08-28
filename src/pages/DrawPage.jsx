@@ -75,7 +75,7 @@ const DrawPage = () => {
   } = useDrawWizard(currentBaba?.id);
 
   const [checkingSession, setCheckingSession] = useState(true);
-  const [showManualOverride, setShowManualOverride] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   // Enquanto o baba do dia estiver com sessão ATIVA (ninguém finalizou ainda),
   // pula direto pra Partida — vale tanto pro sorteio automático quanto pro
@@ -87,81 +87,75 @@ const DrawPage = () => {
   // sessão anterior (ex: preso na tela de Times) e busca o estado real do
   // banco — sem isso, clicar no card podia cair numa etapa antiga em vez de
   // ir direto pra partida ao vivo.
-  useEffect(() => {
+  uuseEffect(() => {
     if (!currentBaba?.id) return;
-  
-    // Se não estamos retomando uma partida e já avançamos no wizard,
-    // não precisamos consultar a sessão ativa.
-    if (!forceResume && step !== 1) {
-      setCheckingSession(false);
-      return;
-    }
-  
+
     let cancelled = false;
-  
+
     const loadActiveSession = async () => {
-      setCheckingSession(true);
-  
-      try {
-        const today = new Date().toISOString().split('T')[0];
-  
-        const { data, error } = await supabase
-          .from('draw_results')
-          .select('*')
-          .eq('baba_id', currentBaba.id)
-          .eq('draw_date', today)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-  
-        if (error) throw error;
-        if (cancelled) return;
-  
-        if (data?.teams?.length >= 2) {
-          console.log('[DrawPage] Sessão ativa encontrada:', data.id);
-  
-          // Primeiro carrega o sorteio REAL do banco.
-          setDrawResult({
-            teams: data.teams,
-            reserves: data.reserves || [],
-            goalkeeperQueue: data.goalkeeper_queue || [],
-            drawResultId: data.id,
-          });
-  
-          // Não reutiliza o matchState antigo salvo pelo wizard.
-          setMatchState(null);
-  
-          // Retoma diretamente a partida.
-          setStep(3);
-  
-          return;
+        setCheckingSession(true);
+        setSessionChecked(false);
+
+        try {
+            const today = new Date().toISOString().split('T')[0];
+
+            const { data, error } = await supabase
+                .from('draw_results')
+                .select('*')
+                .eq('baba_id', currentBaba.id)
+                .eq('draw_date', today)
+                .eq('status', 'active')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (cancelled) return;
+
+            if (data?.teams?.length >= 2) {
+                console.log(
+                    '[DrawPage] Sessão ativa encontrada:',
+                    data.id
+                );
+
+                setDrawResult({
+                    teams: data.teams,
+                    reserves: data.reserves || [],
+                    goalkeeperQueue: data.goalkeeper_queue || [],
+                    drawResultId: data.id
+                });
+
+                setMatchState(null);
+                setStep(3);
+            } else if (forceResume) {
+                setStep(1);
+            }
+
+            setSessionChecked(true);
+
+        } catch (err) {
+            if (!cancelled) {
+                console.error(
+                    '[DrawPage] erro ao buscar sessão ativa:',
+                    err
+                );
+
+                setSessionChecked(true);
+            }
+        } finally {
+            if (!cancelled) {
+                setCheckingSession(false);
+            }
         }
-  
-        // Se veio pelo botão "Partidas em andamento",
-        // mas não existe sessão ativa, volta para configuração.
-        if (forceResume) {
-          console.log('[DrawPage] Nenhuma sessão ativa encontrada.');
-          setStep(1);
-        }
-  
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[DrawPage] erro ao buscar sessão ativa:', err);
-        }
-      } finally {
-        if (!cancelled) {
-          setCheckingSession(false);
-        }
-      }
     };
-  
+
     loadActiveSession();
-  
+
     return () => {
-      cancelled = true;
+        cancelled = true;
     };
-  }, [currentBaba?.id, forceResume]);
+}, [currentBaba?.id, forceResume]);
 
   const handleBack = () => {
     if (step === 1) navigate('/dashboard');
@@ -201,9 +195,9 @@ const DrawPage = () => {
 
         {/* Conteúdo do step ativo */}
         <Suspense fallback={<StepLoader />}>
-          {forceResume && checkingSession ? (
-            <StepLoader />
-          ) : step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
+        {!sessionChecked || checkingSession ? (
+    <StepLoader />
+) : step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
             <div className="text-center py-16 rounded-3xl bg-surface-1 border border-dashed border-border-mid space-y-3 px-6">
               <Settings2 size={28} className={`text-cyan-electric mx-auto ${checkingSession ? 'animate-spin' : ''}`} />
               <p className="text-[11px] font-black uppercase tracking-widest text-white">
