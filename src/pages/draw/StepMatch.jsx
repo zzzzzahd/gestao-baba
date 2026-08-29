@@ -166,7 +166,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       drawResult.goalkeeperQueue || [],
       { A: null, B: null },
       initialBench,
-      {}
+      {},
+      drawResult.drawResultId || null
     );
 
     setLoading(false);
@@ -316,7 +317,8 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       gkQueue = [],
       gkOv = { A: null, B: null },
       benchMap = benchedByTeam,
-      borrowMap = borrowedByTeam
+      borrowMap = borrowedByTeam,
+      drawResultIdParam = drawResultId
     ) => {
       if (!currentBaba) return;
 
@@ -337,7 +339,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           .from('matches')
           .select('id')
           .eq('baba_id', currentBaba.id)
-          .eq('draw_result_id', drawResultId)
+          .eq('draw_result_id', drawResultIdParam)
           .eq('status', 'in_progress')
           .limit(1)
           .maybeSingle();
@@ -360,7 +362,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 team_a_name: teamA.name,
                 team_b_name: teamB.name,
                 status: 'in_progress',
-                draw_result_id: drawResultId
+                draw_result_id: drawResultIdParam
               }
             ])
             .select()
@@ -651,65 +653,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     );
   };
 
-  // Confere o placar calculado pelos gols individuais (match_players)
-  // contra o placar resumido da partida (matches).
-  // match_players continua sendo a fonte do placar detalhado; matches recebe
-  // também o placar para Realtime, WatchPage e classificação do dia.
-  const readAndValidateMatchScore = useCallback(async (id = matchId) => {
-    if (!id) {
-      throw new Error('Partida sem match_id');
-    }
-
-    const [playersResult, matchResult] = await Promise.all([
-      supabase
-        .from('match_players')
-        .select('team, goals')
-        .eq('match_id', id),
-      supabase
-        .from('matches')
-        .select('team_a_score, team_b_score')
-        .eq('id', id)
-        .maybeSingle()
-    ]);
-
-    if (playersResult.error) throw playersResult.error;
-    if (matchResult.error) throw matchResult.error;
-    if (!matchResult.data) throw new Error('Partida não encontrada em matches');
-
-    const scoreA = (playersResult.data || [])
-      .filter(p => ['A', 'a'].includes(p.team))
-      .reduce((sum, p) => sum + Number(p.goals || 0), 0);
-    const scoreB = (playersResult.data || [])
-      .filter(p => ['B', 'b'].includes(p.team))
-      .reduce((sum, p) => sum + Number(p.goals || 0), 0);
-
-    const matchesScoreA = Number(matchResult.data.team_a_score || 0);
-    const matchesScoreB = Number(matchResult.data.team_b_score || 0);
-    const consistent = scoreA === matchesScoreA && scoreB === matchesScoreB;
-
-    if (!consistent) {
-      console.error('[MatchSync] DIVERGÊNCIA DE PLACAR', {
-        matchId: id,
-        matchPlayers: `${scoreA} x ${scoreB}`,
-        matches: `${matchesScoreA} x ${matchesScoreB}`
-      });
-    }
-
-    return { scoreA, scoreB, matchesScoreA, matchesScoreB, consistent };
-  }, [matchId]);
-
-  const repairMatchesScoreFromPlayers = useCallback(async (id, scoreA, scoreB) => {
-    const { error } = await supabase
-      .from('matches')
-      .update({
-        team_a_score: scoreA,
-        team_b_score: scoreB
-      })
-      .eq('id', id);
-
-    if (error) throw error;
-  }, []);
-
   const handleGoalClick = team => {
     setGoalTeam(team);
     setSelectedScorer('');
@@ -722,110 +665,77 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       toast.error('Selecione quem fez o gol!');
       return;
     }
-    if (!matchId || !goalTeam) {
-      toast.error('Partida ainda não está sincronizada.');
-      return;
-    }
 
     try {
-      // 1) Registro detalhado: o gol do jogador vai para match_players.
-      const { data: pd, error: playerReadError } = await supabase
+      const { data: pd } = await supabase
         .from('match_players')
-        .select('goals')
+        .select('goals,assists')
         .eq('match_id', matchId)
         .eq('player_id', selectedScorer)
         .single();
 
-      if (playerReadError) throw playerReadError;
-
-      const { error: playerGoalError } = await supabase
+      await supabase
         .from('match_players')
-        .update({ goals: Number(pd?.goals || 0) + 1 })
+        .update({
+          goals: (pd?.goals || 0) + 1
+        })
         .eq('match_id', matchId)
         .eq('player_id', selectedScorer);
 
-      if (playerGoalError) throw playerGoalError;
-
-      // Assistência continua exclusivamente em match_players.
       if (selectedAssist) {
-        const { data: ad, error: assistReadError } = await supabase
+        const { data: ad } = await supabase
           .from('match_players')
           .select('assists')
           .eq('match_id', matchId)
           .eq('player_id', selectedAssist)
           .single();
 
-        if (assistReadError) throw assistReadError;
-
-        const { error: assistError } = await supabase
+        await supabase
           .from('match_players')
-          .update({ assists: Number(ad?.assists || 0) + 1 })
+          .update({
+            assists: (ad?.assists || 0) + 1
+          })
           .eq('match_id', matchId)
           .eq('player_id', selectedAssist);
-
-        if (assistError) throw assistError;
       }
 
-      // 2) Atualiza também o placar resumido em matches.
-      // Fazemos a leitura antes para não depender do estado React, que pode
-      // estar atrasado por uma atualização Realtime.
-      const { data: matchRow, error: matchReadError } = await supabase
-        .from('matches')
-        .select('team_a_score, team_b_score')
-        .eq('id', matchId)
-        .single();
-
-      if (matchReadError) throw matchReadError;
-
-      const nextScoreA = Number(matchRow?.team_a_score || 0) + (goalTeam === 'A' ? 1 : 0);
-      const nextScoreB = Number(matchRow?.team_b_score || 0) + (goalTeam === 'B' ? 1 : 0);
-
-      const { error: matchScoreError } = await supabase
-        .from('matches')
-        .update({
-          team_a_score: nextScoreA,
-          team_b_score: nextScoreB
-        })
-        .eq('id', matchId);
-
-      if (matchScoreError) throw matchScoreError;
-
-      // 3) Confronta as duas lógicas. Se houver divergência,
-      // match_players é a referência detalhada e corrige o resumo em matches.
-      let validation = await readAndValidateMatchScore(matchId);
-
-      if (!validation.consistent) {
-        await repairMatchesScoreFromPlayers(
-          matchId,
-          validation.scoreA,
-          validation.scoreB
-        );
-        validation = await readAndValidateMatchScore(matchId);
-      }
-
-      if (!validation.consistent) {
-        throw new Error('Não foi possível sincronizar o placar entre match_players e matches.');
-      }
-
-      // O estado visual também passa a usar o valor conferido no banco.
-      setCurrentMatch(prev => ({
-        ...prev,
-        scoreA: validation.scoreA,
-        scoreB: validation.scoreB
-      }));
-
+      // Corrigido: buscava o nome só no roster bruto (currentMatch.teamX.players),
+      // que não inclui jogador emprestado (time incompleto) — usa a escalação
+      // ativa agora, senão o toast mostrava "Jogador" pra quem foi puxado de outro time.
       const scorer = getActiveLineup(
         goalTeam === 'A' ? currentMatch.teamA : currentMatch.teamB
       ).find(p => p.id === selectedScorer);
-      const scorerName = scorer?.name ?? 'Jogador';
+
+      const scorerName =
+        scorer?.name ?? 'Jogador';
+
+      setCurrentMatch(prev => ({
+        ...prev,
+        scoreA:
+          goalTeam === 'A'
+            ? prev.scoreA + 1
+            : prev.scoreA,
+        scoreB:
+          goalTeam === 'B'
+            ? prev.scoreB + 1
+            : prev.scoreB
+      }));
 
       setShowGoalModal(false);
 
-      if (navigator.vibrate) navigator.vibrate(80);
+      if (navigator.vibrate) {
+        navigator.vibrate(80);
+      }
+
       Sounds.goal();
-      toast.success(fmt(GOAL_MESSAGES, { name: scorerName }));
+
+      toast.success(
+        fmt(GOAL_MESSAGES, {
+          name: scorerName
+        })
+      );
     } catch (err) {
-      console.error('[StepMatch] handleSaveGoal:', err);
+      console.error(err);
       toast.error('Erro ao registrar gol');
     }
   };
@@ -886,32 +796,24 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
     const { teamA, teamB } = currentMatch;
 
-    // Antes de finalizar, confronta as duas representações do placar.
-    // match_players contém os gols individuais; matches contém o placar resumido.
-    // Se houver divergência, corrige matches a partir de match_players e confere
-    // novamente antes de salvar a partida como finished.
-    let scoreA = Number(currentMatch.scoreA || 0);
-    let scoreB = Number(currentMatch.scoreB || 0);
+    // Recalcula o placar a partir de match_players (fonte da verdade) em vez
+    // de confiar só no estado local — achado um caso real em produção onde
+    // uma partida tinha 3 gols registrados em match_players mas foi salva com
+    // placar final 0x0 porque o estado local (currentMatch.scoreA/scoreB)
+    // ficou dessincronizado.
+    let scoreA = currentMatch.scoreA;
+    let scoreB = currentMatch.scoreB;
 
     if (matchId) {
-      let validation = await readAndValidateMatchScore(matchId);
+      const { data: mp } = await supabase
+        .from('match_players')
+        .select('team, goals')
+        .eq('match_id', matchId);
 
-      if (!validation.consistent) {
-        console.warn('[MatchSync] Corrigindo matches a partir de match_players antes de finalizar.');
-        await repairMatchesScoreFromPlayers(
-          matchId,
-          validation.scoreA,
-          validation.scoreB
-        );
-        validation = await readAndValidateMatchScore(matchId);
+      if (mp) {
+        scoreA = mp.filter(p => ['A', 'a'].includes(p.team)).reduce((s, p) => s + (p.goals || 0), 0);
+        scoreB = mp.filter(p => ['B', 'b'].includes(p.team)).reduce((s, p) => s + (p.goals || 0), 0);
       }
-
-      if (!validation.consistent) {
-        throw new Error('Placar inconsistente: partida não pode ser finalizada.');
-      }
-
-      scoreA = validation.scoreA;
-      scoreB = validation.scoreB;
     }
 
     let queue = [...allTeams];
@@ -986,7 +888,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     }
 
     if (matchId) {
-      await supabase
+      const { error: matchUpdateErr } = await supabase
         .from('matches')
         .update({
           status: 'finished',
@@ -997,17 +899,27 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         })
         .eq('id', matchId);
 
+      if (matchUpdateErr) {
+        console.error('[StepMatch] erro ao finalizar partida:', matchUpdateErr);
+        toast.error('Erro ao salvar o placar final — tenta de novo');
+      }
+
       loadDailyStandings();
     }
 
     if (currentBaba && drawResultId) {
-      await supabase
+      const { error: queueUpdateErr } = await supabase
         .from('draw_results')
         .update({
           teams: queue,
           goalkeeper_queue: gkQueue
         })
         .eq('id', drawResultId);
+
+      if (queueUpdateErr) {
+        console.error('[StepMatch] erro ao salvar a fila:', queueUpdateErr);
+        toast.error('Erro ao salvar a fila — a próxima partida pode vir com o time errado');
+      }
     }
 
     setFinishedMatch({
@@ -1026,9 +938,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     matchId,
     loadDailyStandings,
     currentBaba,
-    drawResultId,
-    readAndValidateMatchScore,
-    repairMatchesScoreFromPlayers
+    drawResultId
   ]);
 
   // ============================================================
@@ -1096,7 +1006,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
       // Registra o empate no banco.
       if (matchId) {
-        await supabase
+        const { error: matchUpdateErr } = await supabase
           .from('matches')
           .update({
             status: 'finished',
@@ -1107,18 +1017,28 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
           })
           .eq('id', matchId);
 
+        if (matchUpdateErr) {
+          console.error('[StepMatch] erro ao finalizar partida (empate):', matchUpdateErr);
+          toast.error('Erro ao salvar o placar final — tenta de novo');
+        }
+
         loadDailyStandings();
       }
 
       // Salva a nova fila.
       if (currentBaba && drawResultId) {
-        await supabase
+        const { error: queueUpdateErr } = await supabase
           .from('draw_results')
           .update({
             teams: queue,
             goalkeeper_queue: nextGkQueue
           })
           .eq('id', drawResultId);
+
+        if (queueUpdateErr) {
+          console.error('[StepMatch] erro ao salvar a fila (empate):', queueUpdateErr);
+          toast.error('Erro ao salvar a fila — a próxima partida pode vir com o time errado');
+        }
       }
 
       toast.success(
@@ -1143,14 +1063,6 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       currentBaba,
       drawResultId
     ]
-  );
-
-  const continueAfterMatch = useCallback(
-    async queue => {
-      setShowPostGame(false);
-      proceedToNextMatch(queue);
-    },
-    []
   );
 
   const proceedToNextMatch = useCallback(
@@ -1206,6 +1118,17 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
       borrowedByTeam,
       onReset
     ]
+  );
+
+  // Corrigido: antes tinha deps [] e ficava preso pra sempre numa versão
+  // antiga de proceedToNextMatch (com goalkeeperQueue/gkOverride/etc do
+  // momento em que a tela montou, não os atuais).
+  const continueAfterMatch = useCallback(
+    async queue => {
+      setShowPostGame(false);
+      proceedToNextMatch(queue);
+    },
+    [proceedToNextMatch]
   );
 
   // ============================================================
