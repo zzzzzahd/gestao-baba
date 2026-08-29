@@ -97,6 +97,17 @@ const DrawPage = () => {
         setSessionChecked(false);
 
         try {
+          const {
+    data: { session },
+    error: sessionError
+} = await supabase.auth.getSession();
+
+if (sessionError) throw sessionError;
+
+console.log('[DrawPage] USUÁRIO AUTENTICADO:', {
+    userId: session?.user?.id,
+    email: session?.user?.email,
+});
             const today = new Date().toISOString().split('T')[0];
 
             const { data, error } = await supabase
@@ -114,11 +125,7 @@ const DrawPage = () => {
             if (cancelled) return;
 
             if (data?.teams?.length >= 2) {
-             console.log('[DrawPage] SESSÃO:', {
-  userId: session?.user?.id,
-  email: session?.user?.email,
-  sessionId: session?.access_token ? 'TOKEN_PRESENTE' : 'SEM_TOKEN',
-});;
+
 
                 setDrawResult({
                     teams: data.teams,
