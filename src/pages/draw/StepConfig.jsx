@@ -269,25 +269,43 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       // Sortear de novo descarta as partidas da sessão anterior (mesmo dia) —
       // senão a classificação/fila do dia ficaria misturando placares de
       // sorteios diferentes. match_players e cards apagam em cascata.
-      if (force && existing?.id) {
-        // 1. Encerra a sessão de sorteio anterior
-        const { error: finishErr } = await supabase
+      //
+      // IMPORTANTE: encerra TODAS as sessões ativas do dia (não só a que veio
+      // no `existing`) — isso é o que evita o erro 409 (duplicate key value
+      // violates unique constraint "idx_draw_results_one_active"): se por
+      // qualquer motivo sobrar mais de uma sessão 'active' pro mesmo baba+dia
+      // (corrida entre cliques, sobra de um teste anterior), o insert lá
+      // embaixo quebra até a última sobrar encerrada.
+      if (force) {
+        const { data: staleActives, error: staleErr } = await supabase
           .from('draw_results')
-          .update({
-            status: 'finished',
-            finished_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-      
-        if (finishErr) throw finishErr;
-      
-        // 2. Remove as partidas da sessão anterior
-        const { error: deleteMatchesErr } = await supabase
-          .from('matches')
-          .delete()
-          .eq('draw_result_id', existing.id);
-      
-        if (deleteMatchesErr) throw deleteMatchesErr;
+          .select('id')
+          .eq('baba_id', currentBaba.id)
+          .eq('draw_date', today)
+          .eq('status', 'active');
+
+        if (staleErr) throw staleErr;
+
+        if (staleActives?.length > 0) {
+          const staleIds = staleActives.map(r => r.id);
+
+          const { error: finishErr } = await supabase
+            .from('draw_results')
+            .update({
+              status: 'finished',
+              finished_at: new Date().toISOString(),
+            })
+            .in('id', staleIds);
+
+          if (finishErr) throw finishErr;
+
+          const { error: deleteMatchesErr } = await supabase
+            .from('matches')
+            .delete()
+            .in('draw_result_id', staleIds);
+
+          if (deleteMatchesErr) throw deleteMatchesErr;
+        }
       }
 
       const { data: constraints } = await supabase.rpc('get_draw_constraints', {
@@ -336,7 +354,25 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         finished_by:      null,
       }).select().single();
 
-      if (drawErr) throw drawErr;
+      if (drawErr) {
+        // Corrida rara: dois cliques quase simultâneos podem os dois passarem
+        // pela checagem acima antes de qualquer um inserir. Em vez de só
+        // falhar, reaproveita a sessão que o outro clique já criou.
+        if (drawErr.code === '23505') {
+          const { data: recovered } = await supabase
+            .from('draw_results').select('*')
+            .eq('baba_id', currentBaba.id).eq('draw_date', today)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1).maybeSingle();
+          if (recovered?.teams?.length >= 2) {
+            Sounds.unlock();
+            onNext({ teams: recovered.teams, reserves: recovered.reserves || [], goalkeeperQueue: recovered.goalkeeper_queue || [], drawResultId: recovered.id });
+            return;
+          }
+        }
+        throw drawErr;
+      }
 
       // Sprint 3 — som de sorteio
       Sounds.unlock();
