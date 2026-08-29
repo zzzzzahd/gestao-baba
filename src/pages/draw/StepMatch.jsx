@@ -865,6 +865,22 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
         'EMPATE! Saem os dois times.'
       );
 
+      // Pausa o cronômetro no banco imediatamente — sem isso, recarregar a
+      // tela antes de escolher o par ou ímpar buscava o relógio ainda
+      // "rodando e vencido" (clock_running=true com clock_ends_at no
+      // passado), disparando esse mesmo finalização de novo em loop, sem
+      // nunca deixar chegar na próxima partida.
+      setClockRunning(false);
+      setClockEndsAt(null);
+      setClockRemaining(0);
+      if (matchId) {
+        await supabase.from('matches').update({
+          clock_running: false,
+          clock_ends_at: null,
+          clock_remaining_seconds: 0,
+        }).eq('id', matchId);
+      }
+
       const rest = queue.slice(2);
 
       setTieChoice({
