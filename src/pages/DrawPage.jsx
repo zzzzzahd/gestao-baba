@@ -114,10 +114,11 @@ const DrawPage = () => {
             if (cancelled) return;
 
             if (data?.teams?.length >= 2) {
-                console.log(
-                    '[DrawPage] Sessão ativa encontrada:',
-                    data.id
-                );
+             console.log('[DrawPage] SESSÃO:', {
+  userId: session?.user?.id,
+  email: session?.user?.email,
+  sessionId: session?.access_token ? 'TOKEN_PRESENTE' : 'SEM_TOKEN',
+});;
 
                 setDrawResult({
                     teams: data.teams,
