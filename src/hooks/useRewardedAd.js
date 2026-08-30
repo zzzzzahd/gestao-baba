@@ -15,10 +15,22 @@
 //     porque não há inventário de anúncio no momento.
 //   - Só bloqueia a ação quando o anúncio realmente apareceu e a pessoa
 //     fechou/pulou antes de terminar — aí sim ela precisa tentar de novo.
+//   - Timeout de segurança: se o Google simplesmente nunca responder nada
+//     (nem sucesso, nem "sem preenchimento") — o que acontece na prática
+//     enquanto a conta AdSense ainda não foi aprovada — libera a ação depois
+//     de alguns segundos em vez de travar o usuário pra sempre. Isso já
+//     aconteceu de verdade: com VITE_ADSENSE_CLIENT_ID configurado mas a
+//     conta ainda sem aprovação, adBreakDone às vezes nunca dispara.
 
 import { useCallback, useRef } from 'react';
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+
+// Tempo máximo de espera por qualquer resposta do Google antes de liberar a
+// ação mesmo assim. Um anúncio de verdade carrega em segundos; se passar
+// disso, é sinal de que algo não vai responder (conta não aprovada, sem
+// preenchimento sem callback, bloqueador de anúncio silencioso, etc.).
+const RESPONSE_TIMEOUT_MS = 8000;
 
 function ensureAdBreakGlobals() {
   window.adsbygoogle = window.adsbygoogle || [];
@@ -35,7 +47,8 @@ export function useRewardedAd(placementName) {
 
   /**
    * @param {() => void} onGranted - chamado quando a ação deve prosseguir
-   *   (anúncio assistido até o fim, ou fallback sem anúncio disponível).
+   *   (anúncio assistido até o fim, sem preenchimento, ou timeout de
+   *   segurança — nesses três casos o usuário não deve ficar travado).
    * @param {() => void} [onSkipped] - chamado quando o anúncio apareceu mas
    *   a pessoa fechou/pulou antes de terminar. A ação NÃO deve prosseguir.
    */
@@ -48,7 +61,18 @@ export function useRewardedAd(placementName) {
     pending.current = true;
 
     ensureAdBreakGlobals();
-    let resolved = false;
+    let settled = false;
+
+    const finish = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      pending.current = false;
+      fn?.();
+    };
+
+    // Rede de segurança: nada travado indefinidamente esperando o Google.
+    const timeoutId = setTimeout(() => finish(onGranted), RESPONSE_TIMEOUT_MS);
 
     try {
       window.adBreak({
@@ -58,25 +82,21 @@ export function useRewardedAd(placementName) {
           showAdFn();
         },
         adViewed() {
-          resolved = true;
-          onGranted();
+          finish(onGranted);
         },
         adDismissed() {
-          resolved = true;
-          onSkipped?.();
+          finish(onSkipped);
         },
         adBreakDone() {
-          pending.current = false;
           // beforeReward nunca foi chamado (sem preenchimento) — não é culpa
           // do usuário, libera a ação normalmente.
-          if (!resolved) onGranted();
+          finish(onGranted);
         },
       });
     } catch {
       // Bloqueador de anúncio ou script ainda não carregou — não trava a
       // função por causa disso.
-      pending.current = false;
-      onGranted();
+      finish(onGranted);
     }
   }, [placementName]);
 
