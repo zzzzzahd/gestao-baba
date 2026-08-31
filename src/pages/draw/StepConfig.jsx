@@ -248,13 +248,16 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
     if (!canDraw) return;
     setDrawing(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // Usa a data do PRÓXIMO JOGO, não "hoje" — as confirmações (incluindo
+      // convidados) vivem sob nextGameDay.dateStr; se o sorteio salvasse sob
+      // a data do calendário, um sorteio feito num dia diferente do jogo
+      // ficava descolado de quem realmente confirmou presença (times vazios).
+      const today = nextGameDay?.dateStr || new Date().toISOString().split('T')[0];
 
       const { data: existing } = await supabase
        .from('draw_results')
        .select('*')
        .eq('baba_id', currentBaba.id)
-       .eq('draw_date', today)
        .eq('status', 'active')
        .order('created_at', { ascending: false })
        .limit(1)
@@ -281,7 +284,6 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
           .from('draw_results')
           .select('id')
           .eq('baba_id', currentBaba.id)
-          .eq('draw_date', today)
           .eq('status', 'active');
 
         if (staleErr) throw staleErr;
@@ -328,6 +330,15 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         currentBaba.gk_mode || 'fixed',
       );
 
+      // Nunca cria uma sessão de sorteio sem nenhum time — isso deixava uma
+      // sessão "active" vazia travada no banco, bloqueando qualquer sorteio
+      // seguinte (o índice único só permite 1 sessão ativa por dia).
+      if (!teams || teams.length === 0) {
+        toast.error(`Sem jogadores suficientes confirmados pra ${today === nextGameDay?.dateStr ? 'esse jogo' : today} — confere as confirmações antes de sortear.`);
+        setDrawing(false);
+        return;
+      }
+
       const avgRatings   = teams.map(t =>
         t.players.reduce((s, p) => s + (p.balance_level || 0), 0) / (t.players.length || 1)
       );
@@ -361,7 +372,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         if (drawErr.code === '23505') {
           const { data: recovered } = await supabase
             .from('draw_results').select('*')
-            .eq('baba_id', currentBaba.id).eq('draw_date', today)
+            .eq('baba_id', currentBaba.id)
             .eq('status', 'active')
             .order('created_at', { ascending: false })
             .limit(1).maybeSingle();

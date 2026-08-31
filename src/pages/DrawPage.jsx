@@ -97,24 +97,10 @@ const DrawPage = () => {
         setSessionChecked(false);
 
         try {
-          const {
-    data: { session },
-    error: sessionError
-} = await supabase.auth.getSession();
-
-if (sessionError) throw sessionError;
-
-console.log('[DrawPage] USUÁRIO AUTENTICADO:', {
-    userId: session?.user?.id,
-    email: session?.user?.email,
-});
-            const today = new Date().toISOString().split('T')[0];
-
             const { data, error } = await supabase
                 .from('draw_results')
                 .select('*')
                 .eq('baba_id', currentBaba.id)
-                .eq('draw_date', today)
                 .eq('status', 'active')
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -125,7 +111,10 @@ console.log('[DrawPage] USUÁRIO AUTENTICADO:', {
             if (cancelled) return;
 
             if (data?.teams?.length >= 2) {
-
+                console.log(
+                    '[DrawPage] Sessão ativa encontrada:',
+                    data.id
+                );
 
                 setDrawResult({
                     teams: data.teams,

@@ -29,13 +29,12 @@ const WatchPage = () => {
 
   const load = useCallback(async () => {
     if (!currentBaba?.id) return;
-    const today = new Date().toISOString().split('T')[0];
 
-    // Sessão ATIVA de hoje (pode ter mais de um sorteio no dia — só o mais
-    // recente ainda ativo interessa aqui).
+    // Sessão ativa do baba — não filtra por data, só importa se está ativa
+    // agora (o sorteio pode acontecer antes do dia do jogo).
     const { data: draw } = await supabase
       .from('draw_results').select('*')
-      .eq('baba_id', currentBaba.id).eq('draw_date', today)
+      .eq('baba_id', currentBaba.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1).maybeSingle();

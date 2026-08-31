@@ -32,13 +32,14 @@ const TabOverview = ({
   const [showActivity, setShowActivity] = useState(true);
   const [activeSession, setActiveSession] = useState(false);
 
-  // Ponto 6: sinaliza quando já tem um baba em andamento hoje (sorteio ativo,
+  // Ponto 6: sinaliza quando já tem um baba em andamento (sorteio ativo,
   // ainda não encerrado) — isso é o que trava um novo sorteio simultâneo.
+  // Não filtra por data — só importa se tem sessão ativa pro baba, não em
+  // qual dia ela foi arquivada (o sorteio pode acontecer antes do dia do jogo).
   useEffect(() => {
     if (!currentBaba?.id) return;
-    const today = new Date().toISOString().split('T')[0];
     supabase.from('draw_results').select('id')
-      .eq('baba_id', currentBaba.id).eq('draw_date', today)
+      .eq('baba_id', currentBaba.id)
       .eq('status', 'active')
       .limit(1).maybeSingle()
       .then(({ data }) => setActiveSession(!!data));
