@@ -109,7 +109,7 @@ export const getNextGameDay = (baba) => {
 
 // ─────────────────────────────────────────────
 // SORTEIO BALANCEADO POR NÍVEL (abaixo/na média/acima)
-// balance_level vem de player_rating_summary.avg_level (ou guest_level p/ convidados)
+// balance_level vem de player_rating_summary.avg_level (ou balance_level p/ convidados)
 // — não usa mais final_rating (esse fica só p/ perfil/stats).
 // ─────────────────────────────────────────────
 export const generateBalancedTeams = (players, numTeams = 2) => {
@@ -729,7 +729,7 @@ export const BabaProvider = ({ children }) => {
 
       const enriched = confirmed.map(p => ({
         ...p,
-        balance_level: p.is_guest ? (p.guest_level ?? 2) : (levelMap.get(p.id) ?? 2),
+        balance_level: p.is_guest ? (p.balance_level ?? 2) : (levelMap.get(p.id) ?? 2),
       }));
 
       const numTeams  = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));

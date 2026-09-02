@@ -204,7 +204,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
 
       const { data: newPlayer, error: playerErr } = await supabase
         .from('players')
-        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, guest_level: guestLevel }])
+        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, balance_level: guestLevel }])
         .select().single();
       if (playerErr) throw playerErr;
 
@@ -320,7 +320,7 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       const confirmedIds     = gameConfirmations.map(c => c.player_id);
       const confirmedPlayers = players
         .filter(p => confirmedIds.includes(p.id))
-        .map(p => ({ ...p, balance_level: p.is_guest ? (p.guest_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
+        .map(p => ({ ...p, balance_level: p.is_guest ? (p.balance_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
 
       const { teams, reserves, goalkeeperQueue } = drawTeamsWithConstraints(
         confirmedPlayers,

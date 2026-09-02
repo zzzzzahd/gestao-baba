@@ -58,7 +58,7 @@ const DrawConfigBlock = ({
 
       const { data: newPlayer, error: playerErr } = await supabase
         .from('players')
-        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, guest_level: guestLevel }])
+        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, balance_level: guestLevel }])
         .select().single();
       if (playerErr) throw playerErr;
 
