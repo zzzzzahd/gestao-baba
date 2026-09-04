@@ -32,7 +32,7 @@ const PAGES = {
   '/privacidade': PrivacyPage,
   '/visitor':     VisitorMode,
   '/sobre':       AboutPage,
-  '/perfil/:id':  PublicProfilePage,
+  '/player/:userId':  PublicProfilePage,
 };
 
 export function render(url) {

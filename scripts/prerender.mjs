@@ -45,7 +45,7 @@ const ROUTE_META = {
     title: 'Sobre - Draft Play',
     description: 'Conheça o Draft Play: gestão de peladas e babas, sorteio de times, financeiro e ranking em um só lugar.',
   },
-  '/perfil/:id': {
+  '/player/:userId': {
     title: 'Perfil Público - Draft Play',
     description: 'Perfil público de um usuário do Draft Play.',
   },
