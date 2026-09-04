@@ -18,7 +18,6 @@ import BadgesSection      from '../components/BadgesSection';
 import ThemeToggle        from '../components/ThemeToggle';
 import { PlanBadge }     from '../components/PlanBadge';
 import ReferralPanel     from '../components/ReferralPanel';
-import AdBanner          from '../components/AdBanner';
 import ExportDataModal   from '../components/ExportDataModal';
 import DeleteAccountModal from '../components/DeleteAccountModal';
 import DivisionChangeScreen from '../components/DivisionChangeScreen';
@@ -382,10 +381,6 @@ const ProfilePage = () => {
           </div>
         )}
 
-        {/* ── Banner AdSense — rodapé do Perfil/Estatísticas (Free/anônimo) ── */}
-        {tab === 'stats' && (
-          <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PROFILE} className="mt-2" />
-        )}
       </div>
 
       <ShareableCardModal

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
+import AdBanner from '../components/AdBanner';
 import {
   LogIn, Zap, Users, Shuffle, Radio, Star,
   UserCheck, Wallet, Trophy, ShieldCheck, Sparkles, CheckCircle2,
@@ -244,6 +245,9 @@ const LandingPage = () => {
             Coordenador de baba{/* TODO: trocar por nome real com autorização da pessoa */}
           </p>
         </div>
+
+        {/* ── Banner AdSense — página pública, com conteúdo editorial real ── */}
+        <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_LANDING} className="mt-2" />
 
         {/* Footer */}
         <div className="text-center space-y-3">

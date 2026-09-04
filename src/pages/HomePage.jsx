@@ -17,7 +17,6 @@ import toast from 'react-hot-toast';
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
 import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
-import AdBanner                   from '../components/AdBanner';
 import { isStandalonePWA } from '../utils/pwaInstallPrompt';
 
 // ─── Countdown hook inline ─────────────────────────────────────────────────────
@@ -547,8 +546,6 @@ const HomePage = () => {
           </button>
         </div>
 
-        {/* ── Banner AdSense — rodapé da lista de babas (Free/anônimo) ── */}
-        <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_HOME} className="mt-4" />
       </div>
       {/* ── Fim do container scrollável ── */}
 

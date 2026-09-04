@@ -20,7 +20,6 @@ import ModeSelector    from '../components/ModeSelector';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
 import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
 import { PlanBadge } from '../components/PlanBadge';
-import AdBanner from '../components/AdBanner';
 import toast from 'react-hot-toast';
 
 const TabOverview  = lazy(() => import('./dashboard/TabOverview'));
@@ -358,13 +357,6 @@ const DashboardPage = () => {
           </Suspense>
         </div>
 
-        {/* ── Banner AdSense — rodapé da Home/Dashboard (Free/anônimo).
-               Só na aba overview: manage/postgame ficam perto de sorteio e
-               partida ao vivo, que são telas de ação — combinado não pôr
-               anúncio ali. ── */}
-        {activeTab === 'overview' && (
-          <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_DASHBOARD} className="mt-4" />
-        )}
       </div>
 
       {/* ── Modais ── */}

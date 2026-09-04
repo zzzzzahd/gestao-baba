@@ -5,6 +5,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Info, Mail } from 'lucide-react';
+import AdBanner from '../components/AdBanner';
 
 const Section = ({ title, children }) => (
   <div className="space-y-2">
@@ -60,6 +61,9 @@ export default function AboutPage() {
             — sorteio de times equilibrados na hora, de graça, sem cadastro.
           </p>
         </Section>
+
+        {/* ── Banner AdSense — página pública, com conteúdo editorial real ── */}
+        <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_ABOUT} className="my-2" />
 
         <Section title="Contato">
           <p className="flex items-center gap-2">

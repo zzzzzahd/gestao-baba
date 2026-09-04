@@ -12,6 +12,7 @@ import { ArrowLeft, Star, UserPlus, UserMinus, Share2, Instagram, Users, Edit3 }
 import StreakBadge from '../components/StreakBadge';
 import DivisionBadge from '../components/DivisionBadge';
 import { POSITION_LABEL } from '../constants/positions';
+import AdBanner from '../components/AdBanner';
 
 const RARITY_COLOR = {
   legendary: 'text-yellow-400',
@@ -385,6 +386,9 @@ export default function PublicProfilePage() {
             <p className="text-[11px] font-black text-text-muted uppercase">Nenhuma partida ainda</p>
           </div>
         )}
+
+        {/* ── Banner AdSense — página pública, com conteúdo editorial real (perfil do jogador) ── */}
+        <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PUBLIC_PROFILE} className="mt-2" />
       </div>
     </div>
   );
