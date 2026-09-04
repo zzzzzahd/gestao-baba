@@ -5,8 +5,9 @@
 // de conquistas fixa no código rodando em paralelo; removida.
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate }      from 'react-router-dom';
-import { supabase }                    from '../services/supabase';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { getPublicProfileData } from '../services/publicProfileService';
 import { useAuth }                     from '../contexts/AuthContext';
 import { ArrowLeft, Star, UserPlus, UserMinus, Share2, Instagram, Users, Edit3 } from 'lucide-react';
 import StreakBadge from '../components/StreakBadge';
@@ -21,116 +22,55 @@ const RARITY_COLOR = {
   common:    'text-text-low',
 };
 
-export default function PublicProfilePage() {
+export default function PublicProfilePage({ initialData = null }) {
   const { userId } = useParams();
   const navigate   = useNavigate();
   const { user }   = useAuth();
 
-  const [profile,   setProfile]   = useState(null);
-  const [stats,     setStats]     = useState(null);
-  const [streak,    setStreak]    = useState(0);
-  const [earnedBadges, setEarnedBadges] = useState([]); // badges do Sprint 14
-  const [following, setFollowing] = useState(false);
-  const [followers, setFollowers] = useState(0);
-  const [loading,   setLoading]   = useState(true);
-  const [notFound,  setNotFound]  = useState(false);
-  const [toggling,  setToggling]  = useState(false);
+const [profile, setProfile] = useState(initialData?.profile || null);
+const [stats, setStats] = useState(initialData?.stats || null);
+const [streak, setStreak] = useState(initialData?.streak || 0);
+const [earnedBadges, setEarnedBadges] = useState(
+  initialData?.earnedBadges || []
+);
+const [following, setFollowing] = useState(false);
+const [followers, setFollowers] = useState(
+  initialData?.followers || 0
+);
+const [loading, setLoading] = useState(!initialData);
+const [notFound, setNotFound] = useState(false);
+const [toggling, setToggling] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
     if (!userId) return;
+  
+    // No SSR os dados já foram carregados pelo entry-server.
+    // No navegador, carregamos/atualizamos os dados normalmente.
     loadPublicProfile();
-  }, [userId]);
+  }, [userId, user]);
 
   const loadPublicProfile = async () => {
     setLoading(true);
+  
     try {
-      // 1. Perfil (inclui campos novos do Sprint 19)
-      const { data: prof, error: profErr } = await supabase
-        .from('profiles')
-        .select('id, name, avatar_url, position, favorite_team, bio, instagram_handle, preferred_position, is_public')
-        .eq('id', userId)
-        .single();
-
-      if (profErr || !prof) { setNotFound(true); return; }
-      if (prof.is_public === false) { setNotFound(true); return; }
-      setProfile(prof);
-
-      // 2. Player IDs
-      const { data: playerRows } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', userId);
-
-      const playerIds = (playerRows || []).map(p => p.id);
-
-      if (playerIds.length === 0) {
-        setStats({ goals: 0, assists: 0, matches: 0, rating: 0, babaCount: 0 });
-        setStreak(0);
-        setLoading(false);
+      const data = await getPublicProfileData(userId);
+  
+      if (!data) {
+        setNotFound(true);
         return;
       }
-
-      const babaCount = playerRows.length;
-
-      // 3. Stats de partidas
-      const { data: mp } = await supabase
-        .from('match_players')
-        .select('goals, assists')
-        .in('player_id', playerIds);
-
-      const goals   = (mp || []).reduce((s, r) => s + (r.goals   || 0), 0);
-      const assists = (mp || []).reduce((s, r) => s + (r.assists || 0), 0);
-      const matches = (mp || []).length;
-
-      // 4. Rating médio
-      const { data: ratings } = await supabase
-        .from('player_rating_summary')
-        .select('final_rating')
-        .in('player_id', playerIds);
-
-      const ratingVals = (ratings || []).map(r => r.final_rating).filter(v => v > 0);
-      const avgRating  = ratingVals.length
-        ? ratingVals.reduce((a, b) => a + b, 0) / ratingVals.length
-        : 0;
-
-      // 5. Streak
-      const { data: confs } = await supabase
-        .from('game_confirmations')
-        .select('game_date')
-        .in('player_id', playerIds)
-        .eq('status', 'confirmed')
-        .order('game_date', { ascending: false })
-        .limit(30);
-
-      let s = (confs || []).length > 0 ? 1 : 0;
-      for (let i = 1; i < (confs || []).length; i++) {
-        const prev     = new Date(confs[i - 1].game_date);
-        const curr     = new Date(confs[i].game_date);
-        const diffDays = (prev - curr) / (1000 * 60 * 60 * 24);
-        if (diffDays <= 14) s++;
-        else break;
-      }
-      setStreak(s);
-      setStats({ goals, assists, matches, rating: avgRating, babaCount });
-
-      // 6. Badges do Sprint 14 (player_badges)
-      const { data: pb } = await supabase
-        .from('player_badges')
-        .select('badge_id, earned_at, badge:badge_definitions(name, icon, rarity)')
-        .in('player_id', playerIds)
-        .order('earned_at', { ascending: false });
-      setEarnedBadges(pb || []);
-
-      // 7. Followers
-      const { count: fCount } = await supabase
-        .from('player_follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('followed_id', userId);
-      setFollowers(fCount || 0);
-
-      // 8. Verificar se o usuário logado segue
+  
+      setProfile(data.profile);
+      setStats(data.stats);
+      setStreak(data.streak);
+      setEarnedBadges(data.earnedBadges);
+      setFollowers(data.followers);
+  
+      // ---------------------------------------------------------
+      // FOLLOWING CONTINUA SENDO VERIFICADO NO CLIENTE
+      // ---------------------------------------------------------
       if (user && user.id !== userId) {
         const { data: fol } = await supabase
           .from('player_follows')
@@ -138,11 +78,13 @@ export default function PublicProfilePage() {
           .eq('follower_id', user.id)
           .eq('followed_id', userId)
           .maybeSingle();
+  
         setFollowing(!!fol);
+      } else {
+        setFollowing(false);
       }
-
-    } catch (err) {
-      console.error('[PublicProfilePage]', err);
+    } catch (error) {
+      console.error('[PublicProfilePage]', error);
       setNotFound(true);
     } finally {
       setLoading(false);

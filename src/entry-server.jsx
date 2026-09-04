@@ -1,44 +1,108 @@
-// src/entry-server.jsx
-//
-// Usado SOMENTE pelo script de pré-render (scripts/prerender.mjs), nunca pelo
-// app em runtime no navegador. Renderiza as páginas 100% públicas (que não
-// dependem de sessão/Supabase) para HTML estático, para que o crawler do
-// AdSense — e qualquer outro rastreador que não execute JS — veja conteúdo
-// real na primeira resposta, em vez do <div id="root"></div> vazio que o SPA
-// entrega por padrão.
-//
-// Cada página aqui foi conferida: nenhuma delas usa useAuth()/useBaba(), então
-// dá para renderizar isolada, sem AuthProvider/BabaProvider/BrowserRouter reais
-// nem chamadas ao Supabase durante o build.
-
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 
 import LandingPage from './pages/LandingPage';
-import TermsPage   from './pages/TermsPage';
+import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import VisitorMode from './pages/VisitorMode';
-import AboutPage   from './pages/AboutPage';
-import PublicProfilePage   from './pages/PublicProfilePage.jsx';
+import AboutPage from './pages/AboutPage';
+import PublicProfilePage from './pages/PublicProfilePage.jsx';
 
-// Rotas elegíveis para pré-render. Mantém só páginas públicas e estáveis —
-// nada que dependa de auth, dados do Supabase ou params dinâmicos.
-export const PRERENDER_ROUTES = ['/', '/termos', '/privacidade', '/visitor', '/sobre'];
+import { supabase } from './services/supabase';
+import { getPublicProfileData } from './services/publicProfileService';
+
+// ---------------------------------------------------------
+// ROTAS ESTÁTICAS
+// ---------------------------------------------------------
+
+export const PRERENDER_ROUTES = [
+  '/',
+  '/termos',
+  '/privacidade',
+  '/visitor',
+  '/sobre',
+];
+
+// ---------------------------------------------------------
+// PÁGINAS ESTÁTICAS
+// ---------------------------------------------------------
 
 const PAGES = {
-  '/':            LandingPage,
-  '/termos':      TermsPage,
+  '/': LandingPage,
+  '/termos': TermsPage,
   '/privacidade': PrivacyPage,
-  '/visitor':     VisitorMode,
-  '/sobre':       AboutPage,
-  '/player/:userId':  PublicProfilePage,
+  '/visitor': VisitorMode,
+  '/sobre': AboutPage,
 };
 
-export function render(url) {
+// ---------------------------------------------------------
+// DESCOBRIR PERFIS PÚBLICOS
+// ---------------------------------------------------------
+
+export async function getPublicProfileRoutes() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('is_public', true);
+
+  if (error) {
+    console.error(
+      '[entry-server] erro ao buscar perfis públicos:',
+      error
+    );
+
+    return [];
+  }
+
+  return (data || [])
+    .map((profile) => profile.id)
+    .filter(Boolean)
+    .map((id) => `/player/${id}`);
+}
+
+// ---------------------------------------------------------
+// RENDER
+// ---------------------------------------------------------
+
+export async function render(url) {
+  // -------------------------------------------------------
+  // PERFIL PÚBLICO DINÂMICO
+  // Exemplo: /player/abc123
+  // -------------------------------------------------------
+
+  const playerMatch = url.match(/^\/player\/([^/]+)\/?$/);
+
+  if (playerMatch) {
+    const userId = playerMatch[1];
+
+    const initialData = await getPublicProfileData(userId);
+
+    if (!initialData) {
+      throw new Error(
+        `[entry-server] perfil público não encontrado: ${userId}`
+      );
+    }
+
+    return renderToString(
+      <React.StrictMode>
+        <StaticRouter location={url}>
+          <PublicProfilePage initialData={initialData} />
+        </StaticRouter>
+      </React.StrictMode>
+    );
+  }
+
+  // -------------------------------------------------------
+  // ROTAS ESTÁTICAS
+  // -------------------------------------------------------
+
   const Page = PAGES[url];
+
   if (!Page) {
-    throw new Error(`[entry-server] rota não mapeada para pré-render: ${url}`);
+    throw new Error(
+      `[entry-server] rota não mapeada para pré-render: ${url}`
+    );
   }
 
   return renderToString(
