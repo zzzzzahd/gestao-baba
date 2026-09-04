@@ -14,7 +14,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root      = path.resolve(__dirname, '..');
@@ -45,6 +45,10 @@ const ROUTE_META = {
     title: 'Sobre - Draft Play',
     description: 'Conheça o Draft Play: gestão de peladas e babas, sorteio de times, financeiro e ranking em um só lugar.',
   },
+  '/perfil/:id': {
+    title: 'Perfil Público - Draft Play',
+    description: 'Perfil público de um usuário do Draft Play.',
+  },
 };
 
 async function main() {
@@ -56,7 +60,7 @@ async function main() {
   }
 
   const { render, PRERENDER_ROUTES } = await import(
-    path.join(ssrDir, 'entry-server.js')
+    pathToFileURL(path.join(ssrDir, 'entry-server.js')).href
   );
 
   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8');
