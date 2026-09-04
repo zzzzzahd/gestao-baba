@@ -20,6 +20,7 @@ import TermsPage   from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import VisitorMode from './pages/VisitorMode';
 import AboutPage   from './pages/AboutPage';
+import PublicProfilePage   from './pages/PublicProfilePage.jsx';
 
 // Rotas elegíveis para pré-render. Mantém só páginas públicas e estáveis —
 // nada que dependa de auth, dados do Supabase ou params dinâmicos.
@@ -31,6 +32,7 @@ const PAGES = {
   '/privacidade': PrivacyPage,
   '/visitor':     VisitorMode,
   '/sobre':       AboutPage,
+  '/perfil/:id':  PublicProfilePage,
 };
 
 export function render(url) {
