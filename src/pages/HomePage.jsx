@@ -16,6 +16,7 @@ import { deleteTournament } from '../services/tournamentService';
 import toast from 'react-hot-toast';
 import { DAY_SHORT } from '../utils/constants';
 import { usePullToRefresh }       from '../hooks/usePullToRefresh';
+import { useInterstitialGate } from '../hooks/useInterstitialGate';
 import PullToRefreshIndicator     from '../components/PullToRefreshIndicator';
 import { isStandalonePWA } from '../utils/pwaInstallPrompt';
 
@@ -263,6 +264,10 @@ const FABMenu = ({ onClose, onCreateBaba, onCreateTournament, onJoin }) => (
 
 // ─── Componente principal ────────────────────────────────────────────────────
 const HomePage = () => {
+  // Interstitial não-recompensado — só pra Free/Visitante (nunca Assinante),
+  // e não em toda entrada na tela (ver useInterstitialGate).
+  useInterstitialGate('home-entrada');
+
   const navigate  = useNavigate();
   const { profile, user } = useAuth();
   const { myBabas, setCurrentBaba, joinBaba, loading, syncData } = useBaba();

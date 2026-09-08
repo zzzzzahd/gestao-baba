@@ -18,6 +18,7 @@ import MembersModal    from '../components/MembersModal';
 import NextGameCard    from '../components/NextGameCard';
 import ModeSelector    from '../components/ModeSelector';
 import { useThemeColor, useThemeStyles } from '../hooks/useThemeColor';
+import { useInterstitialGate } from '../hooks/useInterstitialGate';
 import { DashboardHeaderSkeleton } from '../components/SkeletonLoader';
 import { PlanBadge } from '../components/PlanBadge';
 import toast from 'react-hot-toast';
@@ -45,6 +46,10 @@ const TabLoader = () => (
 // ─── DashboardPage ─────────────────────────────────────────────────────────────
 
 const DashboardPage = () => {
+  // Interstitial não-recompensado — só pra Free/Visitante (nunca Assinante),
+  // e não em toda entrada na tela (ver useInterstitialGate).
+  useInterstitialGate('dashboard-entrada');
+
   const navigate                        = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, signOut, user }      = useAuth();
