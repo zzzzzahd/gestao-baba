@@ -22,7 +22,6 @@ import ExportDataModal   from '../components/ExportDataModal';
 import DeleteAccountModal from '../components/DeleteAccountModal';
 import DivisionChangeScreen from '../components/DivisionChangeScreen';
 import { getDivision } from '../components/DivisionBadge';
-import { useInterstitialGate } from '../hooks/useInterstitialGate';
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 
@@ -55,10 +54,6 @@ const TABS = [
 // ─── ProfilePage ──────────────────────────────────────────────────────────────
 
 const ProfilePage = () => {
-  // Interstitial não-recompensado — só pra Free/Visitante (nunca Assinante),
-  // e não em toda entrada na tela (ver useInterstitialGate).
-  useInterstitialGate('perfil-entrada');
-
   const navigate                          = useNavigate();
   const { profile, user, refreshProfile } = useAuth();
   const { myBabas, currentBaba, players } = useBaba();
