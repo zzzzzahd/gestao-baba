@@ -275,13 +275,13 @@ const DashboardPage = () => {
                           : (p.display_name || '?').charAt(0).toUpperCase()}
                       </div>
                     ))}
-                    {players.length > 4 && (
+                    {playersWithRatings.length > 4 && (
                       <div className="w-8 h-8 rounded-full border-2 border-surface-2 bg-surface-3 flex items-center justify-center text-[8px] font-black text-text-mid shadow-lg">
-                        +{players.length - 4}
+                        +{playersWithRatings.length - 4}
                       </div>
                     )}
                   </div>
-                  <span className="text-xs font-bold text-text-low">{players?.length || 0} atletas ativos</span>
+                  <span className="text-xs font-bold text-text-low">{playersWithRatings.length} atletas ativos</span>
                 </div>
               </div>
             </div>
