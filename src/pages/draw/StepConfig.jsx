@@ -173,7 +173,7 @@ const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints
 // ─── StepConfig ───────────────────────────────────────────────────────────────
 
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
-  const { currentBaba, gameConfirmations, players, isDrawing, nextGameDay, reloadConfirmations, getAllRatings } = useBaba();
+  const { currentBaba, gameConfirmations, isDrawing, nextGameDay, reloadConfirmations, getAllRatings } = useBaba();
   const features = useFeatures();
   const [drawing,         setDrawing]         = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
@@ -186,7 +186,15 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
   const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
   const confirmedCount = gameConfirmations?.length || 0;
   const guests          = (gameConfirmations || []).filter(c => c.player?.is_guest);
-  const minRequired    = safeConfig.playersPerTeam * 2;
+  // 'reserve': cada time precisa de +1 vaga própria de reserva pra se formar
+  // (ver lineCapacityPerTeam em drawTeamsWithConstraints) — sem contar isso
+  // aqui, o "mínimo pra sortear" ficava subestimado e liberava o sorteio com
+  // confirmados de menos pra formar 2 times de verdade (ex: playersPerTeam=2
+  // mostrava mínimo 4, mas o algoritmo só forma o 1º time com 3 confirmados
+  // — precisa de 6 pros 2 times, não 4). Isso deixava StepMatch travado pra
+  // sempre em "Preparando partida..." (exige 2+ times pra sair do loading).
+  const perTeamForMin  = safeConfig.strategy === 'reserve' ? safeConfig.playersPerTeam + 1 : safeConfig.playersPerTeam;
+  const minRequired    = perTeamForMin * 2;
   const totalTeams     = Math.floor(confirmedCount / safeConfig.playersPerTeam);
   const totalMatches   = Math.floor(totalTeams / 2);
   const reserveCount   = confirmedCount % safeConfig.playersPerTeam
@@ -317,9 +325,17 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
       const ratingsData = await getAllRatings();
       const levelMap     = new Map(ratingsData.map(r => [r.player_id, r.avg_level ?? 2]));
 
-      const confirmedIds     = gameConfirmations.map(c => c.player_id);
-      const confirmedPlayers = players
-        .filter(p => confirmedIds.includes(p.id))
+      // Monta a partir de gameConfirmations (que já traz o player via join,
+      // sempre atualizado por reloadConfirmations) — não do array `players`
+      // do contexto, que fica desatualizado logo depois de adicionar um
+      // convidado: handleAddGuest só chama reloadConfirmations(), nunca
+      // refaz o loadPlayers() do BabaContext. Filtrar por `players` (stale)
+      // fazia o sorteio silenciosamente ignorar convidados recém-adicionados,
+      // formando menos times do que deveria (às vezes só 1, travando o
+      // StepMatch pra sempre em "Preparando partida...").
+      const confirmedPlayers = gameConfirmations
+        .map(c => c.player)
+        .filter(Boolean)
         .map(p => ({ ...p, balance_level: p.is_guest ? (p.balance_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
 
       const { teams, reserves, goalkeeperQueue } = drawTeamsWithConstraints(
@@ -330,10 +346,13 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         currentBaba.gk_mode || 'fixed',
       );
 
-      // Nunca cria uma sessão de sorteio sem nenhum time — isso deixava uma
-      // sessão "active" vazia travada no banco, bloqueando qualquer sorteio
-      // seguinte (o índice único só permite 1 sessão ativa por dia).
-      if (!teams || teams.length === 0) {
+      // Nunca cria uma sessão de sorteio sem pelo menos 2 times — com só 1
+      // (ou 0), StepMatch nunca sai da tela "Preparando partida..." (exige
+      // os 2 lados pra montar a partida), e o app fica preso num loading
+      // infinito sem nenhum erro visível. Isso também deixava uma sessão
+      // "active" travada no banco, bloqueando qualquer sorteio seguinte (o
+      // índice único só permite 1 sessão ativa por dia).
+      if (!teams || teams.length < 2) {
         toast.error(`Sem jogadores suficientes confirmados pra ${today === nextGameDay?.dateStr ? 'esse jogo' : today} — confere as confirmações antes de sortear.`);
         setDrawing(false);
         return;

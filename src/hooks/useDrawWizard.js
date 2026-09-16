@@ -51,8 +51,14 @@ export const useDrawWizard = (babaId) => {
     }
   }, [babaId]);
 
-  const update = useCallback((partial) => {
+  // `update` aceita um objeto OU uma função (prev) => partial — igual ao
+  // setState funcional do React. É isso que permite setDrawConfig/
+  // setMatchState ficarem 100% estáveis (deps só de `update`, que nunca
+  // muda) em vez de precisarem capturar state.drawConfig/state.matchState
+  // no próprio useCallback.
+  const update = useCallback((partialOrFn) => {
     setState(prev => {
+      const partial = typeof partialOrFn === 'function' ? partialOrFn(prev) : partialOrFn;
       const next = { ...prev, ...partial };
       save(next);
       return next;
@@ -61,13 +67,22 @@ export const useDrawWizard = (babaId) => {
 
   const setStep = useCallback((step) => update({ step }), [update]);
 
+  // FIX: antes dependia de state.drawConfig — toda vez que drawConfig
+  // mudava, essa função ganhava uma referência NOVA. Sem consequência aqui
+  // sozinho, mas o mesmo padrão em setMatchState (abaixo) causava um loop
+  // infinito real: o useEffect de persistência do StepMatch.jsx tem
+  // setMatchState nas deps E chama setMatchState dentro dele — cada render
+  // gerava uma função nova, que disparava o efeito de novo, que chamava
+  // setMatchState de novo, sem nunca parar (era o "Maximum update depth"
+  // que aparecia preso na tela). Usando prev direto do update() em vez do
+  // state fechado no closure, a função fica estável de verdade.
   const setDrawConfig = useCallback(
-    (configOrFn) => update({
+    (configOrFn) => update(prev => ({
       drawConfig: typeof configOrFn === 'function'
-        ? configOrFn(state.drawConfig)
+        ? configOrFn(prev.drawConfig)
         : configOrFn,
-    }),
-    [update, state.drawConfig],
+    })),
+    [update],
   );
 
   const setDrawResult = useCallback(
@@ -76,12 +91,12 @@ export const useDrawWizard = (babaId) => {
   );
 
   const setMatchState = useCallback(
-    (matchStateOrFn) => update({
+    (matchStateOrFn) => update(prev => ({
       matchState: typeof matchStateOrFn === 'function'
-        ? matchStateOrFn(state.matchState)
+        ? matchStateOrFn(prev.matchState)
         : matchStateOrFn,
-    }),
-    [update, state.matchState],
+    })),
+    [update],
   );
 
   const reset = useCallback(() => {
