@@ -44,6 +44,20 @@ const balanceTeams = (players, numTeams, playersPerTeam, leftoverStrategy) => {
     starSum: 0,
   }));
 
+  // Capacidade de cada time.
+  // - 'reserve': todos os times têm playersPerTeam; quem sobra vira reserva.
+  // - 'fill': todos os jogadores entram. Quando não fecha certinho, os times
+  //   do INÍCIO ficam com 1 a mais e os times do FINAL ficam com 1 a menos
+  //   (ex.: 15 jogadores em 4 times => A=4, B=4, C=4, D=3).
+  const capacities = Array(numTeams).fill(playersPerTeam);
+  if (leftoverStrategy !== 'reserve') {
+    const base  = Math.floor(players.length / numTeams);
+    const extra = players.length % numTeams;
+    for (let i = 0; i < numTeams; i++) {
+      capacities[i] = i < extra ? base + 1 : base;
+    }
+  }
+
   goalies.sort((a, b) => b.stars - a.stars);
   for (let i = 0; i < numTeams && goalies.length > 0; i++) {
     const g = goalies.shift();
@@ -57,29 +71,31 @@ const balanceTeams = (players, numTeams, playersPerTeam, leftoverStrategy) => {
   let teamIndex  = 0;
   const reserves = [];
 
-  while (outfield.length > 0) {
-    const allFull = teams.every(t => t.players.length >= playersPerTeam);
-    if (leftoverStrategy === 'reserve' && allFull) {
-      reserves.push(...outfield);
-      break;
-    }
-    const player = outfield.shift();
-    if (teams[teamIndex].players.length < playersPerTeam) {
-      teams[teamIndex].players.push(player);
-      teams[teamIndex].starSum += player.stars;
-    } else {
-      const targetTeam = teams.reduce((min, t) => t.players.length < min.players.length ? t : min);
-      if (targetTeam.players.length < playersPerTeam) {
-        targetTeam.players.push(player);
-        targetTeam.starSum += player.stars;
-      } else {
-        reserves.push(player);
-        continue;
-      }
-    }
+  // Avança o ponteiro no esquema "serpente" (A B C D D C B A ...)
+  const advance = () => {
     teamIndex += direction;
     if (teamIndex >= numTeams)    { direction = -1; teamIndex = numTeams - 1; }
     else if (teamIndex < 0)       { direction = 1;  teamIndex = 0; }
+  };
+
+  while (outfield.length > 0) {
+    const allFull = teams.every((t, i) => t.players.length >= capacities[i]);
+    if (allFull) {
+      reserves.push(...outfield);
+      break;
+    }
+
+    // pula times que já estão completos
+    let guard = 0;
+    while (teams[teamIndex].players.length >= capacities[teamIndex] && guard < numTeams * 2 + 2) {
+      advance();
+      guard++;
+    }
+
+    const player = outfield.shift();
+    teams[teamIndex].players.push(player);
+    teams[teamIndex].starSum += player.stars;
+    advance();
   }
 
   return { teams, reserves };

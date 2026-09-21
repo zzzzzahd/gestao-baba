@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BabaProvider } from './contexts/BabaContext';
 import { getNewlyUnlocked, UNLOCK_MESSAGES } from './utils/progressiveFeaturesUnlock';
 import { useBetaAnalytics } from './hooks/useBetaAnalytics';
+import AdsenseScriptGate from './components/AdsenseScriptGate';
 
 // Rotas de entrada (primeira tela que o usuário vê) ficam eager —
 // não faz sentido lazy-loadear o que já é carregado no primeiro paint.
@@ -147,6 +148,7 @@ const AppInner = () => {
 
   return (
     <>
+      <AdsenseScriptGate />
       <OfflineBanner />
       <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>

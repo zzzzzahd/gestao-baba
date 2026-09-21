@@ -28,6 +28,8 @@
     "report": "node scripts/generate-report.mjs",
     "report:open": "node scripts/test-and-report.mjs --open",
     "test:report": "node scripts/test-and-report.mjs",
+    "video:demo": "node video-demo/e2e-video-demo.js",
+    "video:demo:admin": "node video-demo/e2e-video-demo-admin.js",
     "test:report:coverage": "node scripts/test-and-report.mjs --coverage --open"
   },
   "dependencies": {

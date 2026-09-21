@@ -54,16 +54,11 @@ describe('PageWrapper', () => {
       expect(main.className).toContain('animate-page-in');
     });
 
-    it('tem animationDuration de 220ms no style inline', () => {
+    it('não tem style inline de animação (duration/fill-mode vêm só do CSS, evitando prender transform no <main>)', () => {
       const { container } = renderWrapper(<p>teste</p>);
       const main = container.querySelector('main');
-      expect(main.style.animationDuration).toBe('220ms');
-    });
-
-    it('tem animationFillMode "both"', () => {
-      const { container } = renderWrapper(<p>teste</p>);
-      const main = container.querySelector('main');
-      expect(main.style.animationFillMode).toBe('both');
+      expect(main.style.animationFillMode).toBe('');
+      expect(main.style.animationDuration).toBe('');
     });
   });
 

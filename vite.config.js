@@ -8,21 +8,35 @@ import { sentryVitePlugin } from '@sentry/vite-plugin';
 export default defineConfig(({ mode, isSsrBuild }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
-  // AdSense precisa da tag/script presente no HTML já entregue na primeira
-  // resposta — o crawler do AdSense (e a verificação de propriedade do site)
-  // não executa JS de forma confiável, então injetar isso via
-  // document.createElement em main.jsx (como era antes) é invisível pra ele.
-  // Injetando aqui, no build, o HTML final já sai com a tag, sem precisar
-  // de JS pra aparecer.
+  // AdSense precisa da tag de VERIFICAÇÃO presente no HTML já entregue na
+  // primeira resposta — o crawler de verificação de propriedade do site não
+  // executa JS de forma confiável. Mas a verificação usa só a meta tag
+  // (documentado pelo próprio Google como alternativa ao snippet completo,
+  // justamente pra sites que não querem servir anúncio em toda página).
+  //
+  // O <script> do adsbygoogle.js é outra história: diferente da meta tag,
+  // ele ATIVA de fato o carregamento de anúncio (incluindo Auto ads, se
+  // habilitado na conta). Numa SPA, se ele for injetado estaticamente aqui
+  // (presente em toda página), ele fica carregado e ativo durante TODA a
+  // sessão do usuário — inclusive quando ele navega (client-side, sem
+  // recarregar a página) pras telas protegidas por login (Dashboard,
+  // Financeiro, Ranking etc.), mesmo que nenhum <AdBanner> seja renderizado
+  // lá. Foi exatamente isso que causou o Google sinalizar "anúncios em telas
+  // sem conteúdo do editor" mesmo depois de tirar o AdBanner dessas telas.
+  //
+  // Por isso o script NÃO é mais injetado aqui — só a meta tag. O script em
+  // si é carregado/removido dinamicamente pelo AdsenseScriptGate
+  // (src/components/AdsenseScriptGate.jsx), que só o ativa quando a rota
+  // atual é uma das páginas públicas com AdBanner (Landing, Sobre, Perfil
+  // Público) e o remove em qualquer outra rota.
   const adsenseClientId = env.VITE_ADSENSE_CLIENT_ID;
   const adsensePlugin = {
-    name: 'inject-adsense-tags',
+    name: 'inject-adsense-verification-meta',
     transformIndexHtml(html) {
       if (!adsenseClientId) return html;
       return html.replace(
         '</head>',
         `    <meta name="google-adsense-account" content="${adsenseClientId}" />\n` +
-          `    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}" crossorigin="anonymous"></script>\n` +
           `  </head>`
       );
     },

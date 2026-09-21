@@ -13,7 +13,6 @@ const PageWrapper = ({ children, className = '' }) => {
       id="main-content"
       key={location.pathname}
       className={`animate-page-in ${className}`}
-      style={{ animationDuration: '220ms', animationFillMode: 'both' }}
     >
       {children}
     </main>
