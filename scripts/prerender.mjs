@@ -8,6 +8,13 @@ const root = path.resolve(__dirname, '..');
 const distDir = path.join(root, 'dist');
 const ssrDir = path.join(root, 'dist-ssr');
 
+// Domínio canônico de produção — único lugar que precisa mudar se o domínio
+// mudar um dia. Sprint 7 da auditoria AdSense: antes disso, sitemap.xml,
+// robots.txt, canonical e og:url apontavam pra gestao-baba.vercel.app (domínio
+// de preview, sem redirect configurado pro domínio real), o que deixava o
+// Google sem sinal de qual domínio é o canônico.
+const SITE_URL = 'https://www.draftplay.app.br';
+
 const ROUTE_META = {
   '/': {
     title: 'Draft Play - Gestão de Baba',
@@ -138,6 +145,8 @@ async function main() {
         ? ROUTE_META['/player/:userId']
         : ROUTE_META[route] ?? ROUTE_META['/'];
 
+      const canonicalUrl = `${SITE_URL}${route === '/' ? '/' : route}`;
+
       let html = template
         .replace(
           '<main id="main-content"></main>',
@@ -150,6 +159,14 @@ async function main() {
         .replace(
           /<meta name="description" content=".*?" \/>/,
           `<meta name="description" content="${meta.description}" />`
+        )
+        .replace(
+          /<link rel="canonical" href=".*?" \/>/,
+          `<link rel="canonical" href="${canonicalUrl}" />`
+        )
+        .replace(
+          /<meta property="og:url" content=".*?" \/>/,
+          `<meta property="og:url" content="${canonicalUrl}" />`
         );
 
       // -----------------------------------------------------
@@ -191,6 +208,51 @@ async function main() {
       throw error;
     }
   }
+  // -------------------------------------------------------
+  // SITEMAP.XML — gerado aqui, não mais um arquivo estático em
+  // public/, porque precisa incluir os perfis públicos reais
+  // (que mudam a cada build) além das rotas fixas.
+  // -------------------------------------------------------
+
+  const PRIORITY = {
+    '/': '1.0',
+    '/sobre': '0.5',
+    '/visitor': '0.8',
+    '/termos': '0.3',
+    '/privacidade': '0.3',
+  };
+
+  const CHANGEFREQ = {
+    '/': 'weekly',
+    '/sobre': 'monthly',
+    '/visitor': 'monthly',
+    '/termos': 'yearly',
+    '/privacidade': 'yearly',
+  };
+
+  const sitemapEntries = uniqueRoutes
+    .map((route) => {
+      const isProfile = route.startsWith('/player/');
+      const loc = `${SITE_URL}${route}`;
+      const changefreq = isProfile ? 'monthly' : (CHANGEFREQ[route] ?? 'monthly');
+      const priority = isProfile ? '0.4' : (PRIORITY[route] ?? '0.5');
+      return `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+    })
+    .join('\n');
+
+  const sitemapXml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapEntries}\n</urlset>\n`;
+
+  await writeFile(
+    path.join(distDir, 'sitemap.xml'),
+    sitemapXml,
+    'utf-8'
+  );
+
+  console.log(
+    `[prerender] sitemap.xml gerado com ${uniqueRoutes.length} URLs (${profileRoutes.length} perfis públicos)`
+  );
 }
 
 main().catch((error) => {

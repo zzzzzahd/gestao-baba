@@ -37,7 +37,7 @@ export default function MatchShareButton({ match, babaName, topScorers = [], cla
       winner ? `🏆 Vencedor: ${winner}` : `🤝 Empate`,
       scorerLines ? `\n*Artilheiros:*\n${scorerLines}` : '',
       ``,
-      `📱 Gerencie seu baba em: https://gestao-baba.vercel.app`,
+      `📱 Gerencie seu baba em: https://www.draftplay.app.br`,
     ].filter(Boolean).join('\n');
   };
 

@@ -183,8 +183,8 @@ const PrivacyPage = () => {
             </p>
             <p className="mt-2">
               <strong>Canal oficial de privacidade / DPO:</strong>{' '}
-              <a href="mailto:privacidade@gestao-baba.app" className="text-cyan-electric underline">
-                privacidade@gestao-baba.app
+              <a href="mailto:draftplayapp@gmail.com" className="text-cyan-electric underline">
+                draftplayapp@gmail.com
               </a>
             </p>
             <p className="mt-2 text-[11px] text-text-low">
@@ -210,8 +210,8 @@ const PrivacyPage = () => {
           <Section title="10. Contato">
             <p>
               Dúvidas gerais sobre privacidade:{' '}
-              <a href="mailto:privacidade@gestao-baba.app" className="text-cyan-electric underline">
-                privacidade@gestao-baba.app
+              <a href="mailto:draftplayapp@gmail.com" className="text-cyan-electric underline">
+                draftplayapp@gmail.com
               </a>
             </p>
             <p className="mt-1 text-[11px] text-text-low">
@@ -223,6 +223,12 @@ const PrivacyPage = () => {
               >www.gov.br/anpd</a>
             </p>
           </Section>
+        </div>
+
+        <div className="flex justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-text-mid pb-2">
+          <a href="/" className="hover:text-cyan-electric transition-colors">Início</a>
+          <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
+          <a href="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</a>
         </div>
 
         <p className="text-center text-[10px] text-text-muted font-bold uppercase tracking-widest pb-4">

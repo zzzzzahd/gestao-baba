@@ -139,11 +139,16 @@ export default function TermsPage() {
         <Section title="12. Contato">
           <p>
             Dúvidas sobre estes termos? Entre em contato pelo e-mail:{' '}
-            <span className="text-cyan-electric">contato@draftplay.app</span>
+            <span className="text-cyan-electric">draftplayapp@gmail.com</span>
           </p>
         </Section>
 
-        <div className="pt-4 border-t border-border-subtle">
+        <div className="pt-4 border-t border-border-subtle space-y-4">
+          <div className="flex justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-text-mid">
+            <a href="/" className="hover:text-cyan-electric transition-colors">Início</a>
+            <a href="/privacidade" className="hover:text-cyan-electric transition-colors">Privacidade</a>
+            <a href="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</a>
+          </div>
           <button
             onClick={() => navigate(-1)}
             className="w-full py-3.5 rounded-2xl border border-border-mid text-[10px] font-black uppercase tracking-widest text-text-low hover:text-white hover:border-border-high transition-all"

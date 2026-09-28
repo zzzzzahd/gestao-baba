@@ -134,6 +134,12 @@ const [toggling, setToggling] = useState(false);
       >
         ← Voltar
       </button>
+      <a
+        href="/"
+        className="text-[10px] font-black uppercase text-cyan-electric underline"
+      >
+        Ir pra página inicial
+      </a>
     </div>
   );
 

@@ -36,7 +36,7 @@ export default function TeamsShareButton({ teams = [], reserves = [], babaName, 
       teamLines,
       reserveLines,
       ``,
-      `📱 Gerencie seu baba em: https://gestao-baba.vercel.app`,
+      `📱 Gerencie seu baba em: https://www.draftplay.app.br`,
     ].filter(Boolean).join('\n');
   };
 

@@ -30,6 +30,7 @@
     "test:report": "node scripts/test-and-report.mjs",
     "video:demo": "node video-demo/e2e-video-demo.js",
     "video:demo:admin": "node video-demo/e2e-video-demo-admin.js",
+    "video:demo:social": "node video-demo/e2e-video-demo-social.js",
     "test:report:coverage": "node scripts/test-and-report.mjs --coverage --open"
   },
   "dependencies": {

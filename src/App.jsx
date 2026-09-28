@@ -11,6 +11,7 @@ import { BabaProvider } from './contexts/BabaContext';
 import { getNewlyUnlocked, UNLOCK_MESSAGES } from './utils/progressiveFeaturesUnlock';
 import { useBetaAnalytics } from './hooks/useBetaAnalytics';
 import AdsenseScriptGate from './components/AdsenseScriptGate';
+import CookieConsentBanner from './components/CookieConsentBanner';
 
 // Rotas de entrada (primeira tela que o usuário vê) ficam eager —
 // não faz sentido lazy-loadear o que já é carregado no primeiro paint.
@@ -40,6 +41,7 @@ const ComparisonPage       = lazy(() => import('./pages/ComparisonPage'));
 const TournamentPage       = lazy(() => import('./pages/TournamentPage'));
 const TournamentMatchPage  = lazy(() => import('./pages/TournamentMatchPage'));
 const DpStorePage          = lazy(() => import('./pages/DpStorePage'));
+const NotFoundPage         = lazy(() => import('./pages/NotFoundPage'));
 
 import BottomNav     from './components/BottomNav';
 import OfflineBanner from './components/OfflineBanner';
@@ -149,6 +151,7 @@ const AppInner = () => {
   return (
     <>
       <AdsenseScriptGate />
+      <CookieConsentBanner />
       <OfflineBanner />
       <UpdatePrompt />
       <Suspense fallback={<PageLoader />}>
@@ -180,6 +183,7 @@ const AppInner = () => {
           <Route path="/tournament" element={<Navigate to="/home" replace />} />
           <Route path="/teams" element={<ProtectedRoute><PageWrapper><WatchPage /></PageWrapper></ProtectedRoute>} />
           <Route path="/match" element={<Navigate to="/draw" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
       <BottomNav />

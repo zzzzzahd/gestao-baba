@@ -25,11 +25,11 @@ export default function CalendarExportButton({ baba, nextDates = [], className =
       return {
         uid:             `${baba.id}-${start.toISOString().split('T')[0]}`,
         summary:         `⚽ ${baba.name}`,
-        description:     `Baba pelo Draft Play.\nhttps://gestao-baba.vercel.app/dashboard`,
+        description:     `Baba pelo Draft Play.\nhttps://www.draftplay.app.br/dashboard`,
         location:        d.location ?? baba.location ?? '',
         start,
         durationMinutes: 90,
-        url:             'https://gestao-baba.vercel.app/dashboard',
+        url:             'https://www.draftplay.app.br/dashboard',
       };
     });
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import AdBanner from '../components/AdBanner';
 import {
-  LogIn, Zap, Users, Shuffle, Radio, Star,
+  LogIn, Zap, Users, Shuffle, Radio,
   UserCheck, Wallet, Trophy, ShieldCheck, Sparkles, CheckCircle2,
 } from 'lucide-react';
 
@@ -230,19 +230,6 @@ const LandingPage = () => {
           <p className="text-[11px] text-center opacity-60 leading-relaxed px-2">
             Qualquer jogador entra e participa de baba(s) de graça. Quem organiza pode assinar o plano de coordenador
             pra criar seus próprios babas e torneios e liberar os recursos avançados de gestão.
-          </p>
-        </div>
-
-        {/* Depoimento social — troque pelo relato real de um coordenador ou jogador que já usa o app */}
-        <div className="card-glass p-5 border border-border-mid rounded-[1.5rem] space-y-3 animate-fade-in">
-          <div className="flex gap-0.5 text-cyan-electric">
-            {[...Array(5)].map((_, i) => <Star key={i} size={13} fill="currentColor" />)}
-          </div>
-          <p className="text-xs leading-relaxed opacity-80 italic">
-            "Antes era zap lotado de mensagem discutindo time. Hoje o app sorteia e todo mundo já sabe pra que lado vai."
-          </p>
-          <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">
-            Coordenador de baba{/* TODO: trocar por nome real com autorização da pessoa */}
           </p>
         </div>
 

@@ -24,6 +24,7 @@
 
 import { useEffect } from 'react';
 import { useLocation, matchPath } from 'react-router-dom';
+import { useCookieConsent } from '../hooks/useCookieConsent';
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
 const SCRIPT_ID = 'adsbygoogle-script';
@@ -39,11 +40,15 @@ function isAdEligiblePath(pathname) {
 
 export function AdsenseScriptGate() {
   const location = useLocation();
+  const { consent } = useCookieConsent();
 
   useEffect(() => {
     if (!ADSENSE_CLIENT) return;
 
-    const eligible = isAdEligiblePath(location.pathname);
+    // Sprint 10 da auditoria AdSense: além da rota ser elegível, agora
+    // exige consentimento explícito do visitante (CookieConsentBanner.jsx).
+    // Sem consentimento = sem script, mesmo em rota elegível.
+    const eligible = isAdEligiblePath(location.pathname) && consent === 'accepted';
     const existing = document.getElementById(SCRIPT_ID);
 
     if (eligible && !existing) {
@@ -61,7 +66,7 @@ export function AdsenseScriptGate() {
       // nada novo seja enfileirado fora das páginas elegíveis.
       window.adsbygoogle = [];
     }
-  }, [location.pathname]);
+  }, [location.pathname, consent]);
 
   return null;
 }
