@@ -24,7 +24,6 @@
 
 import { useEffect } from 'react';
 import { useLocation, matchPath } from 'react-router-dom';
-import { useCookieConsent } from '../hooks/useCookieConsent';
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
 const SCRIPT_ID = 'adsbygoogle-script';
@@ -40,15 +39,17 @@ function isAdEligiblePath(pathname) {
 
 export function AdsenseScriptGate() {
   const location = useLocation();
-  const { consent } = useCookieConsent();
 
   useEffect(() => {
     if (!ADSENSE_CLIENT) return;
 
-    // Sprint 10 da auditoria AdSense: além da rota ser elegível, agora
-    // exige consentimento explícito do visitante (CookieConsentBanner.jsx).
-    // Sem consentimento = sem script, mesmo em rota elegível.
-    const eligible = isAdEligiblePath(location.pathname) && consent === 'accepted';
+    // A partir da integração com o Google Consent Mode V2 (ver bootstrap em
+    // index.html + useCookieConsent.js), quem decide se o anúncio pode ser
+    // personalizado é o sinal gtag('consent', ...), não mais o carregamento
+    // do script em si. O script carrega em qualquer rota elegível — sem
+    // consentimento, o Google mostra anúncio não-personalizado (ainda gera
+    // receita, sem usar dado pessoal); com consentimento, personalizado.
+    const eligible = isAdEligiblePath(location.pathname);
     const existing = document.getElementById(SCRIPT_ID);
 
     if (eligible && !existing) {
@@ -66,7 +67,7 @@ export function AdsenseScriptGate() {
       // nada novo seja enfileirado fora das páginas elegíveis.
       window.adsbygoogle = [];
     }
-  }, [location.pathname, consent]);
+  }, [location.pathname]);
 
   return null;
 }

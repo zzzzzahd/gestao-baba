@@ -48,4 +48,4 @@ Disallow: /torneio/
 Disallow: /join/
 Disallow: /visitor-match
 
-Sitemap: https://gestao-baba.vercel.app/sitemap.xml
+Sitemap: https://www.draftplay.app.br/sitemap.xml

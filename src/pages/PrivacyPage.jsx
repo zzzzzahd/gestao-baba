@@ -6,6 +6,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield } from 'lucide-react';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 
 const Section = ({ title, children }) => (
   <div className="space-y-2">
@@ -225,11 +226,7 @@ const PrivacyPage = () => {
           </Section>
         </div>
 
-        <div className="flex justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-text-mid pb-2">
-          <a href="/" className="hover:text-cyan-electric transition-colors">Início</a>
-          <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
-          <a href="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</a>
-        </div>
+        <PublicPagesFooter current="privacidade" className="pb-2" />
 
         <p className="text-center text-[10px] text-text-muted font-bold uppercase tracking-widest pb-4">
           Draft Play · LGPD v1.1 · Ago/2026

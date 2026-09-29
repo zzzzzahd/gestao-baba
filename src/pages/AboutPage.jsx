@@ -6,6 +6,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Info, Mail } from 'lucide-react';
 import AdBanner from '../components/AdBanner';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 
 const Section = ({ title, children }) => (
   <div className="space-y-2">
@@ -164,11 +165,7 @@ export default function AboutPage() {
           </p>
         </Section>
 
-        <div className="flex justify-center gap-4 text-[10px] font-bold uppercase tracking-widest text-text-mid pt-2">
-          <a href="/" className="hover:text-cyan-electric transition-colors">Início</a>
-          <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
-          <a href="/privacidade" className="hover:text-cyan-electric transition-colors">Privacidade</a>
-        </div>
+        <PublicPagesFooter current="sobre" />
 
       </div>
     </div>

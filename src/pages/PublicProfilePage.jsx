@@ -14,6 +14,7 @@ import StreakBadge from '../components/StreakBadge';
 import DivisionBadge from '../components/DivisionBadge';
 import { POSITION_LABEL } from '../constants/positions';
 import AdBanner from '../components/AdBanner';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 
 const RARITY_COLOR = {
   legendary: 'text-yellow-400',
@@ -329,14 +330,26 @@ const [toggling, setToggling] = useState(false);
 
         {/* Sem dados */}
         {stats && stats.matches === 0 && (
-          <div className="text-center py-10 border border-dashed border-border-subtle rounded-2xl">
+          <div className="text-center py-10 border border-dashed border-border-subtle rounded-2xl space-y-3">
             <p className="text-3xl mb-2">⚽</p>
             <p className="text-[11px] font-black text-text-muted uppercase">Nenhuma partida ainda</p>
+            <a
+              href="/"
+              className="inline-block text-[10px] font-black uppercase text-cyan-electric underline"
+            >
+              Conheça o Draft Play →
+            </a>
           </div>
         )}
 
-        {/* ── Banner AdSense — página pública, com conteúdo editorial real (perfil do jogador) ── */}
-        <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PUBLIC_PROFILE} className="mt-2" />
+        {/* ── Banner AdSense — só quando o perfil já tem conteúdo próprio de verdade (partida ou conquista) ── */}
+        {(stats?.matches > 0 || allBadges.length > 0) && (
+          <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PUBLIC_PROFILE} className="mt-2" />
+        )}
+
+        {/* Rodapé de navegação — faltava no caso mais comum (perfil com
+            dados reais); só existia no estado "não encontrado". */}
+        <PublicPagesFooter />
       </div>
     </div>
   );

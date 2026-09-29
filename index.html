@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Draft Play - Gestão de Baba</title>
 
+    <!-- Google Consent Mode V2 — precisa rodar ANTES de qualquer tag do
+         Google (AdSense incluso). Estado padrão: tudo negado. Isso NÃO
+         impede o script do AdSense de carregar — ele carrega igual, mas o
+         Google usa esse sinal pra decidir entre anúncio personalizado
+         (precisa de ad_storage/ad_user_data/ad_personalization concedidos)
+         ou não-personalizado (funciona mesmo com tudo negado, sem cookie de
+         perfil). Ver CookieConsentBanner.jsx / useCookieConsent.js pra onde
+         o sinal é atualizado quando a pessoa decide. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ window.dataLayer.push(arguments); }
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500
+      });
+      window.gtag = gtag;
+    </script>
+
     <!-- PWA Essencial -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#00f2ff" />

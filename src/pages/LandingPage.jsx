@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import AdBanner from '../components/AdBanner';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 import {
   LogIn, Zap, Users, Shuffle, Radio,
   UserCheck, Wallet, Trophy, ShieldCheck, Sparkles, CheckCircle2,
@@ -238,13 +239,7 @@ const LandingPage = () => {
 
         {/* Footer */}
         <div className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-widest opacity-40">
-            <a href="/termos" className="hover:text-cyan-electric transition-colors">Termos de uso</a>
-            <span className="opacity-30">·</span>
-            <a href="/privacidade" className="hover:text-cyan-electric transition-colors">Privacidade</a>
-            <span className="opacity-30">·</span>
-            <a href="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</a>
-          </div>
+          <PublicPagesFooter current="home" className="opacity-40" />
           <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
             Powered by Draft Baba v3.0
           </p>
