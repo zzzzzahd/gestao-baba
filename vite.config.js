@@ -29,7 +29,15 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   // (src/components/AdsenseScriptGate.jsx), que só o ativa quando a rota
   // atual é uma das páginas públicas com AdBanner (Landing, Sobre, Perfil
   // Público) e o remove em qualquer outra rota.
-  const adsenseClientId = env.VITE_ADSENSE_CLIENT_ID;
+  // O ID do AdSense é público (aparece no HTML de qualquer site com anúncio),
+  // então tem fallback fixo aqui e é normalizado: se a variável da Vercel vier
+  // sem o prefixo "ca-" (ex.: "pub-123..."), ele é adicionado. Só aplicado no
+  // build de produção, pra não interferir nos testes (vitest).
+  const ADSENSE_FALLBACK_ID = 'ca-pub-4134218291304726';
+  const rawAdsenseId = (env.VITE_ADSENSE_CLIENT_ID || ADSENSE_FALLBACK_ID).trim();
+  const adsenseClientId = mode === 'production'
+    ? (rawAdsenseId.startsWith('ca-') ? rawAdsenseId : `ca-${rawAdsenseId}`)
+    : env.VITE_ADSENSE_CLIENT_ID;
   const adsensePlugin = {
     name: 'inject-adsense-verification-meta',
     transformIndexHtml(html) {
@@ -47,6 +55,9 @@ return {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(
       process.env.npm_package_version ?? '1.3.0'
     ),
+    ...(mode === 'production' && adsenseClientId
+      ? { 'import.meta.env.VITE_ADSENSE_CLIENT_ID': JSON.stringify(adsenseClientId) }
+      : {}),
   },
 
   plugins: [
