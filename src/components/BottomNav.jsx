@@ -14,10 +14,12 @@ const BottomNav = () => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const features  = useFeatures();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  if (PUBLIC_ROUTES.has(location.pathname)) return null;
+  // Visitante (sem login) nunca vê o menu do app: as abas levam a rotas protegidas
+  // que redirecionam pro /login — o Google lê isso como navegação quebrada.
+  if (!user || PUBLIC_ROUTES.has(location.pathname)) return null;
 
   const handleLogout = async () => {
     await signOut();

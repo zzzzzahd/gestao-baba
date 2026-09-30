@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import AdBanner from '../components/AdBanner';
 import PublicPagesFooter from '../components/PublicPagesFooter';
@@ -95,6 +95,16 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 font-sans">
+      <header className="max-w-md mx-auto">
+        <nav
+          aria-label="Menu principal"
+          className="flex items-center justify-center flex-wrap gap-x-5 gap-y-2 text-[11px] font-bold uppercase tracking-widest text-text-mid"
+        >
+          <Link to="/sobre" className="hover:text-cyan-electric transition-colors">Sobre o app</Link>
+          <Link to="/visitor" className="hover:text-cyan-electric transition-colors">Testar sem conta</Link>
+          <Link to="/login" className="hover:text-cyan-electric transition-colors">Entrar</Link>
+        </nav>
+      </header>
       <div className="max-w-md mx-auto space-y-10 py-6">
 
         {/* Logo */}
@@ -239,7 +249,7 @@ const LandingPage = () => {
 
         {/* Footer */}
         <div className="text-center space-y-3">
-          <PublicPagesFooter current="home" className="opacity-40" />
+          <PublicPagesFooter current="home" className="opacity-80" />
           <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
             Powered by Draft Baba v3.0
           </p>

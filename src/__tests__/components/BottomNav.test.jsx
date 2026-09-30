@@ -17,6 +17,12 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// Mock do useAuth: o menu só aparece para usuário logado
+const mockUseAuth = vi.fn(() => ({ user: { id: 'u1' }, signOut: vi.fn() }));
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 vi.mock('../../utils/babaMode', () => ({
   useFeatures: vi.fn(() => ({ financial: false })),
 }));
@@ -33,6 +39,7 @@ const renderNav = () =>
 
 describe('BottomNav', () => {
   beforeEach(() => {
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, signOut: vi.fn() });
     useFeatures.mockReturnValue({ financial: false });
     mockUseLocation.mockReturnValue({ pathname: '/home', search: '', hash: '' });
   });
@@ -52,6 +59,13 @@ describe('BottomNav', () => {
 
     it('não renderiza na rota /visitor', () => {
       mockUseLocation.mockReturnValue({ pathname: '/visitor', search: '', hash: '' });
+      const { container } = renderNav();
+      expect(container.querySelector('nav')).toBeNull();
+    });
+
+    it('não renderiza para visitante sem login, mesmo em rota pública de conteúdo', () => {
+      mockUseAuth.mockReturnValue({ user: null, signOut: vi.fn() });
+      mockUseLocation.mockReturnValue({ pathname: '/sobre', search: '', hash: '' });
       const { container } = renderNav();
       expect(container.querySelector('nav')).toBeNull();
     });
