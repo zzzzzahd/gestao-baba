@@ -7,9 +7,19 @@
 //   • Sincronização em tempo real via Supabase Realtime (useRealtimeMatch)
 //   • Reações ao vivo (MatchReactions)
 //   • Fila/rotatividade "quem ganha fica" com 4 times (vitória A, vitória do
-//     desafiante e empate — os 3 ramos de src/pages/draw/StepMatch.jsx)
+//     desafiante e empate resolvido no par ou ímpar — os 3 ramos de
+//     src/pages/draw/StepMatch.jsx)
 //   • Classificação do dia com soma de pontos (utils/bracket.computeDailyTeamStandings)
 //   • Tela de pós-jogo (PostGameScreen) com as mensagens de vitória/empate
+//
+// Regras atuais do StepMatch que esta suíte reflete:
+//   • A partida NÃO termina sozinha ao chegar em 2 gols: ela só termina pelo
+//     botão "Finalizar Partida" ou quando o cronômetro chega a 0.
+//   • Em caso de empate, abre o modal "Empate!" (par ou ímpar) antes do pós-jogo.
+//   • A classificação do dia é filtrada por draw_result_id, então o sorteio
+//     precisa trazer um drawResultId.
+//   • A foto do vencedor só é pedida no encerramento do baba (finishPhase),
+//     não a cada vitória.
 //
 // Observação: o repositório usa o TestSprite para testes end-to-end orientados
 // por IA contra um servidor rodando (testsprite_tests/tmp/config.json). O
@@ -219,7 +229,14 @@ const TIME_D = { name: 'Time D', players: [
   makePlayer('p19', 'Sara'), makePlayer('p20', 'Tomas', 'goleiro'),
 ]};
 
-const FOUR_TEAMS_DRAW = { teams: [TIME_A, TIME_B, TIME_C, TIME_D], reserves: [] };
+// drawResultId: o StepMatch só carrega a classificação do dia (e salva a fila)
+// quando existe uma sessão de sorteio — as consultas são filtradas por
+// draw_result_id. Sem isso, "Classificação do dia" e "N pts" nunca aparecem.
+const FOUR_TEAMS_DRAW = {
+  teams: [TIME_A, TIME_B, TIME_C, TIME_D],
+  reserves: [],
+  drawResultId: 'draw-1',
+};
 
 const renderStepMatch = (overrides = {}) => {
   const setMatchState = vi.fn();
@@ -283,6 +300,25 @@ const scoreIdFor = (team, playerName) => {
   const players = ALL_TEAMS_BY_NAME[teamName].players;
   return players.find(p => p.name === playerName).id;
 };
+
+// Espera a partida entre os dois times estar no ar de verdade: o indicador
+// "Ao vivo" só aparece quando matchId já foi definido, e os 10 jogadores
+// precisam ter sido inseridos em match_players — sem isso, um gol marcado
+// cedo demais não encontra a linha do jogador e não é gravado.
+const waitForLiveMatch = async (teamAName, teamBName) => {
+  currentTeamAName = teamAName;
+  currentTeamBName = teamBName;
+  await waitFor(() => {
+    expect(screen.getByText('Ao vivo')).toBeInTheDocument();
+    const live = [...db.matches.values()].find(m => m.status === 'in_progress');
+    expect(live?.team_a_name).toBe(teamAName);
+    expect(live?.team_b_name).toBe(teamBName);
+    expect(db.matchPlayers.get(live?.id)).toHaveLength(10);
+  });
+};
+
+// A partida não termina sozinha com 2 gols: encerra pelo botão (ou pelo cronômetro).
+const finishMatch = () => fireEvent.click(screen.getByText(/Finalizar Partida/i));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup
@@ -388,16 +424,41 @@ describe('StepMatch — placar, gols e assistências', () => {
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('gol'));
   });
 
-  it('placar chega a 2 gols e finaliza a partida automaticamente (regra dos 2 gols)', async () => {
+  it('com 2 gols a partida continua em andamento (a regra dos 2 gols não existe mais)', async () => {
     renderStepMatch();
-    await waitFor(() => expect(screen.getAllByText('Time A').length).toBeGreaterThan(0));
+    await waitForLiveMatch('Time A', 'Time B');
+
     await markGoal('A', 'Ana');
     await markGoal('A', 'Bia');
 
-    // Tela de pós-jogo deve aparecer sozinha, sem clicar em "Finalizar Partida"
+    // Placar 2 × 0 na tela, partida ainda ao vivo e sem tela de vencedor
+    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
+    expect(screen.queryAllByText(/venceu/i)).toHaveLength(0);
+
+    const match = [...db.matches.values()][0];
+    expect(match.status).toBe('in_progress');
+  });
+
+  it('"Finalizar Partida" com 2 × 0 encerra a partida e mostra o vencedor', async () => {
+    renderStepMatch();
+    await waitForLiveMatch('Time A', 'Time B');
+
+    await markGoal('A', 'Ana');
+    await markGoal('A', 'Bia');
+
+    finishMatch();
+
+    // Tela de pós-jogo com o vencedor
     await waitFor(() => {
       expect(screen.getAllByText(/venceu/i).length).toBeGreaterThan(0);
     });
+
+    // E a partida foi gravada como finalizada, com o placar recalculado do banco
+    const match = [...db.matches.values()][0];
+    expect(match.status).toBe('finished');
+    expect(match.winner_team).toBe('A');
+    expect(match.team_a_score).toBe(2);
+    expect(match.team_b_score).toBe(0);
   });
 });
 
@@ -465,12 +526,15 @@ describe('StepMatch — simulação completa do baba (4 times sorteados)', () =>
     'a fila de espera e a soma de pontos na classificação do dia',
     async () => {
       renderStepMatch();
-      await waitFor(() => expect(screen.getAllByText('Time A').length).toBeGreaterThan(0));
+      await waitForLiveMatch('Time A', 'Time B');
 
       // ── Rodada 1: Time A 2 × 0 Time B → Time A vence, permanece em campo ──
       expect(screen.getByText('Time C')).toBeInTheDocument(); // próximo da fila
       await markGoal('A', 'Ana');
       await markGoal('A', 'Duda', 'Caio');
+
+      // A partida só termina quando o presidente finaliza (ou o cronômetro zera)
+      finishMatch();
 
       await waitFor(() => expect(screen.getAllByText(/Time A venceu/i).length).toBeGreaterThan(0));
 
@@ -480,19 +544,13 @@ describe('StepMatch — simulação completa do baba (4 times sorteados)', () =>
         expect(screen.getAllByText(/3 pts/).length).toBeGreaterThan(0);
       });
 
-      // Avança: "Próxima partida" → mostra o modal de foto do vencedor → pula
+      // Avança: "Próxima partida" vai direto para a nova partida (a foto do
+      // vencedor só é pedida no encerramento do baba, não a cada vitória).
       fireEvent.click(screen.getByText(/Próxima partida/i));
-      await screen.findByText('Foto do Vencedor');
-      fireEvent.click(screen.getByText(/Pular por agora/i));
 
       // Nova partida: Time A (venceu, ficou) × Time C (desafiante); Time B foi
       // para o fim da fila; Time D é o próximo a aguardar.
-      await waitFor(() => {
-        currentTeamAName = 'Time A';
-        currentTeamBName = 'Time C';
-        expect(screen.getAllByText('Time A').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Time C').length).toBeGreaterThan(0);
-      });
+      await waitForLiveMatch('Time A', 'Time C');
       expect(screen.getByText('Time D')).toBeInTheDocument(); // próximo da fila (único)
       expect(screen.queryByText('Time B')).not.toBeInTheDocument();
 
@@ -500,52 +558,44 @@ describe('StepMatch — simulação completa do baba (4 times sorteados)', () =>
       await markGoal('B', 'Kaio');
       await markGoal('B', 'Lia', 'Marco');
 
+      finishMatch();
+
       await waitFor(() => expect(screen.getAllByText(/Time C venceu/i).length).toBeGreaterThan(0));
 
       fireEvent.click(screen.getByText(/Próxima partida/i));
-      await screen.findByText('Foto do Vencedor');
-      fireEvent.click(screen.getByText(/Pular por agora/i));
 
       // Nova partida: Time C (venceu) × Time D (desafiante); Time A (perdeu)
       // volta para o fim da fila.
-      await waitFor(() => {
-        currentTeamAName = 'Time C';
-        currentTeamBName = 'Time D';
-        expect(screen.getAllByText('Time C').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Time D').length).toBeGreaterThan(0);
-      });
+      await waitForLiveMatch('Time C', 'Time D');
       expect(screen.getByText('Time B')).toBeInTheDocument(); // próximo da fila (único)
       expect(screen.queryByText('Time A')).not.toBeInTheDocument();
 
       // ── Rodada 3: Time C 1 × 1 Time D → empate, os dois saem da frente ──
       await markGoal('A', 'Nina');
       await markGoal('B', 'Rui');
-      fireEvent.click(screen.getByText(/Finalizar Partida/i));
+      finishMatch();
+
+      // Empate: o app abre o modal do par ou ímpar antes do pós-jogo.
+      // Time C ganha no par ou ímpar (a ordem entre C e D não muda quem joga
+      // a próxima partida: os dois vão para o fim da fila).
+      await screen.findByText('Empate!');
+      fireEvent.click(screen.getByRole('button', { name: 'Time C' }));
 
       await waitFor(() => expect(screen.getByText(/Classificação do dia/i)).toBeInTheDocument());
       // Empate: sem "X venceu"; usa uma DRAW_MESSAGES (não cita nome de time)
       expect(screen.queryAllByText(/Time C venceu/i)).toHaveLength(0);
       expect(screen.queryAllByText(/Time D venceu/i)).toHaveLength(0);
 
-      // Avança para a próxima partida. OBS: o `winnerInfo` de StepMatch não é
-      // limpo entre partidas — se a rodada anterior teve vencedor, o modal de
-      // foto reaparece "herdando" esse nome mesmo após um empate na rodada
-      // seguinte. O teste lida com os dois cenários possíveis.
       fireEvent.click(screen.getByText(/Próxima partida/i));
-      const photoModal = screen.queryByText('Foto do Vencedor');
-      if (photoModal) fireEvent.click(screen.getByText(/Pular por agora/i));
 
       // Nova partida: Time B × Time A (os dois primeiros da fila, já que o
       // empate manda os dois times da rodada anterior para o fim da fila).
-      await waitFor(() => {
-        expect(screen.getAllByText('Time B').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Time A').length).toBeGreaterThan(0);
-      });
+      await waitForLiveMatch('Time B', 'Time A');
 
       // ── Classificação final do dia soma os pontos das 3 partidas ──
       // Time A: vitória (3) + derrota (0) = 3 pts
-      // Time B: derrota (0)                = 0 pts
-      // Time C: derrota (0) + vitória (3) + empate (1) = 4 pts
+      // Time B: sem partidas jogadas        = 0 pts (ainda não entrou)
+      // Time C: derrota-vitória: vitória (3) + empate (1) = 4 pts
       // Time D: empate (1)                 = 1 pt
       const finishedMatches = [...db.matches.values()].filter(m => m.status === 'finished');
       expect(finishedMatches).toHaveLength(3);

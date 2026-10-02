@@ -173,8 +173,8 @@ describe('PrivacyPage — contato e DPO', () => {
 
   it('link de email tem href correto', () => {
     renderPage();
-    const link = screen.getAllByText('privacidade@gestao-baba.app')[0].closest('a');
-    expect(link).toHaveAttribute('href', 'mailto:privacidade@gestao-baba.app');
+    const link = screen.getAllByText('draftplayapp@gmail.com')[0].closest('a');
+    expect(link).toHaveAttribute('href', 'mailto:draftplayapp@gmail.com');
   });
 
   it('exibe link para ANPD', () => {

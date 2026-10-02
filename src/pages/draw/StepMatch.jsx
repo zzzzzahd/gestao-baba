@@ -1,5 +1,14 @@
 // src/pages/draw/StepMatch.jsx
 // Sprint 3 — Integra MatchIntro, PostGameScreen, MatchReactions e sons.
+//
+// Alterações desta versão (persistência de escalação no Supabase):
+//   • getBenchedId: fonte única de "quem está no banco" (estado -> fallback na
+//     reserva original), usada em getActiveLineup e no card "Banco do time".
+//   • persistLineupState: grava benched_by_team / gk_override / borrowed_by_team
+//     em `matches` a cada troca manual.
+//   • loadOrCreateMatch: o INSERT já grava as 3 colunas (estado inicial).
+//   • Hidratação: ao ter matchId, o servidor é a fonte da verdade (junto com o
+//     cronômetro, na mesma requisição).
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Target, UserPlus, ChevronLeft, Trophy, ChevronDown, Square } from 'lucide-react';
@@ -21,6 +30,9 @@ import toast from 'react-hot-toast';
 
 const formatTime = (s) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+const isNonEmptyObject = (o) =>
+  !!o && typeof o === 'object' && Object.keys(o).length > 0;
 
 const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) => {
   const { currentBaba } = useBaba();
@@ -200,17 +212,33 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setMatchState
   ]);
 
-  // Busca o cronômetro real do banco sempre que a partida (matchId) muda —
-  // fonte da verdade é o servidor, não o localStorage de quem abriu a tela.
+  // Busca do banco, sempre que a partida (matchId) muda, o cronômetro E a
+  // escalação manual (banco / goleiro emprestado / jogador puxado). A fonte da
+  // verdade é o servidor, não o localStorage de quem abriu a tela.
   useEffect(() => {
     if (!matchId) return;
     (async () => {
       const { data } = await supabase
         .from('matches')
-        .select('clock_running, clock_ends_at, clock_remaining_seconds')
+        .select(
+          'clock_running, clock_ends_at, clock_remaining_seconds, benched_by_team, gk_override, borrowed_by_team'
+        )
         .eq('id', matchId)
         .maybeSingle();
       if (!data) return;
+
+      // As colunas são NOT NULL com default '{}' — então "vazio" significa
+      // "nunca gravado" (partida antiga), e não deve apagar o que já está local.
+      if (isNonEmptyObject(data.benched_by_team)) {
+        setBenchedByTeam(data.benched_by_team);
+      }
+      if (data.gk_override) {
+        setGkOverride(data.gk_override);
+      }
+      if (isNonEmptyObject(data.borrowed_by_team)) {
+        setBorrowedByTeam(data.borrowed_by_team);
+      }
+
       if (data.clock_running && data.clock_ends_at) {
         setClockRunning(true);
         setClockEndsAt(new Date(data.clock_ends_at).getTime());
@@ -259,6 +287,15 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     }
   }, [clockRunning, clockEndsAt, clockRemaining, matchId]);
 
+  // Quem está no banco de um time: escolha explícita (benchedByTeam) ou, se
+  // não houver, a reserva original do sorteio. Fonte única — usada tanto na
+  // escalação ativa quanto no card "Banco do time", pra os dois nunca
+  // divergirem.
+  const getBenchedId = useCallback(
+    team => benchedByTeam[team.name] ?? team.players.find(p => p.isReserve)?.id,
+    [benchedByTeam]
+  );
+
   // Time de linha ativo (titulares) de um time: todos menos quem está no banco,
   // mais qualquer jogador emprestado (ponto 1b, time incompleto). É a fonte da
   // verdade de "quem está realmente jogando essa partida" — usada pros modais
@@ -267,7 +304,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     team => {
       if (!team) return [];
 
-      const benchedId = benchedByTeam[team.name];
+      const benchedId = getBenchedId(team);
 
       const base = benchedId
         ? team.players.filter(p => p.id !== benchedId)
@@ -277,8 +314,26 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
       return [...base, ...borrowed];
     },
-    [benchedByTeam, borrowedByTeam]
+    [getBenchedId, borrowedByTeam]
   );
+
+  // Grava as 3 escolhas manuais da escalação na partida (banco, goleiro
+  // emprestado, jogador puxado). Sem matchId ainda, não faz nada — nesse caso
+  // o valor vai no INSERT de loadOrCreateMatch.
+  const persistLineupState = useCallback(async (mid, { benched, gk, borrowed }) => {
+    if (!mid) return;
+    const { error } = await supabase
+      .from('matches')
+      .update({
+        benched_by_team: benched,
+        gk_override: gk,
+        borrowed_by_team: borrowed
+      })
+      .eq('id', mid);
+    if (error) {
+      console.error('[StepMatch] persistLineupState:', error);
+    }
+  }, []);
 
   const loadDailyStandings = useCallback(async () => {
     if (!currentBaba || !drawResultId) return;
@@ -362,7 +417,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                 team_a_name: teamA.name,
                 team_b_name: teamB.name,
                 status: 'in_progress',
-                draw_result_id: drawResultIdParam
+                draw_result_id: drawResultIdParam,
+                // Estado inicial da escalação já na criação da partida
+                benched_by_team: benchMap,
+                gk_override: gkOv,
+                borrowed_by_team: borrowMap
               }
             ])
             .select()
@@ -552,6 +611,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     setGkOverride(next);
     setShowGkSubModal(false);
 
+    persistLineupState(matchId, {
+      benched: benchedByTeam,
+      gk: next,
+      borrowed: borrowedByTeam
+    });
+
     if (currentMatch) {
       loadOrCreateMatch(
         currentMatch.teamA,
@@ -573,6 +638,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
     };
 
     setGkOverride(next);
+
+    persistLineupState(matchId, {
+      benched: benchedByTeam,
+      gk: next,
+      borrowed: borrowedByTeam
+    });
 
     if (currentMatch) {
       loadOrCreateMatch(
@@ -599,6 +670,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
     setBenchedByTeam(next);
     setShowBenchModal(false);
+
+    persistLineupState(matchId, {
+      benched: next,
+      gk: gkOverride,
+      borrowed: borrowedByTeam
+    });
 
     if (currentMatch) {
       loadOrCreateMatch(
@@ -636,6 +713,12 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
 
     setBorrowedByTeam(next);
     setShowBorrowModal(false);
+
+    persistLineupState(matchId, {
+      benched: benchedByTeam,
+      gk: gkOverride,
+      borrowed: next
+    });
 
     if (currentMatch) {
       loadOrCreateMatch(
@@ -1378,14 +1461,11 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                   }
 
                   const benchedId =
-                    benchedByTeam[team.name];
+                    getBenchedId(team);
 
                   const benched =
                     team.players.find(
                       p => p.id === benchedId
-                    ) ||
-                    team.players.find(
-                      p => p.isReserve
                     );
 
                   return (
@@ -2127,9 +2207,7 @@ const StepMatch = ({ drawResult, matchState, setMatchState, onBack, onReset }) =
                     handleBenchSwap(p.id)
                   }
                   className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors text-[11px] font-bold ${
-                    benchedByTeam[
-                      benchModalTeam.name
-                    ] === p.id
+                    getBenchedId(benchModalTeam) === p.id
                       ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400'
                       : 'bg-surface-2 border-border-subtle hover:border-cyan-electric/40 text-white'
                   }`}

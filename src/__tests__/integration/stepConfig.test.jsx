@@ -6,7 +6,10 @@
 //
 // Cobre:
 //   • Contador de confirmados e o botão "Sortear Times" habilitado/desabilitado
-//     conforme o mínimo (playersPerTeam * 2)
+//     conforme o mínimo:
+//       - strategy 'reserve'    -> (playersPerTeam + 1) * 2  (cada time precisa
+//                                  de +1 vaga própria de reserva)
+//       - strategy 'substitute' -> playersPerTeam * 2
 //   • Fluxo de convidado avulso: adicionar (grava em players + game_confirmations
 //     e recarrega confirmações) e remover
 //   • Ajuste de "jogadores por time" (+/-) e troca de estratégia (Reserva/Incompleto)
@@ -52,9 +55,14 @@ const NEXT_GAME_DAY = { dateStr: '2026-09-12' };
 const makePlayer = (id, name, position = 'linha') => ({ id, name, position });
 const makeConfirmation = (id, player) => ({ id: `conf-${id}`, player_id: player.id, player });
 
-// 10 jogadores confirmados = exatamente o mínimo pra playersPerTeam=5 (padrão)
+// 10 jogadores confirmados:
+//   • strategy 'substitute' -> exatamente o mínimo pra playersPerTeam=5 (5 * 2)
+//   • strategy 'reserve'    -> NÃO basta (mínimo é (5 + 1) * 2 = 12)
 const TEN_PLAYERS = Array.from({ length: 10 }, (_, i) => makePlayer(`p${i + 1}`, `Jogador ${i + 1}`));
 const TEN_CONFIRMATIONS = TEN_PLAYERS.map((p, i) => makeConfirmation(i + 1, p));
+
+const DRAW_CONFIG_RESERVE    = { playersPerTeam: 5, strategy: 'reserve' };
+const DRAW_CONFIG_SUBSTITUTE = { playersPerTeam: 5, strategy: 'substitute' };
 
 const baseBabaCtx = (overrides = {}) => ({
   currentBaba: BABA,
@@ -72,7 +80,7 @@ const renderStepConfig = (props = {}) => {
   const onNext = vi.fn();
   const utils = render(
     <StepConfig
-      drawConfig={{ playersPerTeam: 5, strategy: 'reserve' }}
+      drawConfig={DRAW_CONFIG_RESERVE}
       setDrawConfig={setDrawConfig}
       onNext={onNext}
       {...props}
@@ -107,21 +115,33 @@ describe('StepConfig — contador de confirmados e mínimo pra sortear', () => {
     mockUseBaba.mockReturnValue(baseBabaCtx());
     renderStepConfig();
 
+    // strategy 'reserve' (padrão): mínimo = (5 + 1) * 2 = 12
     expect(screen.getByText('0')).toBeInTheDocument();
-    expect(screen.getByText(/Mínimo 10 para sortear/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mínimo 12 para sortear/i)).toBeInTheDocument();
     expect(screen.getByText(/Sortear Times/i).closest('button')).toBeDisabled();
   });
 
-  it('habilita "Sortear Times" quando bate o mínimo (playersPerTeam * 2)', () => {
+  it('habilita "Sortear Times" quando bate o mínimo (modo Incompleto: playersPerTeam * 2)', () => {
     mockUseBaba.mockReturnValue(baseBabaCtx({
       gameConfirmations: TEN_CONFIRMATIONS,
       players: TEN_PLAYERS,
     }));
-    renderStepConfig();
+    renderStepConfig({ drawConfig: DRAW_CONFIG_SUBSTITUTE });
 
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.queryByText(/Mínimo 10 para sortear/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mínimo/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Sortear Times/i).closest('button')).not.toBeDisabled();
+  });
+
+  it('no modo Reserva, 10 confirmados não bastam: mínimo é (playersPerTeam + 1) * 2 = 12', () => {
+    mockUseBaba.mockReturnValue(baseBabaCtx({
+      gameConfirmations: TEN_CONFIRMATIONS,
+      players: TEN_PLAYERS,
+    }));
+    renderStepConfig(); // strategy: 'reserve'
+
+    expect(screen.getByText(/Mínimo 12 para sortear/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sortear Times/i).closest('button')).toBeDisabled();
   });
 
   it('ajustar "jogadores por time" pra baixo reduz o mínimo exigido', () => {
@@ -244,13 +264,12 @@ describe('StepConfig — convidado avulso', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('StepConfig — sortear (fluxo feliz, sem sessão ativa existente)', () => {
-  // Usa strategy='substitute' aqui de propósito: com strategy='reserve' (o
-  // default do drawConfig acima), o algoritmo de sorteio divide por
-  // (playersPerTeam+1) — 10 confirmados / (5+1) = 1 time só, não 2. Isso é
-  // do próprio algoritmo (drawTeamsWithConstraints), não bug deste teste;
-  // 'substitute' evita esse caso de borda e mantém o teste focado no fluxo
-  // de StepConfig em si (checar sessão ativa → sortear → onNext).
-  const drawConfigSubstitute = { playersPerTeam: 5, strategy: 'substitute' };
+  // Usa strategy='substitute' aqui de propósito: com strategy='reserve', o
+  // mínimo é (playersPerTeam+1)*2 = 12 e o algoritmo divide por
+  // (playersPerTeam+1) — 10 confirmados não formam 2 times (nem liberam o
+  // botão). 'substitute' mantém o teste focado no fluxo de StepConfig em si
+  // (checar sessão ativa → sortear → onNext) com os mesmos 10 confirmados.
+  const drawConfigSubstitute = DRAW_CONFIG_SUBSTITUTE;
 
   it('cria uma nova sessão de sorteio e chama onNext com teams/reserves/drawResultId', async () => {
     mockUseBaba.mockReturnValue(baseBabaCtx({
@@ -286,14 +305,19 @@ describe('StepConfig — sortear (fluxo feliz, sem sessão ativa existente)', ()
     supabase.rpc.mockResolvedValue({ data: [], error: null }); // get_draw_constraints
 
     const { onNext } = renderStepConfig({ drawConfig: drawConfigSubstitute });
-    // draw_config gravado deve refletir o config passado (playersPerTeam=5, strategy=reserve)
-    expect(insertBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baba_id: 'baba-1',
-        draw_date: '2026-09-12', // usa a data do PRÓXIMO JOGO, não "hoje"
-        status: 'active',
-      })
-    );
+    fireEvent.click(screen.getByText(/Sortear Times/i));
+
+    // O insert só acontece depois do clique (e de algumas chamadas async),
+    // então precisa estar dentro de um waitFor.
+    await waitFor(() => {
+      expect(insertBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          baba_id: 'baba-1',
+          draw_date: '2026-09-12', // usa a data do PRÓXIMO JOGO, não "hoje"
+          status: 'active',
+        })
+      );
+    });
 
     await waitFor(() => {
       expect(onNext).toHaveBeenCalledWith(
@@ -332,7 +356,8 @@ describe('StepConfig — sortear (fluxo feliz, sem sessão ativa existente)', ()
       return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) };
     });
 
-    const { onNext } = renderStepConfig();
+    // 'substitute' pra que 10 confirmados habilitem o botão (ver comentário acima)
+    const { onNext } = renderStepConfig({ drawConfig: DRAW_CONFIG_SUBSTITUTE });
     fireEvent.click(screen.getByText(/Sortear Times/i));
 
     await waitFor(() => {

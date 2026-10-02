@@ -1,5 +1,5 @@
 // src/components/PostGameScreen.jsx
-// Sprint 3 â€” Tela pÃ³s-jogo: resumo do placar, MVP e CTA de compartilhamento.
+// Sprint 3 — Tela pós-jogo: resumo do placar, MVP e CTA de compartilhamento.
 
 import React from 'react';
 import { Trophy, Share2, X } from 'lucide-react';
@@ -23,10 +23,10 @@ const PostGameScreen = ({
 
   const handleShare = async () => {
     const text = [
-      `âš½ ${babaName ?? 'Baba'}`,
-      `${teamA?.name ?? 'Time A'} ${scoreA} Ã— ${scoreB} ${teamB?.name ?? 'Time B'}`,
-      isDraw ? 'ðŸ¤ Empate!' : `ðŸ† Vencedor: ${winnerTeam?.name}`,
-      'ðŸ“± www.draftplay.app.br',
+      `⚽ ${babaName ?? 'Baba'}`,
+      `${teamA?.name ?? 'Time A'} ${scoreA} × ${scoreB} ${teamB?.name ?? 'Time B'}`,
+      isDraw ? '🤝 Empate!' : `🏆 Vencedor: ${winnerTeam?.name}`,
+      '📱 www.draftplay.app.br',
     ].join('\n');
     if (navigator.share) {
       try { await navigator.share({ text }); } catch {}
@@ -53,7 +53,7 @@ const PostGameScreen = ({
                 <p className="text-[10px] font-black uppercase text-cyan-electric/70 mb-1">{teamA?.name ?? 'Time A'}</p>
                 <p className="text-5xl font-black tabular-nums text-white">{scoreA}</p>
               </div>
-              <p className="text-text-muted font-black text-xl">Ã—</p>
+              <p className="text-text-muted font-black text-xl">×</p>
               <div className="flex-1 text-left">
                 <p className="text-[10px] font-black uppercase text-yellow-500/70 mb-1">{teamB?.name ?? 'Time B'}</p>
                 <p className="text-5xl font-black tabular-nums text-white">{scoreB}</p>
@@ -62,25 +62,25 @@ const PostGameScreen = ({
             <p className="text-[11px] text-text-low font-black mt-2 px-2">{headline}</p>
           </div>
 
-          {/* Trophy se nÃ£o-empate */}
+          {/* Trophy se não-empate */}
           {!isDraw && (
             <div className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-yellow-500/10 border border-yellow-500/20">
               <Trophy size={16} className="text-yellow-500" />
               <span className="text-[11px] font-black uppercase text-yellow-500">
-                {winnerTeam?.name} venceu! ðŸ†
+                {winnerTeam?.name} venceu! 🏆
               </span>
             </div>
           )}
 
-          {/* ClassificaÃ§Ã£o do dia */}
+          {/* Classificação do dia */}
           {standings.length > 0 && (
             <div className="p-3 rounded-2xl bg-surface-2 border border-border-mid space-y-1.5">
               <p className="text-[8px] font-black text-text-muted uppercase tracking-widest text-center mb-1.5">
-                ClassificaÃ§Ã£o do dia
+                Classificação do dia
               </p>
               {standings.slice(0, 4).map((t, i) => (
                 <div key={t.name} className="flex items-center gap-2 text-[10px]">
-                  <span className="w-4 text-text-muted font-black">{i + 1}Âº</span>
+                  <span className="w-4 text-text-muted font-black">{i + 1}º</span>
                   <span className="flex-1 font-black uppercase truncate text-text-mid">{t.name}</span>
                   <span className="font-black text-cyan-electric tabular-nums">{t.Pts} pts</span>
                 </div>
@@ -88,7 +88,7 @@ const PostGameScreen = ({
             </div>
           )}
 
-          {/* BotÃµes */}
+          {/* Botões */}
           <div className="space-y-3">
             <button
               onClick={handleShare}
@@ -100,7 +100,7 @@ const PostGameScreen = ({
               onClick={onClose}
               className="w-full py-3 text-text-muted font-black uppercase text-[10px] tracking-widest hover:text-white transition-colors"
             >
-              PrÃ³xima partida â†’
+              Próxima partida →
             </button>
           </div>
         </div>

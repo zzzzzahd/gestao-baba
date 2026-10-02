@@ -112,18 +112,19 @@ describe('AuthContext', () => {
 
 describe('Fluxo de login', () => {
   beforeEach(() => {
+    // Limpa o histórico de chamadas para um teste não enxergar as chamadas do outro
+    vi.clearAllMocks();
     supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     supabase.auth.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
-  });
-
-  it('chama signInWithPassword com email e senha corretos', async () => {
     supabase.auth.signInWithPassword.mockResolvedValue({
       data: { user: makeUser(), session: {} },
       error: null,
     });
+  });
 
+  it('chama signInWithPassword com email e senha corretos', async () => {
     const LoginTest = () => {
       const { signIn } = useAuth();
       return (
@@ -145,9 +146,41 @@ describe('Fluxo de login', () => {
       fireEvent.click(screen.getByText('Login'));
     });
 
+    // objectContaining: valida as credenciais sem depender do formato do `options`
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'test@email.com',
+        password: 'senha123',
+      })
+    );
+  });
+
+  it('envia o captchaToken em options quando ele é informado', async () => {
+    const LoginTest = () => {
+      const { signIn } = useAuth();
+      return (
+        <button onClick={() => signIn('test@email.com', 'senha123', 'token-captcha')}>
+          Login
+        </button>
+      );
+    };
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <LoginTest />
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('Login'));
+    });
+
     expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
       email: 'test@email.com',
       password: 'senha123',
+      options: { captchaToken: 'token-captcha' },
     });
   });
 });

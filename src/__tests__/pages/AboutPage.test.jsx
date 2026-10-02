@@ -60,8 +60,8 @@ describe('AboutPage › seções', () => {
   it('exibe seção "Contato" com link de e-mail', () => {
     wrap();
     expect(screen.getByText('Contato')).toBeInTheDocument();
-    const emailLink = screen.getByRole('link', { name: /contato@draftplay\.app/i });
-    expect(emailLink).toHaveAttribute('href', 'mailto:contato@draftplay.app');
+    const emailLink = screen.getByRole('link', { name: /draftplayapp@gmail\.com/i });
+    expect(emailLink).toHaveAttribute('href', 'mailto:draftplayapp@gmail.com');
   });
 });
 
