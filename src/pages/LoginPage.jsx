@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 import toast from 'react-hot-toast';
 
 // Cloudflare Turnstile — protege LOGIN, CADASTRO e RECUPERAÇÃO DE SENHA
@@ -350,14 +351,20 @@ const LoginPage = () => {
                 </div>
               </div>
               <span className="text-[11px] text-text-low leading-relaxed">
-                Li e aceito a{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate('/privacidade')}
+                Li e aceito os{' '}
+                <Link
+                  to="/termos"
+                  className="text-cyan-electric underline hover:text-white transition-colors"
+                >
+                  Termos de Uso
+                </Link>
+                {' '}e a{' '}
+                <Link
+                  to="/privacidade"
                   className="text-cyan-electric underline hover:text-white transition-colors"
                 >
                   Política de Privacidade
-                </button>
+                </Link>
                 {' '}e autorizo o uso dos meus dados para funcionamento do Draft Play.
               </span>
             </label>
@@ -399,6 +406,9 @@ const LoginPage = () => {
             ← Voltar
           </button>
         </form>
+
+        {/* Navegação para as páginas públicas (Início, Sobre, Termos, Privacidade) */}
+        <PublicPagesFooter className="mt-6" />
       </div>
 
       {/* ── Modal: recuperar senha ── */}

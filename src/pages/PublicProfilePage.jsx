@@ -9,7 +9,7 @@
 // description e noindex únicos por jogador. Não remover.
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { getPublicProfileData } from '../services/publicProfileService';
 import { useAuth }                     from '../contexts/AuthContext';
@@ -144,12 +144,12 @@ export default function PublicProfilePage({ initialData = null }) {
       >
         ← Voltar
       </button>
-      <a
-        href="/"
+      <Link
+        to="/"
         className="text-[10px] font-black uppercase text-cyan-electric underline"
       >
         Ir pra página inicial
-      </a>
+      </Link>
     </div>
   );
 
@@ -362,18 +362,44 @@ export default function PublicProfilePage({ initialData = null }) {
           <div className="text-center py-10 border border-dashed border-border-subtle rounded-2xl space-y-3">
             <p className="text-3xl mb-2">⚽</p>
             <p className="text-[11px] font-black text-text-muted uppercase">Nenhuma partida ainda</p>
-            <a
-              href="/"
+            <Link
+              to="/"
               className="inline-block text-[10px] font-black uppercase text-cyan-electric underline"
             >
               Conheça o Draft Play →
-            </a>
+            </Link>
           </div>
         )}
 
         {/* ── Banner AdSense — só quando o perfil já tem conteúdo próprio de verdade (partida ou conquista) ── */}
         {(stats?.matches > 0 || allBadges.length > 0) && (
           <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_PUBLIC_PROFILE} className="mt-2" />
+        )}
+
+        {/* Chamada para visitante sem login: leva pra criar conta e conhecer o app */}
+        {!user && (
+          <div className="text-center py-6 px-4 border border-border-subtle rounded-2xl space-y-3 bg-surface-2/40">
+            <p className="text-[11px] font-black text-white uppercase tracking-widest">
+              Quer ter o seu perfil também?
+            </p>
+            <p className="text-[10px] text-text-mid font-bold leading-relaxed">
+              No Draft Play você organiza seu baba, acompanha gols, assistências e conquistas.
+            </p>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <Link
+                to="/login"
+                className="px-5 py-2.5 rounded-2xl bg-cyan-electric text-black text-[10px] font-black uppercase tracking-widest"
+              >
+                Criar conta / Entrar
+              </Link>
+              <Link
+                to="/"
+                className="text-[10px] font-black uppercase text-cyan-electric underline"
+              >
+                Conheça o Draft Play
+              </Link>
+            </div>
+          </div>
         )}
 
         {/* Rodapé de navegação — faltava no caso mais comum (perfil com

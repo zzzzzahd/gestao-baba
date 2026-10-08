@@ -2,7 +2,7 @@
 // Sprint 10.5 — Termos de Uso do Draft Play (LGPD art. 8)
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, FileText } from 'lucide-react';
 import PublicPagesFooter from '../components/PublicPagesFooter';
 
@@ -130,9 +130,9 @@ export default function TermsPage() {
         <Section title="11. Privacidade">
           <p>
             O tratamento dos seus dados pessoais é descrito na nossa{' '}
-            <span className="text-cyan-electric cursor-pointer" onClick={() => navigate('/privacidade')}>
+            <Link to="/privacidade" className="text-cyan-electric underline">
               Política de Privacidade
-            </span>
+            </Link>
             , elaborada em conformidade com a LGPD.
           </p>
         </Section>
@@ -140,7 +140,9 @@ export default function TermsPage() {
         <Section title="12. Contato">
           <p>
             Dúvidas sobre estes termos? Entre em contato pelo e-mail:{' '}
-            <span className="text-cyan-electric">draftplayapp@gmail.com</span>
+            <a href="mailto:draftplayapp@gmail.com" className="text-cyan-electric underline">
+              draftplayapp@gmail.com
+            </a>
           </p>
         </Section>
 

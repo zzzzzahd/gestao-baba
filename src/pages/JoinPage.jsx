@@ -3,8 +3,9 @@
 // Mantém fallback para invite_code legado da tabela babas
 
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import PublicPagesFooter from '../components/PublicPagesFooter';
 
 export default function JoinPage() {
   const { code }   = useParams();
@@ -154,6 +155,7 @@ export default function JoinPage() {
           >
             Ir para início
           </button>
+          <PublicPagesFooter className="mt-8" />
         </div>
       </div>
     );
@@ -245,6 +247,16 @@ export default function JoinPage() {
           </svg>
           Compartilhar no WhatsApp
         </button>
+
+        {/* Quem recebeu o convite pode querer saber o que é o app antes de criar conta */}
+        <Link
+          to="/"
+          className="mt-6 text-[10px] font-black uppercase tracking-widest text-cyan-electric underline"
+        >
+          O que é o Draft Play?
+        </Link>
+
+        <PublicPagesFooter className="mt-6" />
       </div>
     </div>
   );
