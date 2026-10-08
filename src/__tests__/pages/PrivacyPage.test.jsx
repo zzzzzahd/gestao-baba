@@ -167,7 +167,7 @@ describe('PrivacyPage — contato e DPO', () => {
 
   it('exibe email de contato de privacidade', () => {
     renderPage();
-    const links = screen.getAllByText('privacidade@gestao-baba.app');
+    const links = screen.getAllByText('draftplayapp@gmail.com');
     expect(links.length).toBeGreaterThan(0);
   });
 

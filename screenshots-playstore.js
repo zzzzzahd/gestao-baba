@@ -4,9 +4,24 @@
  * Tira prints das principais telas do Draft Play (gestao-baba)
  * já no tamanho recomendado pela Google Play Store, e salva
  * tudo em ./screenshots/ pronto pra subir no Play Console.
+ *
+ * Login sem captcha (mesmo método do video-demo/demo-auth.js):
+ *   1. SERVICE ROLE KEY gera um magic link (API admin do Supabase)
+ *   2. ANON KEY troca o token por uma sessão real (verifyOtp)
+ *   3. A sessão é injetada no localStorage (sb-<project-ref>-auth-token)
+ *
+ * Variáveis (ambiente, .env.local ou .env na pasta do projeto):
+ *   SUPABASE_URL (ou VITE_SUPABASE_URL)
+ *   SUPABASE_ANON_KEY (ou VITE_SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_ANON_KEY)
+ *   SUPABASE_SERVICE_ROLE_KEY (ou SUPABASE_SERVICE_KEY / SUPABASE_SECRET_KEY)
+ *   DEMO_EMAIL (ou TEST_EMAIL)
+ *   SCREENSHOT_THEME=dark|light (padrão: dark)
+ *
+ * ATENÇÃO: a service role key nunca deve ir para o front-end nem para o Git.
  */
 
 import { chromium, devices } from 'playwright';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,10 +29,42 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Definição dos valores padrão para evitar passar por $env toda vez
+// ---------- Carrega .env.local e .env (sem sobrescrever o que já está no ambiente) ----------
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!m || line.trim().startsWith('#')) continue;
+    let value = m[2];
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[m[1]] === undefined) process.env[m[1]] = value;
+  }
+}
+for (const dir of new Set([process.cwd(), __dirname])) {
+  loadEnvFile(path.join(dir, '.env.local'));
+  loadEnvFile(path.join(dir, '.env'));
+}
+
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const EMAIL = process.env.TEST_EMAIL || 'draftplayapp@gmail.com';
-const PASSWORD = process.env.TEST_PASSWORD || 'DraftPlay#Teste2026';
+const EMAIL = process.env.DEMO_EMAIL || process.env.TEST_EMAIL || 'draftplayapp@gmail.com';
+const THEME = process.env.SCREENSHOT_THEME === 'light' ? 'light' : 'dark';
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  '';
+const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  '';
 
 // Adicione aqui IDs válidos do seu banco se quiser tirar print do torneio e perfil público
 const TOURNAMENT_ID = process.env.TOURNAMENT_ID || '';
@@ -128,45 +175,94 @@ function buildIdDependentRoutes() {
   return routes;
 }
 
-async function ensureOutDir() {
+function ensureOutDir() {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 }
 
-async function login(page) {
-  if (!EMAIL || !PASSWORD) {
-    console.log('⚠️  EMAIL ou PASSWORD não definidos — pulando login.');
-    return false;
-  }
-
+function attachErrorLogger(page) {
   page.on('console', (msg) => {
     if (msg.type() === 'error') console.log(`   [Browser Error]: ${msg.text()}`);
   });
+}
 
-  console.log(`🔑 Tentando autenticar em ${BASE_URL}/login com: ${EMAIL}...`);
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1000);
+/** Evita popups de primeira visita e força o tema, em toda página aberta no contexto. */
+async function applyAppFlags(context) {
+  await context.addInitScript((theme) => {
+    try {
+      localStorage.setItem('draft_play_onboarding_done_v2', '1');
+      localStorage.setItem('draft_play_beta_nps_shown', '1');
+      localStorage.setItem('draft_play_theme', theme);
+    } catch {
+      /* origem sem localStorage (about:blank etc.) */
+    }
+  }, THEME);
+}
 
+/** Gera uma sessão válida sem senha e sem captcha (secret key + anon key). */
+async function getAdminSession() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
+    throw new Error(
+      'Faltam variáveis: SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY ' +
+        '(defina no ambiente ou no .env.local da pasta do projeto).'
+    );
+  }
+
+  const authOpts = { auth: { autoRefreshToken: false, persistSession: false } };
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, authOpts);
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: EMAIL,
+  });
+  if (linkError) {
+    throw new Error(`Falha ao gerar magic link (confira a chave e se o e-mail ${EMAIL} existe): ${linkError.message}`);
+  }
+
+  const hashedToken = linkData?.properties?.hashed_token;
+  if (!hashedToken) throw new Error('O Supabase não retornou hashed_token.');
+
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, authOpts);
+  const { data: verifyData, error: verifyError } = await anon.auth.verifyOtp({
+    token_hash: hashedToken,
+    type: 'magiclink',
+  });
+  if (verifyError) throw new Error(`Falha ao trocar o token por sessão: ${verifyError.message}`);
+  if (!verifyData?.session) throw new Error('verifyOtp não retornou sessão.');
+
+  return verifyData.session;
+}
+
+/** Chave que o supabase-js usa por padrão: sb-<project-ref>-auth-token. */
+function buildSupabaseStorageKey(supabaseUrl) {
+  const match = supabaseUrl.match(/^https?:\/\/([^.]+)\.supabase\.co/i);
+  if (!match) throw new Error(`Não consegui extrair o project-ref de SUPABASE_URL: ${supabaseUrl}`);
+  return `sb-${match[1]}-auth-token`;
+}
+
+/** Injeta a sessão no localStorage e confirma que o app abriu logado. */
+async function login(page) {
   try {
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]').first();
-    const passInput = page.locator('input[type="password"], input[name="password"], input[placeholder*="senha" i]').first();
+    const session = await getAdminSession();
+    const storageKey = buildSupabaseStorageKey(SUPABASE_URL);
 
-    await emailInput.waitFor({ state: 'visible', timeout: 5000 });
-    await emailInput.click();
-    await emailInput.fill(EMAIL);
+    console.log(`🔑 Sessão criada para ${EMAIL}, injetando no app...`);
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(700);
 
-    await passInput.click();
-    await passInput.fill(PASSWORD);
+    await page.evaluate(
+      ([key, value]) => localStorage.setItem(key, value),
+      [storageKey, JSON.stringify(session)]
+    );
+    await page.waitForTimeout(600);
 
-    console.log('⏳ Enviando formulário de login...');
-    await passInput.press('Enter');
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.waitForTimeout(2500);
 
-    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
-    await page.waitForTimeout(2000);
-
-    console.log(`✅ Login efetuado! URL atual: ${page.url()}`);
-    return true;
+    const logged = !new URL(page.url()).pathname.includes('/login');
+    console.log(logged ? `✅ Login efetuado! URL atual: ${page.url()}` : '❌ O app não reconheceu a sessão (voltou para /login).');
+    return logged;
   } catch (err) {
-    console.log(`❌ Login falhou — a página não saiu de /login. URL atual: ${page.url()}`);
+    console.log(`❌ Login falhou: ${err.message}`);
     return false;
   }
 }
@@ -183,7 +279,7 @@ async function shoot(page, route) {
     }
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1500);
 
     const closeButtons = page.locator('[aria-label="Fechar"], [aria-label="Close"]');
     if (await closeButtons.count()) {
@@ -200,19 +296,30 @@ async function shoot(page, route) {
 }
 
 (async () => {
-  await ensureOutDir();
+  ensureOutDir();
 
   const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext({ ...DEVICE });
-  const page = await context.newPage();
+  const contextOpts = { ...DEVICE, colorScheme: THEME, locale: 'pt-BR' };
+
+  // ---------- Fase 1: telas públicas e visitante (contexto limpo, sem sessão) ----------
+  const publicContext = await browser.newContext(contextOpts);
+  await applyAppFlags(publicContext);
+  const publicPage = await publicContext.newPage();
+  attachErrorLogger(publicPage);
 
   for (const route of PUBLIC_ROUTES) {
-    await shoot(page, route);
+    await shoot(publicPage, route);
   }
-
   for (const route of VISITOR_ROUTES) {
-    await shoot(page, route);
+    await shoot(publicPage, route);
   }
+  await publicContext.close();
+
+  // ---------- Fase 2: telas privadas (sessão criada via Supabase Admin) ----------
+  const privateContext = await browser.newContext(contextOpts);
+  await applyAppFlags(privateContext);
+  const page = await privateContext.newPage();
+  attachErrorLogger(page);
 
   const logged = await login(page);
   if (logged) {

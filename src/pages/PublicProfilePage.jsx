@@ -3,6 +3,10 @@
 // Conquistas vêm só do banco (badge_definitions/player_badges) — mesma fonte
 // que BadgesSection.jsx usa no perfil privado. Antes havia uma segunda lista
 // de conquistas fixa no código rodando em paralelo; removida.
+//
+// A div raiz expõe data-profile-* (nome, gols, assistências, jogos). O script
+// de prerender lê esses atributos no HTML renderizado pra gerar title,
+// description e noindex únicos por jogador. Não remover.
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -28,47 +32,50 @@ export default function PublicProfilePage({ initialData = null }) {
   const navigate   = useNavigate();
   const { user }   = useAuth();
 
-const [profile, setProfile] = useState(initialData?.profile || null);
-const [stats, setStats] = useState(initialData?.stats || null);
-const [streak, setStreak] = useState(initialData?.streak || 0);
-const [earnedBadges, setEarnedBadges] = useState(
-  initialData?.earnedBadges || []
-);
-const [following, setFollowing] = useState(false);
-const [followers, setFollowers] = useState(
-  initialData?.followers || 0
-);
-const [loading, setLoading] = useState(!initialData);
-const [notFound, setNotFound] = useState(false);
-const [toggling, setToggling] = useState(false);
+  const [profile, setProfile] = useState(initialData?.profile || null);
+  const [stats, setStats] = useState(initialData?.stats || null);
+  const [streak, setStreak] = useState(initialData?.streak || 0);
+  const [earnedBadges, setEarnedBadges] = useState(
+    initialData?.earnedBadges || []
+  );
+  const [following, setFollowing] = useState(false);
+  const [followers, setFollowers] = useState(
+    initialData?.followers || 0
+  );
+  const [loading, setLoading] = useState(!initialData);
+  const [notFound, setNotFound] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
     if (!userId) return;
-  
+
     // No SSR os dados já foram carregados pelo entry-server.
     // No navegador, carregamos/atualizamos os dados normalmente.
     loadPublicProfile();
   }, [userId, user]);
 
   const loadPublicProfile = async () => {
-    setLoading(true);
-  
+    // Só mostra o spinner se ainda não há nada pra exibir. Com initialData
+    // (HTML pré-renderizado) o conteúdo continua na tela enquanto atualiza.
+    if (!profile) setLoading(true);
+
     try {
       const data = await getPublicProfileData(userId);
-  
+
       if (!data) {
         setNotFound(true);
         return;
       }
-  
+
+      setNotFound(false);
       setProfile(data.profile);
       setStats(data.stats);
       setStreak(data.streak);
       setEarnedBadges(data.earnedBadges);
       setFollowers(data.followers);
-  
+
       // ---------------------------------------------------------
       // FOLLOWING CONTINUA SENDO VERIFICADO NO CLIENTE
       // ---------------------------------------------------------
@@ -79,14 +86,16 @@ const [toggling, setToggling] = useState(false);
           .eq('follower_id', user.id)
           .eq('followed_id', userId)
           .maybeSingle();
-  
+
         setFollowing(!!fol);
       } else {
         setFollowing(false);
       }
     } catch (error) {
       console.error('[PublicProfilePage]', error);
-      setNotFound(true);
+      // Se já havia conteúdo pré-renderizado, não troca por "não encontrado"
+      // por causa de uma falha de rede.
+      if (!profile) setNotFound(true);
     } finally {
       setLoading(false);
     }
@@ -124,7 +133,7 @@ const [toggling, setToggling] = useState(false);
     </div>
   );
 
-  if (notFound) return (
+  if (notFound || !profile) return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-center px-6">
       <p className="text-5xl">🔍</p>
       <h1 className="text-xl font-black text-white uppercase">Jogador não encontrado</h1>
@@ -153,7 +162,13 @@ const [toggling, setToggling] = useState(false);
   }));
 
   return (
-    <div className="min-h-screen bg-black text-white pb-12">
+    <div
+      className="min-h-screen bg-black text-white pb-12"
+      data-profile-name={profile.name || ''}
+      data-profile-goals={stats?.goals ?? 0}
+      data-profile-assists={stats?.assists ?? 0}
+      data-profile-matches={stats?.matches ?? 0}
+    >
 
       {/* Header */}
       <div className="relative px-6 pt-14 pb-6 flex flex-col items-center bg-black">
@@ -303,6 +318,20 @@ const [toggling, setToggling] = useState(false);
             </div>
           ))}
         </div>
+
+        {/* Resumo em texto — conteúdo próprio de cada jogador, presente no
+            HTML pré-renderizado (ajuda indexação e a avaliação de conteúdo). */}
+        {stats && stats.matches > 0 && (
+          <p className="text-xs text-text-mid text-center leading-relaxed font-bold">
+            {profile.name} já disputou {stats.matches} {stats.matches === 1 ? 'partida' : 'partidas'} no
+            Draft Play, com {stats.goals ?? 0} {(stats.goals ?? 0) === 1 ? 'gol' : 'gols'} e {stats.assists ?? 0}{' '}
+            {(stats.assists ?? 0) === 1 ? 'assistência' : 'assistências'}
+            {stats.rating > 0 ? `, rating global ${Number(stats.rating).toFixed(2)}` : ''}
+            {allBadges.length > 0
+              ? ` e ${allBadges.length} ${allBadges.length === 1 ? 'conquista desbloqueada' : 'conquistas desbloqueadas'}`
+              : ''}.
+          </p>
+        )}
 
         {/* Conquistas (banco Sprint 14 + locais) */}
         {allBadges.length > 0 && (
