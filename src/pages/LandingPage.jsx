@@ -93,6 +93,46 @@ const tips = [
   { t: 'Deixe a cobrança clara', d: 'Valor, data e chave Pix no mesmo lugar da lista de presença evitam cobrar um por um no grupo.' },
 ];
 
+// Galeria "Veja o app por dentro". Cada print fica em public/marketing/.
+// Pra trocar um print, substitua o arquivo mantendo o mesmo nome (proporção ~540x897, WebP).
+// Prints que ainda valem refazer: app-sorteio (mostrar o RESULTADO com times prontos)
+// e app-caixa (mostrar valores de exemplo em vez de R$ 0,00).
+const appShots = [
+  { file: 'app-baba', title: 'Painel do baba', desc: 'Próximo jogo, agenda da semana e lista de membros num lugar só.', alt: 'Painel do baba no Draft Play com contagem para o próximo jogo, agenda e lista de membros' },
+  { file: 'app-sorteio', title: 'Assistente de sorteio', desc: 'Confirmados, convidados, jogadores por time, reservas e restrições de sorteio.', alt: 'Assistente de sorteio do Draft Play com confirmados, convidados e jogadores por time' },
+  { file: 'app-rankings', title: 'Rankings', desc: 'Gols, assistências, MVP, mês e fair-play, com pódio e a sua posição.', alt: 'Tela de rankings do Draft Play com abas de gols, assistências, MVP, mês e fair-play e pódio' },
+  { file: 'app-comparacao', title: 'Comparação 1v1', desc: 'Dois jogadores lado a lado: gols, assistências, vitórias e aproveitamento.', alt: 'Comparação entre dois jogadores no Draft Play com gols, assistências e vitórias lado a lado' },
+  { file: 'app-perfil', title: 'Perfil público', desc: 'Estatísticas e conquistas num perfil com link pra compartilhar.', alt: 'Perfil público de jogador no Draft Play com estatísticas, conquistas e botão de copiar link' },
+  { file: 'app-caixa', title: 'Caixa do baba', desc: 'Arrecadado, despesas e saldo, com nova cobrança e nova despesa.', alt: 'Tela financeira do Draft Play com caixa do baba, arrecadado, despesas e saldo atual' },
+  { file: 'app-visitante', title: 'Modo Visitante', desc: 'Sorteie os times sem conta: jogadores por time, reserva e nível.', alt: 'Modo ferramenta rápida do Draft Play para sortear times sem conta' },
+];
+
+// Print do app em moldura de celular; se o arquivo faltar, mostra um espaço reservado.
+const AppShot = ({ file, alt }) => {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="rounded-[1.8rem] bg-black border border-white/15 p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.6),0_0_30px_rgba(0,242,255,0.08)]">
+      <div className="rounded-[1.4rem] overflow-hidden bg-surface-2" style={{ aspectRatio: '540 / 897' }}>
+        {failed ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-xs opacity-60">
+            <Smartphone size={28} className="text-cyan-electric" />
+            Print em breve
+          </div>
+        ) : (
+          <img
+            src={`/marketing/${file}.webp`}
+            alt={alt}
+            width="540" height="897"
+            loading="lazy" decoding="async"
+            onError={() => setFailed(true)}
+            className="w-full h-full object-cover object-top"
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
 const faqs = [
   { q: 'Dá pra testar sem me cadastrar?', a: 'Não pra testar: no Modo Visitante você sorteia os times na hora, sem cadastro. Pra criar um baba e guardar histórico e ranking, é preciso ter conta.' },
   { q: 'Posso entrar só como jogador?', a: 'Pode. Você entra pelo convite do coordenador, confirma presença, acompanha o placar e ganha avaliação, badges e ranking, de graça.' },
@@ -382,6 +422,22 @@ const LandingPage = () => {
         <p className="text-center font-hand text-3xl font-bold text-cyan-electric mt-10">
           Resultado: times prontos, lista de presença confirmada e histórico do grupo salvo.
         </p>
+      </section>
+
+      {/* Veja o app por dentro: no celular rola de lado, no computador vira grade */}
+      <section className="max-w-5xl mx-auto px-6 py-14 border-t border-white/5">
+        <Title hand sub="Telas reais do Draft Play Baba Manager.">Veja o app por dentro</Title>
+        <ul className="flex md:grid md:grid-cols-4 gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-6 px-6 md:mx-0 md:px-0 pb-4">
+          {appShots.map((a) => (
+            <li key={a.file} className="shrink-0 w-[62%] sm:w-[40%] md:w-auto snap-center space-y-3">
+              <AppShot file={a.file} alt={a.alt} />
+              <div className="px-1">
+                <p className="font-hand text-2xl font-bold leading-none">{a.title}</p>
+                <p className="text-xs opacity-60 leading-relaxed mt-1">{a.desc}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* 4. Recursos */}
