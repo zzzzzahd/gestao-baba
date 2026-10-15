@@ -1,0 +1,3234 @@
+diff --git a/public/robots.txt b/public/robots.txt
+index 5e25882..e285a3f 100644
+--- a/public/robots.txt
++++ b/public/robots.txt
+@@ -3,7 +3,7 @@ Allow: /
+ Allow: /$
+ Allow: /termos
+ Allow: /privacidade
+-Allow: /visitor
++Allow: /ferramentas
+ Allow: /sobre
+ Allow: /player/
+ Allow: /followers/
+@@ -28,7 +28,7 @@ Allow: /
+ Allow: /$
+ Allow: /termos
+ Allow: /privacidade
+-Allow: /visitor
++Allow: /ferramentas
+ Allow: /sobre
+ Allow: /player/
+ Allow: /followers/
+diff --git a/public/sitemap.xml b/public/sitemap.xml
+index c5f59ce..729a25f 100644
+--- a/public/sitemap.xml
++++ b/public/sitemap.xml
+@@ -6,7 +6,7 @@
+     <priority>1.0</priority>
+   </url>
+   <url>
+-    <loc>https://www.draftplay.app.br/visitor</loc>
++    <loc>https://www.draftplay.app.br/ferramentas</loc>
+     <changefreq>monthly</changefreq>
+     <priority>0.8</priority>
+   </url>
+diff --git a/scripts/prerender.mjs b/scripts/prerender.mjs
+index 27f59a2..f24a18f 100644
+--- a/scripts/prerender.mjs
++++ b/scripts/prerender.mjs
+@@ -31,12 +31,6 @@ const ROUTE_META = {
+       'Política de privacidade e tratamento de dados da plataforma Draft Play.',
+   },
+ 
+-  '/visitor': {
+-    title: 'Modo Visitante - Sorteio de Times | Draft Play',
+-    description:
+-      'Monte a lista de jogadores e sorteie times equilibrados na hora, sem precisar criar conta.',
+-  },
+-
+   '/sobre': {
+     title: 'Sobre - Draft Play',
+     description:
+@@ -172,7 +166,7 @@ async function main() {
+   // IMPORTAR BUNDLE SSR
+   // -------------------------------------------------------
+ 
+-  const { render, PRERENDER_ROUTES, getPublicProfileRoutes } = await import(
++  const { render, PRERENDER_ROUTES, EXTRA_ROUTE_META, getPublicProfileRoutes } = await import(
+     pathToFileURL(path.join(ssrDir, 'entry-server.js')).href
+   );
+ 
+@@ -182,6 +176,9 @@ async function main() {
+ 
+   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8');
+ 
++  // Metadados das rotas de ferramentas vêm do catálogo (src/content/toolsCatalog.js)
++  Object.assign(ROUTE_META, EXTRA_ROUTE_META);
++
+   // -------------------------------------------------------
+   // ROTAS ESTÁTICAS + PERFIS PÚBLICOS
+   // -------------------------------------------------------
+@@ -284,7 +281,7 @@ async function main() {
+   const PRIORITY = {
+     '/': '1.0',
+     '/sobre': '0.5',
+-    '/visitor': '0.8',
++    '/ferramentas': '0.8',
+     '/termos': '0.3',
+     '/privacidade': '0.3',
+   };
+@@ -292,7 +289,7 @@ async function main() {
+   const CHANGEFREQ = {
+     '/': 'weekly',
+     '/sobre': 'monthly',
+-    '/visitor': 'monthly',
++    '/ferramentas': 'monthly',
+     '/termos': 'yearly',
+     '/privacidade': 'yearly',
+   };
+@@ -306,7 +303,7 @@ async function main() {
+       const isProfile = route.startsWith('/player/');
+       const loc = `${SITE_URL}${route}`;
+       const changefreq = isProfile ? 'monthly' : CHANGEFREQ[route] ?? 'monthly';
+-      const priority = isProfile ? '0.4' : PRIORITY[route] ?? '0.5';
++      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (route.startsWith('/ferramentas/') ? '0.7' : '0.5');
+       return `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+     })
+     .join('\n');
+diff --git a/src/App.jsx b/src/App.jsx
+index dad39d1..91fbe8b 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -26,7 +26,12 @@ const PublicProfilePage    = lazy(() => import('./pages/PublicProfilePage'));
+ const MatchPageVisitor     = lazy(() => import('./pages/MatchPageVisitor'));
+ const RankingsPage         = lazy(() => import('./pages/RankingsPage'));
+ const FinancialPage        = lazy(() => import('./pages/FinancialPage'));
+-const VisitorMode          = lazy(() => import('./pages/VisitorMode'));
++const FerramentasPage      = lazy(() => import('./pages/FerramentasPage'));
++const SorteadorTimes       = lazy(() => import('./pages/tools/SorteadorTimes'));
++const TorneioCalculadora   = lazy(() => import('./pages/tools/TorneioCalculadora'));
++const TabelaJogos          = lazy(() => import('./pages/tools/TabelaJogos'));
++const DivisaoDespesas      = lazy(() => import('./pages/tools/DivisaoDespesas'));
++const OrganizadorPresenca  = lazy(() => import('./pages/tools/OrganizadorPresenca'));
+ const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
+ const CreatePage           = lazy(() => import('./pages/CreatePage'));
+ const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
+@@ -159,7 +164,13 @@ const AppInner = () => {
+           <Route path="/"              element={<LandingPage />} />
+           <Route path="/login"         element={<LoginPage />} />
+           <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
+-          <Route path="/visitor"       element={<VisitorMode />} />
++          <Route path="/visitor"       element={<Navigate to="/ferramentas/sorteador" replace />} />
++          <Route path="/ferramentas"                       element={<FerramentasPage />} />
++          <Route path="/ferramentas/sorteador"             element={<SorteadorTimes />} />
++          <Route path="/ferramentas/calculadora-torneio"    element={<TorneioCalculadora />} />
++          <Route path="/ferramentas/tabela-de-jogos"        element={<TabelaJogos />} />
++          <Route path="/ferramentas/divisao-de-despesas"    element={<DivisaoDespesas />} />
++          <Route path="/ferramentas/lista-de-presenca"      element={<OrganizadorPresenca />} />
+           <Route path="/visitor-match" element={<MatchPageVisitor />} />
+           <Route path="/privacidade"   element={<PrivacyPage />} />
+           <Route path="/termos"        element={<TermsPage />} />
+diff --git a/src/__tests__/components/BottomNav.test.jsx b/src/__tests__/components/BottomNav.test.jsx
+index b51bbd0..1b19b8b 100644
+--- a/src/__tests__/components/BottomNav.test.jsx
++++ b/src/__tests__/components/BottomNav.test.jsx
+@@ -57,8 +57,8 @@ describe('BottomNav', () => {
+       expect(container.querySelector('nav')).toBeNull();
+     });
+ 
+-    it('não renderiza na rota /visitor', () => {
+-      mockUseLocation.mockReturnValue({ pathname: '/visitor', search: '', hash: '' });
++    it('não renderiza na rota /visitor-match', () => {
++      mockUseLocation.mockReturnValue({ pathname: '/visitor-match', search: '', hash: '' });
+       const { container } = renderNav();
+       expect(container.querySelector('nav')).toBeNull();
+     });
+diff --git a/src/__tests__/pages/AboutPage.test.jsx b/src/__tests__/pages/AboutPage.test.jsx
+index 312cd5e..7cb3a04 100644
+--- a/src/__tests__/pages/AboutPage.test.jsx
++++ b/src/__tests__/pages/AboutPage.test.jsx
+@@ -51,10 +51,10 @@ describe('AboutPage › seções', () => {
+     expect(screen.getByText('Pra quem é')).toBeInTheDocument();
+   });
+ 
+-  it('exibe seção "Modo Visitante" com link para /visitor', () => {
++  it('exibe seção "Ferramentas gratuitas" com link para /ferramentas', () => {
+     wrap();
+-    const link = screen.getByRole('link', { name: /Modo Visitante/i });
+-    expect(link).toHaveAttribute('href', '/visitor');
++    const link = screen.getByRole('link', { name: /ferramentas gratuitas/i });
++    expect(link).toHaveAttribute('href', '/ferramentas');
+   });
+ 
+   it('exibe seção "Contato" com link de e-mail', () => {
+diff --git a/src/__tests__/pages/FerramentasPublicas.test.jsx b/src/__tests__/pages/FerramentasPublicas.test.jsx
+new file mode 100644
+index 0000000..92a4598
+--- /dev/null
++++ b/src/__tests__/pages/FerramentasPublicas.test.jsx
+@@ -0,0 +1,116 @@
++import React from 'react';
++import { describe, it, expect, vi } from 'vitest';
++import { render, screen, fireEvent, within } from '@testing-library/react';
++import { MemoryRouter } from 'react-router-dom';
++
++vi.mock('../../components/Logo', () => ({ default: () => <div>Logo</div> }));
++
++import FerramentasPage from '../../pages/FerramentasPage';
++import TorneioCalculadora from '../../pages/tools/TorneioCalculadora';
++import DivisaoDespesas from '../../pages/tools/DivisaoDespesas';
++import OrganizadorPresenca from '../../pages/tools/OrganizadorPresenca';
++import TabelaJogos from '../../pages/tools/TabelaJogos';
++import SorteadorTimes from '../../pages/tools/SorteadorTimes';
++import { TOOLS } from '../../content/toolsCatalog';
++
++const wrap = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);
++const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
++
++describe('Hub /ferramentas', () => {
++  it('tem um h1 e um link para cada ferramenta do catálogo', () => {
++    wrap(<FerramentasPage />);
++    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
++    for (const t of TOOLS) {
++      expect(screen.getAllByRole('link').some((a) => a.getAttribute('href') === t.path)).toBe(true);
++    }
++  });
++});
++
++describe('Calculadora de torneio', () => {
++  it('8 equipes, mata-mata: 7 jogos; 6 equipes pontos corridos ida e volta: 30', () => {
++    wrap(<TorneioCalculadora />);
++    const results = screen.getByLabelText('Resultado', { selector: 'section' });
++    expect(within(results).getAllByText('Jogos')[0].nextSibling.textContent).toBe('7');
++    fireEvent.click(screen.getByRole('button', { name: 'Pontos corridos' }));
++    type('Equipes', '6');
++    fireEvent.click(screen.getByRole('button', { name: 'Ida e volta' }));
++    expect(within(screen.getByLabelText('Resultado', { selector: 'section' })).getAllByText('Jogos')[0].nextSibling.textContent).toBe('30');
++  });
++  it('mostra erro com 1 equipe e some o resultado', () => {
++    wrap(<TorneioCalculadora />);
++    type('Equipes', '1');
++    expect(screen.getByRole('alert').textContent).toMatch(/pelo menos 2 equipes/i);
++    expect(screen.queryByText('Resultado')).toBeNull();
++  });
++  it('campo vazio não quebra', () => {
++    wrap(<TorneioCalculadora />);
++    type('Equipes', '');
++    expect(screen.getByRole('alert')).toBeInTheDocument();
++  });
++});
++
++describe('Divisão de despesas', () => {
++  it('R$ 200 / 12 pagantes → R$ 16,67 por pessoa', () => {
++    wrap(<DivisaoDespesas />);
++    type(/Quadra/i, '150');
++    type(/Arbitragem/i, '50');
++    const r = screen.getByLabelText('Resultado', { selector: 'section' });
++    expect(within(r).getByText('Total').nextSibling.textContent).toBe('R$ 200,00');
++    expect(within(r).getByText('Por participante').nextSibling.textContent).toBe('R$ 16,67');
++  });
++  it('valor inválido mostra mensagem', () => {
++    wrap(<DivisaoDespesas />);
++    type(/Quadra/i, 'abc');
++    expect(screen.getByRole('alert').textContent).toMatch(/valor inválido/i);
++  });
++});
++
++describe('Lista de presença', () => {
++  it('conta confirmados, ausentes, reservas e times', () => {
++    wrap(<OrganizadorPresenca />);
++    type('Lista de jogadores', '1. Ana\n2. Bia\n3. Caio\n4. Davi\n5. Edu\n6. Fer\n7. Gui');
++    type('Jogadores por time', '3');
++    for (const n of ['Ana', 'Bia', 'Caio', 'Davi', 'Edu', 'Fer', 'Gui']) fireEvent.click(screen.getByLabelText(n));
++    const r = screen.getByLabelText('Resumo', { selector: 'section' });
++    expect(within(r).getByText('Confirmados').nextSibling.textContent).toBe('7');
++    expect(within(r).getByText('Times possíveis').nextSibling.textContent).toBe('2');
++    expect(within(r).getByText('Reservas').nextSibling.textContent).toBe('1');
++    fireEvent.click(screen.getByLabelText('Gui'));
++    expect(within(screen.getByLabelText('Resumo', { selector: 'section' })).getByText('Ausentes').nextSibling.textContent).toBe('1');
++  });
++});
++
++describe('Tabela de jogos', () => {
++  it('gera pontos corridos com folga para 5 equipes', () => {
++    wrap(<TabelaJogos />);
++    type('Equipes (uma por linha)', 'A\nB\nC\nD\nE');
++    fireEvent.click(screen.getByRole('button', { name: 'Gerar tabela' }));
++    expect(screen.getAllByText(/^Folga:/).length).toBe(5);
++  });
++  it('bloqueia nomes repetidos', () => {
++    wrap(<TabelaJogos />);
++    type('Equipes (uma por linha)', 'A\nB\na');
++    expect(screen.getByRole('alert').textContent).toMatch(/repetidos/i);
++    expect(screen.getByRole('button', { name: 'Gerar tabela' })).toBeDisabled();
++  });
++});
++
++describe('Sorteador', () => {
++  it('importa lista, sorteia 2 times de 3 e mostra todos os jogadores', () => {
++    localStorage.clear();
++    wrap(<SorteadorTimes />);
++    type('Jogadores por time', '3');
++    type(/Ou cole uma lista/i, 'Ana\nBia\nCaio\nDavi\nEdu\nFer');
++    fireEvent.click(screen.getByRole('button', { name: 'Importar lista' }));
++    fireEvent.click(screen.getByRole('button', { name: /Sortear times/i }));
++    const teams = screen.getByLabelText('Times sorteados', { selector: 'section' });
++    expect(within(teams).getAllByRole('listitem')).toHaveLength(6);
++  });
++  it('avisa quando faltam jogadores', () => {
++    localStorage.clear();
++    wrap(<SorteadorTimes />);
++    type('Nome', 'Ana');
++    fireEvent.click(screen.getByRole('button', { name: '+ Adicionar' }));
++    expect(screen.getByRole('alert').textContent).toMatch(/pelo menos 10 jogadores/i);
++  });
++});
+diff --git a/src/__tests__/utils/expenseSplit.test.js b/src/__tests__/utils/expenseSplit.test.js
+new file mode 100644
+index 0000000..5731a3d
+--- /dev/null
++++ b/src/__tests__/utils/expenseSplit.test.js
+@@ -0,0 +1,45 @@
++import { describe, it, expect } from 'vitest';
++import { parseMoneyToCents, formatBRL, splitEqually, scenarios } from '../../utils/expenseSplit';
++
++describe('parseMoneyToCents', () => {
++  it.each([
++    ['80', 8000], ['80,5', 8050], ['R$ 1.234,50', 123450], ['1234,56', 123456],
++    ['12.5', 1250], ['1.234', 123400], ['0,99', 99], [' 10 ', 1000],
++  ])('%s → %i', (input, cents) => expect(parseMoneyToCents(input)).toBe(cents));
++  it.each([[''], ['abc'], ['-5'], ['1,234,5'], [null], ['12,345']])('%s → null', (i) => {
++    expect(parseMoneyToCents(i)).toBeNull();
++  });
++});
++
++describe('formatBRL', () => {
++  it('formata com milhar e centavos', () => {
++    expect(formatBRL(123450)).toBe('R$ 1.234,50');
++    expect(formatBRL(5)).toBe('R$ 0,05');
++    expect(formatBRL(null)).toBe('—');
++  });
++});
++
++describe('splitEqually', () => {
++  it('divide e arredonda para cima, sobra vira folga de caixa', () => {
++    const r = splitEqually(20000, 12, 1); // 200,00 / 12 = 16,666…
++    expect(r.perPerson).toBe(1667);
++    expect(r.collected).toBe(1667 * 12);
++    expect(r.surplus).toBe(1667 * 12 - 20000);
++    expect(r.collected).toBeGreaterThanOrEqual(r.total);
++  });
++  it('arredondamento para R$ 1,00', () => {
++    const r = splitEqually(20000, 12, 100);
++    expect(r.perPerson).toBe(1700);
++  });
++  it('divisão exata não gera sobra', () => {
++    expect(splitEqually(10000, 10).surplus).toBe(0);
++  });
++  it('0 pagantes ou não inteiro → null', () => {
++    expect(splitEqually(1000, 0)).toBeNull();
++    expect(splitEqually(1000, 2.5)).toBeNull();
++  });
++  it('cenários não incluem pagantes < 1', () => {
++    const s = scenarios(10000, 2);
++    expect(s.map((x) => x.payers)).toEqual([1, 2, 3, 4]);
++  });
++});
+diff --git a/src/__tests__/utils/teamBalancer.test.js b/src/__tests__/utils/teamBalancer.test.js
+new file mode 100644
+index 0000000..5b6d49d
+--- /dev/null
++++ b/src/__tests__/utils/teamBalancer.test.js
+@@ -0,0 +1,56 @@
++import { describe, it, expect } from 'vitest';
++import { balanceTeams, teamCount, parsePlayerList } from '../../utils/teamBalancer';
++
++const mk = (n, gk = 0) => Array.from({ length: n }, (_, i) => ({
++  id: i, name: `J${i}`, position: i < gk ? 'goleiro' : 'linha', stars: (i % 3) + 1,
++}));
++
++describe('balanceTeams', () => {
++  it('reserve: times completos, sobra vira reserva, ninguém repetido', () => {
++    const { teams, reserves } = balanceTeams(mk(13), 2, 6, 'reserve');
++    expect(teams.map((t) => t.players.length)).toEqual([6, 6]);
++    expect(reserves).toHaveLength(1);
++    const ids = [...teams.flatMap((t) => t.players), ...reserves].map((p) => p.id);
++    expect(new Set(ids).size).toBe(13);
++  });
++  it('fill: 15 jogadores em 4 times → 4,4,4,3', () => {
++    const { teams, reserves } = balanceTeams(mk(15), 4, 4, 'substitute');
++    expect(teams.map((t) => t.players.length)).toEqual([4, 4, 4, 3]);
++    expect(reserves).toHaveLength(0);
++  });
++  it('goleiros: um por time antes dos demais', () => {
++    const { teams } = balanceTeams(mk(10, 2), 2, 5, 'reserve');
++    expect(teams.every((t) => t.players.filter((p) => p.position === 'goleiro').length === 1)).toBe(true);
++  });
++  it('níveis equilibrados: diferença da soma de estrelas ≤ 2 (serpentina)', () => {
++    for (let k = 0; k < 20; k++) {
++      const { teams } = balanceTeams(mk(12), 2, 6, 'reserve');
++      expect(Math.abs(teams[0].starSum - teams[1].starSum)).toBeLessThanOrEqual(2);
++    }
++  });
++  it('rng fixo é determinístico', () => {
++    const a = balanceTeams(mk(10), 2, 5, 'reserve', () => 0.5).teams.map((t) => t.players.map((p) => p.id));
++    const b = balanceTeams(mk(10), 2, 5, 'reserve', () => 0.5).teams.map((t) => t.players.map((p) => p.id));
++    expect(a).toEqual(b);
++  });
++});
++
++describe('teamCount', () => {
++  it('reserve = floor, fill = ceil', () => {
++    expect(teamCount(13, 5, 'reserve')).toBe(2);
++    expect(teamCount(13, 5, 'fill')).toBe(3);
++    expect(teamCount(13, 0)).toBe(0);
++  });
++});
++
++describe('parsePlayerList', () => {
++  it('remove numeração, marcadores, emojis e duplicados', () => {
++    const { names, duplicates } = parsePlayerList('Lista do baba:\n1. João ✅\n2) maria\n- Pedro\n• José\n4 - joão\n\nÁgata');
++    expect(names).toEqual(['João', 'maria', 'Pedro', 'José', 'Ágata']);
++    expect(duplicates).toEqual(['joão']);
++  });
++  it('aceita vazio', () => {
++    expect(parsePlayerList('').names).toEqual([]);
++    expect(parsePlayerList(null).names).toEqual([]);
++  });
++});
+diff --git a/src/__tests__/utils/tournamentMath.test.js b/src/__tests__/utils/tournamentMath.test.js
+new file mode 100644
+index 0000000..358593c
+--- /dev/null
++++ b/src/__tests__/utils/tournamentMath.test.js
+@@ -0,0 +1,161 @@
++import { describe, it, expect } from 'vitest';
++import {
++  summarize, validateConfig, roundRobinSchedule, knockoutSchedule, drawGroups,
++  seedPositions, groupSizes, formatDuration, scheduleToText,
++} from '../../utils/tournamentMath';
++
++const names = (n) => Array.from({ length: n }, (_, i) => `E${i + 1}`);
++
++describe('summarize — contagem de jogos', () => {
++  it('mata-mata: n-1 jogos para qualquer n', () => {
++    for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 32]) {
++      expect(summarize({ format: 'knockout', teams: n }).totalGames).toBe(n - 1);
++    }
++  });
++  it('mata-mata com 6 equipes: 2 byes, rodadas 2+2+1', () => {
++    const s = summarize({ format: 'knockout', teams: 6 });
++    expect(s.byes).toBe(2);
++    expect(s.rounds.map((r) => r.games)).toEqual([2, 2, 1]);
++  });
++  it('mata-mata com 8 equipes: rodadas 4+2+1 e rótulos', () => {
++    const s = summarize({ format: 'knockout', teams: 8 });
++    expect(s.rounds.map((r) => r.label)).toEqual(['Quartas de final', 'Semifinais', 'Final']);
++  });
++  it('disputa de 3º lugar soma 1 jogo', () => {
++    expect(summarize({ format: 'knockout', teams: 8, thirdPlace: true }).totalGames).toBe(8);
++  });
++  it('pontos corridos: n(n-1)/2 por turno', () => {
++    expect(summarize({ format: 'roundrobin', teams: 6 }).totalGames).toBe(15);
++    expect(summarize({ format: 'roundrobin', teams: 5 }).totalGames).toBe(10);
++    expect(summarize({ format: 'roundrobin', teams: 6, legs: 2 }).totalGames).toBe(30);
++  });
++  it('pontos corridos: rodadas = n-1 (par) ou n (ímpar)', () => {
++    expect(summarize({ format: 'roundrobin', teams: 6 }).totalRounds).toBe(5);
++    expect(summarize({ format: 'roundrobin', teams: 5 }).totalRounds).toBe(5);
++  });
++  it('grupos: 8 equipes em 2 grupos = 12 jogos; +4 equipes no mata-mata = 3 jogos', () => {
++    const g = summarize({ format: 'groups', teams: 8, groupCount: 2 });
++    expect(g.totalGames).toBe(12);
++    const gk = summarize({ format: 'groups', teams: 8, groupCount: 2, knockoutAfterGroups: true, advancePerGroup: 2 });
++    expect(gk.groupGames).toBe(12);
++    expect(gk.knockoutGames).toBe(3);
++    expect(gk.totalGames).toBe(15);
++  });
++  it('grupos desiguais: 7 equipes em 2 grupos = 4+3 → 6+3 = 9 jogos', () => {
++    expect(groupSizes(7, 2)).toEqual([4, 3]);
++    expect(summarize({ format: 'groups', teams: 7, groupCount: 2 }).totalGames).toBe(9);
++  });
++});
++
++describe('summarize — duração', () => {
++  it('1 campo, 8 equipes mata-mata, 20 min + 5 min: 7 faixas → 140 + 30', () => {
++    const s = summarize({ format: 'knockout', teams: 8, fields: 1, matchMinutes: 20, breakMinutes: 5 });
++    expect(s.slots).toBe(7);
++    expect(s.estimatedMinutes).toBe(7 * 20 + 6 * 5);
++  });
++  it('2 campos reduzem faixas por rodada (4 jogos → 2 faixas)', () => {
++    const s = summarize({ format: 'knockout', teams: 8, fields: 2, matchMinutes: 20, breakMinutes: 0 });
++    expect(s.slots).toBe(2 + 1 + 1);
++  });
++  it('formatDuration', () => {
++    expect(formatDuration(45)).toBe('45 min');
++    expect(formatDuration(120)).toBe('2 h');
++    expect(formatDuration(95)).toBe('1 h 35 min');
++  });
++});
++
++describe('validateConfig', () => {
++  it('rejeita equipes inválidas e grupos impossíveis', () => {
++    expect(validateConfig({ format: 'knockout', teams: 1 }).length).toBeGreaterThan(0);
++    expect(validateConfig({ format: 'knockout', teams: 2.5 }).length).toBeGreaterThan(0);
++    expect(validateConfig({ format: 'groups', teams: 5, groupCount: 3 }).length).toBeGreaterThan(0);
++    expect(validateConfig({ format: 'groups', teams: 8, groupCount: 2, knockoutAfterGroups: true, advancePerGroup: 5 }).length).toBeGreaterThan(0);
++    expect(validateConfig({ format: 'x', teams: 8 }).length).toBeGreaterThan(0);
++  });
++  it('aceita configuração válida', () => {
++    expect(validateConfig({ format: 'groups', teams: 8, groupCount: 2, knockoutAfterGroups: true, advancePerGroup: 2, fields: 1, matchMinutes: 20, breakMinutes: 5 })).toEqual([]);
++  });
++});
++
++describe('roundRobinSchedule', () => {
++  const pairKey = (g) => [g.home, g.away].sort().join('|');
++  it('cada par se enfrenta exatamente uma vez e ninguém joga duas vezes na rodada', () => {
++    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
++      const rounds = roundRobinSchedule(names(n));
++      const seen = new Set();
++      for (const r of rounds) {
++        const inRound = new Set();
++        for (const g of r.games) {
++          expect(inRound.has(g.home) || inRound.has(g.away)).toBe(false);
++          inRound.add(g.home); inRound.add(g.away);
++          const k = pairKey(g);
++          expect(seen.has(k)).toBe(false);
++          seen.add(k);
++        }
++      }
++      expect(seen.size).toBe((n * (n - 1)) / 2);
++    }
++  });
++  it('número ímpar: uma folga por rodada, todas as equipes folgam uma vez', () => {
++    const rounds = roundRobinSchedule(names(5));
++    expect(rounds.every((r) => r.rest)).toBe(true);
++    expect(new Set(rounds.map((r) => r.rest)).size).toBe(5);
++  });
++  it('2 turnos: o returno inverte o mando', () => {
++    const rounds = roundRobinSchedule(names(4), { legs: 2 });
++    expect(rounds).toHaveLength(6);
++    expect(rounds[3].games[0]).toEqual({ home: rounds[0].games[0].away, away: rounds[0].games[0].home });
++  });
++  it('bate com a contagem de summarize', () => {
++    const rounds = roundRobinSchedule(names(6), { legs: 2 });
++    expect(rounds.reduce((s, r) => s + r.games.length, 0)).toBe(summarize({ format: 'roundrobin', teams: 6, legs: 2 }).totalGames);
++  });
++});
++
++describe('knockoutSchedule', () => {
++  it('seedPositions(8) = 1,8,4,5,2,7,3,6', () => {
++    expect(seedPositions(8)).toEqual([1, 8, 4, 5, 2, 7, 3, 6]);
++  });
++  it('total de jogos = n-1 e número de jogos com id é consistente', () => {
++    for (const n of [3, 5, 6, 7, 8, 12]) {
++      const rounds = knockoutSchedule(names(n));
++      const games = rounds.flatMap((r) => r.games).filter((g) => !g.bye);
++      expect(games).toHaveLength(n - 1);
++      expect(games.map((g) => g.id)).toEqual(Array.from({ length: n - 1 }, (_, i) => i + 1));
++    }
++  });
++  it('byes vão para as melhores cabeças de chave', () => {
++    const rounds = knockoutSchedule(names(6));
++    const byes = rounds[0].games.filter((g) => g.bye).map((g) => g.home);
++    expect(byes.sort()).toEqual(['E1', 'E2']);
++  });
++  it('3º lugar: numeração e confrontos', () => {
++    const rounds = knockoutSchedule(names(4), { thirdPlace: true });
++    expect(rounds.map((r) => r.label)).toEqual(['Semifinais', 'Disputa de 3º lugar', 'Final']);
++    expect(rounds[1].games[0]).toMatchObject({ id: 3, home: 'Perdedor do jogo 1', away: 'Perdedor do jogo 2' });
++    expect(rounds[2].games[0].id).toBe(4);
++  });
++  it('2 equipes: só a final', () => {
++    const rounds = knockoutSchedule(['A', 'B']);
++    expect(rounds).toHaveLength(1);
++    expect(rounds[0].label).toBe('Final');
++  });
++});
++
++describe('drawGroups / texto', () => {
++  it('serpentina por cabeça de chave', () => {
++    const g = drawGroups(names(8), 2);
++    expect(g[0]).toEqual(['E1', 'E4', 'E5', 'E8']);
++    expect(g[1]).toEqual(['E2', 'E3', 'E6', 'E7']);
++  });
++  it('aleatório com rng fixo é determinístico e completo', () => {
++    const rng = () => 0.3;
++    const g = drawGroups(names(7), 3, { mode: 'random', rng });
++    expect(g.flat().sort()).toEqual(names(7).sort());
++  });
++  it('scheduleToText inclui folga e bye', () => {
++    const txt = scheduleToText(roundRobinSchedule(['A', 'B', 'C']), { title: 'Teste' });
++    expect(txt).toContain('Folga:');
++    expect(txt.startsWith('Teste')).toBe(true);
++  });
++});
+diff --git a/src/components/AdBanner.jsx b/src/components/AdBanner.jsx
+index d4dc4d7..585f729 100644
+--- a/src/components/AdBanner.jsx
++++ b/src/components/AdBanner.jsx
+@@ -7,6 +7,8 @@
+ //     slot ser preenchido via variável de ambiente (item 1.1 do plano)
+ 
+ import React, { useEffect, useRef } from 'react';
++import { useInRouterContext, useLocation } from 'react-router-dom';
++import { isAdEligiblePath } from '../utils/adEligibility';
+ import { usePlan } from '../hooks/usePlan';
+ 
+ const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+@@ -16,8 +18,19 @@ const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+  * @param {string} props.slot       - ID do slot de anúncio (AdSense → Unidades de anúncio)
+  * @param {string} [props.className]
+  */
++function useRouteAllowsAds() {
++  // Sem Router (testes isolados) não há rota para checar: não bloqueia.
++  const inRouter = useInRouterContext();
++  const pathname = inRouter ? useLocation().pathname : null; // eslint-disable-line react-hooks/rules-of-hooks
++  return pathname === null ? true : isAdEligiblePath(pathname);
++}
++
+ export function AdBanner({ slot, className = '' }) {
+-  const { showAds } = usePlan();
++  const { showAds: planShowsAds } = usePlan();
++  // Política única (src/utils/adEligibility.js): mesmo que alguém coloque um
++  // <AdBanner> numa rota não elegível, ele não renderiza.
++  const routeAllowsAds = useRouteAllowsAds();
++  const showAds = planShowsAds && routeAllowsAds;
+   const insRef = useRef(null);
+   const pushed = useRef(false);
+ 
+diff --git a/src/components/AdsenseScriptGate.jsx b/src/components/AdsenseScriptGate.jsx
+index 3d8b026..28013a3 100644
+--- a/src/components/AdsenseScriptGate.jsx
++++ b/src/components/AdsenseScriptGate.jsx
+@@ -13,7 +13,7 @@
+ //
+ // Este componente resolve isso na raiz: só existe UM <script> de verdade no
+ // DOM quando a rota atual é uma página pública com conteúdo do editor
+-// (Landing, Sobre, Perfil Público — as mesmas 3 que usam <AdBanner>). Em
++// (ver src/utils/adEligibility.js). Em
+ // qualquer outra rota — incluindo login, join, followers, visitor, e claro
+ // todas as protegidas — o script é removido do DOM.
+ //
+@@ -23,19 +23,13 @@
+ // pra comprovar propriedade, sem precisar ativar o script pesado.
+ 
+ import { useEffect } from 'react';
+-import { useLocation, matchPath } from 'react-router-dom';
++import { useLocation } from 'react-router-dom';
++import { isAdEligiblePath } from '../utils/adEligibility';
+ 
+ const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
+ const SCRIPT_ID = 'adsbygoogle-script';
+ 
+-// Mesmas rotas que hoje renderizam <AdBanner>, mais a /visitor-match (que
+-// usa o rewarded ad de useRewardedAd.js) — todas públicas, sem login. Ajuste
+-// aqui junto de qualquer mudança em quais páginas usam anúncio.
+-const AD_ELIGIBLE_PATTERNS = ['/', '/sobre', '/player/:userId', '/visitor-match'];
+-
+-function isAdEligiblePath(pathname) {
+-  return AD_ELIGIBLE_PATTERNS.some((pattern) => matchPath(pattern, pathname));
+-}
++// A lista de rotas elegíveis fica em src/utils/adEligibility.js (política única).
+ 
+ export function AdsenseScriptGate() {
+   const location = useLocation();
+diff --git a/src/components/BottomNav.jsx b/src/components/BottomNav.jsx
+index fa8d551..3320eba 100644
+--- a/src/components/BottomNav.jsx
++++ b/src/components/BottomNav.jsx
+@@ -8,7 +8,7 @@ import { useFeatures } from '../utils/babaMode';
+ import { useAuth } from '../contexts/AuthContext';
+ import ConfirmModal from './ConfirmModal';
+ 
+-const PUBLIC_ROUTES = new Set(['/', '/login', '/redefinir-senha', '/visitor', '/visitor-match']);
++const PUBLIC_ROUTES = new Set(['/', '/login', '/redefinir-senha', '/visitor-match']);
+ 
+ const BottomNav = () => {
+   const navigate  = useNavigate();
+@@ -19,7 +19,7 @@ const BottomNav = () => {
+ 
+   // Visitante (sem login) nunca vê o menu do app: as abas levam a rotas protegidas
+   // que redirecionam pro /login — o Google lê isso como navegação quebrada.
+-  if (!user || PUBLIC_ROUTES.has(location.pathname)) return null;
++  if (!user || PUBLIC_ROUTES.has(location.pathname) || location.pathname.startsWith('/ferramentas')) return null;
+ 
+   const handleLogout = async () => {
+     await signOut();
+diff --git a/src/components/CookieConsentBanner.jsx b/src/components/CookieConsentBanner.jsx
+index f003657..985f1db 100644
+--- a/src/components/CookieConsentBanner.jsx
++++ b/src/components/CookieConsentBanner.jsx
+@@ -5,16 +5,10 @@
+ // assim que ele escolher qualquer uma das opções. Não é modal — não bloqueia
+ // a leitura do conteúdo enquanto a pessoa decide.
+ 
+-import { useLocation, matchPath } from 'react-router-dom';
++import { useLocation } from 'react-router-dom';
++import { isAdEligiblePath } from '../utils/adEligibility';
+ import { useCookieConsent } from '../hooks/useCookieConsent';
+ 
+-// Mesmas rotas do AdsenseScriptGate — só faz sentido perguntar aqui.
+-const AD_ELIGIBLE_PATTERNS = ['/', '/sobre', '/player/:userId', '/visitor-match'];
+-
+-function isAdEligiblePath(pathname) {
+-  return AD_ELIGIBLE_PATTERNS.some((pattern) => matchPath(pattern, pathname));
+-}
+-
+ export function CookieConsentBanner() {
+   const location = useLocation();
+   const { consent, accept, rejectAds } = useCookieConsent();
+diff --git a/src/components/Logo.jsx b/src/components/Logo.jsx
+index bcfa0bc..93d7209 100644
+--- a/src/components/Logo.jsx
++++ b/src/components/Logo.jsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
+ 
+-const Logo = ({ size = 'large' }) => {
++// `as`: elemento do texto da marca. Páginas que já têm o próprio <h1> passam as="p"
++// para não ficar com dois h1.
++const Logo = ({ size = 'large', as: Heading = 'h1' }) => {
+   const isLarge = size === 'large';
+ 
+   // Configurações de tamanho responsivo
+@@ -29,7 +31,7 @@ const Logo = ({ size = 'large' }) => {
+ 
+       {/* 2. O TEXTO COM BRILHO TÁTICO (CORRIGIDO SEM CORTAR O 'Y') */}
+       <div className="flex flex-col items-center overflow-visible">
+-        <h1 
++        <Heading
+           className={`font-display font-black italic tracking-tighter leading-none ${dimensions.title} overflow-visible`}
+           style={{
+             // Gradiente Sólido: Branco -> Azul Cyan Elétrico
+@@ -50,7 +52,7 @@ const Logo = ({ size = 'large' }) => {
+           }}
+         >
+           DRAFT PLAY
+-        </h1>
++        </Heading>
+         
+         {/* Subtítulo Clean */}
+         <p className={`text-cyan-electric font-semibold tracking-[0.5em] uppercase ${dimensions.sub} mt-1`}>
+diff --git a/src/components/PublicPagesFooter.jsx b/src/components/PublicPagesFooter.jsx
+index cf77d63..7fb5818 100644
+--- a/src/components/PublicPagesFooter.jsx
++++ b/src/components/PublicPagesFooter.jsx
+@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
+ 
+ const LINKS = [
+   { to: '/', key: 'home', label: 'Início' },
++  { to: '/ferramentas', key: 'ferramentas', label: 'Ferramentas' },
+   { to: '/sobre', key: 'sobre', label: 'Sobre' },
+   { to: '/termos', key: 'termos', label: 'Termos de uso' },
+   { to: '/privacidade', key: 'privacidade', label: 'Privacidade' },
+diff --git a/src/components/tools/ui.jsx b/src/components/tools/ui.jsx
+new file mode 100644
+index 0000000..3717be8
+--- /dev/null
++++ b/src/components/tools/ui.jsx
+@@ -0,0 +1,213 @@
++// src/components/tools/ui.jsx
++// Peças compartilhadas das ferramentas públicas: layout com conteúdo
++// explicativo, campos acessíveis, botão de copiar e avisos.
++
++import React, { useId, useState } from 'react';
++import { Link } from 'react-router-dom';
++import { ArrowLeft, Copy, Check, AlertTriangle } from 'lucide-react';
++import Logo from '../Logo';
++import PublicPagesFooter from '../PublicPagesFooter';
++import { usePageMeta } from '../../hooks/usePageMeta';
++import { TOOLS } from '../../content/toolsCatalog';
++
++export const inputCls =
++  'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-cyan-electric transition-colors';
++
++export function ToolLayout({ slug, title, metaTitle, metaDescription, intro, children, howTo = [], premises = [], limitations }) {
++  usePageMeta(metaTitle, metaDescription);
++  const others = TOOLS.filter((t) => t.slug !== slug);
++  return (
++    <div className="min-h-screen bg-black text-white font-sans">
++      <div className="max-w-3xl mx-auto px-5 py-6 space-y-8">
++        <header className="flex items-center justify-between">
++          <Link to="/"><Logo size="small" as="p" /></Link>
++          <Link
++            to="/ferramentas"
++            className="text-[10px] font-black opacity-60 hover:opacity-100 uppercase tracking-[0.2em] flex items-center gap-2"
++          >
++            <ArrowLeft size={12} aria-hidden="true" /> Todas as ferramentas
++          </Link>
++        </header>
++
++        <main id="main-content" className="space-y-8">
++          <div className="space-y-3">
++            <h1 className="text-2xl md:text-3xl font-black italic tracking-tight text-cyan-electric">{title}</h1>
++            <p className="text-sm opacity-70 leading-relaxed">{intro}</p>
++          </div>
++
++          {children}
++
++          {howTo.length > 0 && (
++            <section aria-labelledby="como-usar" className="card-glass p-5 rounded-2xl border border-border-mid space-y-3">
++              <h2 id="como-usar" className="text-base font-black">Como usar</h2>
++              <ol className="list-decimal pl-5 space-y-2 text-sm opacity-75 leading-relaxed">
++                {howTo.map((h) => <li key={h}>{h}</li>)}
++              </ol>
++            </section>
++          )}
++
++          {premises.length > 0 && (
++            <section aria-labelledby="premissas" className="card-glass p-5 rounded-2xl border border-border-mid space-y-3">
++              <h2 id="premissas" className="text-base font-black">Como o cálculo funciona</h2>
++              <ul className="list-disc pl-5 space-y-2 text-sm opacity-75 leading-relaxed">
++                {premises.map((p) => <li key={p}>{p}</li>)}
++              </ul>
++              {limitations && <p className="text-xs opacity-55 leading-relaxed">{limitations}</p>}
++            </section>
++          )}
++
++          <section aria-labelledby="privacidade-ferramenta" className="text-xs opacity-55 leading-relaxed">
++            <h2 id="privacidade-ferramenta" className="sr-only">Privacidade</h2>
++            Os cálculos acontecem no seu navegador: o que você digita aqui não é enviado a nenhum servidor do
++            Draft Play. Os resultados são estimativas baseadas nos valores informados.
++          </section>
++
++          <nav aria-label="Outras ferramentas" className="space-y-3">
++            <h2 className="text-base font-black">Outras ferramentas</h2>
++            <ul className="grid sm:grid-cols-2 gap-3">
++              {others.map((t) => (
++                <li key={t.slug}>
++                  <Link to={t.path} className="block card-glass p-4 rounded-xl border border-border-mid hover:border-cyan-electric/40 transition-colors h-full">
++                    <span className="block text-sm font-bold">{t.name}</span>
++                    <span className="block text-xs opacity-60 mt-1 leading-relaxed">{t.short}</span>
++                  </Link>
++                </li>
++              ))}
++            </ul>
++          </nav>
++
++          <div className="card-glass p-5 rounded-2xl border border-cyan-electric/20 text-sm leading-relaxed flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
++            <p className="opacity-80">Quer guardar histórico, ranking e financeiro do seu baba?</p>
++            <Link to="/login" className="shrink-0 bg-cyan-electric text-black font-black text-xs uppercase tracking-widest px-5 py-3 rounded-xl text-center">
++              Conhecer o Draft Play
++            </Link>
++          </div>
++        </main>
++
++        <PublicPagesFooter current="ferramentas" className="pb-6" />
++      </div>
++    </div>
++  );
++}
++
++export function Field({ label, hint, error, children }) {
++  const id = useId();
++  const child = React.cloneElement(children, {
++    id,
++    'aria-describedby': [hint && `${id}-hint`, error && `${id}-err`].filter(Boolean).join(' ') || undefined,
++    'aria-invalid': error ? true : undefined,
++  });
++  return (
++    <div className="space-y-1.5">
++      <label htmlFor={id} className="block text-[11px] font-black uppercase tracking-wider opacity-70">{label}</label>
++      {child}
++      {hint && <p id={`${id}-hint`} className="text-[11px] opacity-50">{hint}</p>}
++      {error && <p id={`${id}-err`} role="alert" className="text-[11px] text-red-400 font-bold">{error}</p>}
++    </div>
++  );
++}
++
++/** Campo numérico inteiro: guarda texto, devolve número (ou NaN se vazio/ inválido). */
++export function IntField({ label, value, onChange, min = 0, max = 999, hint, error }) {
++  return (
++    <Field label={label} hint={hint} error={error}>
++      <input
++        type="number"
++        inputMode="numeric"
++        min={min}
++        max={max}
++        step={1}
++        value={value}
++        onChange={(e) => onChange(e.target.value)}
++        className={inputCls}
++      />
++    </Field>
++  );
++}
++
++export const toInt = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
++
++export function ErrorList({ errors }) {
++  if (!errors.length) return null;
++  return (
++    <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm space-y-1">
++      <p className="font-black flex items-center gap-2 text-red-300"><AlertTriangle size={16} aria-hidden="true" /> Confira os dados</p>
++      <ul className="list-disc pl-5 text-red-200/90">
++        {errors.map((e) => <li key={e}>{e}</li>)}
++      </ul>
++    </div>
++  );
++}
++
++export function CopyButton({ text, label = 'Copiar resultado', className = '' }) {
++  const [state, setState] = useState('idle');
++  const copy = async () => {
++    try {
++      if (navigator.clipboard?.writeText) {
++        await navigator.clipboard.writeText(text);
++      } else {
++        const ta = document.createElement('textarea');
++        ta.value = text;
++        ta.setAttribute('readonly', '');
++        ta.style.position = 'fixed';
++        ta.style.opacity = '0';
++        document.body.appendChild(ta);
++        ta.select();
++        const ok = document.execCommand('copy');
++        document.body.removeChild(ta);
++        if (!ok) throw new Error('copy failed');
++      }
++      setState('done');
++    } catch {
++      setState('error');
++    }
++    setTimeout(() => setState('idle'), 2200);
++  };
++  return (
++    <button
++      type="button"
++      onClick={copy}
++      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-cyan-electric/30 bg-cyan-electric/10 text-cyan-electric text-xs font-black uppercase tracking-wider active:scale-95 transition-transform ${className}`}
++    >
++      {state === 'done' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
++      <span aria-live="polite">
++        {state === 'done' ? 'Copiado!' : state === 'error' ? 'Não foi possível copiar' : label}
++      </span>
++    </button>
++  );
++}
++
++export const Panel = ({ children, className = '' }) => (
++  <div className={`card-glass p-5 rounded-2xl border border-border-mid space-y-4 ${className}`}>{children}</div>
++);
++
++export const Stat = ({ label, value, sub }) => (
++  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
++    <p className="text-[10px] font-black uppercase tracking-wider opacity-50">{label}</p>
++    <p className="text-2xl font-black text-cyan-electric mt-1">{value}</p>
++    {sub && <p className="text-[11px] opacity-55 mt-1 leading-snug">{sub}</p>}
++  </div>
++);
++
++export function Segmented({ label, options, value, onChange }) {
++  return (
++    <fieldset className="space-y-1.5">
++      <legend className="text-[11px] font-black uppercase tracking-wider opacity-70">{label}</legend>
++      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
++        {options.map((o) => (
++          <button
++            key={o.value}
++            type="button"
++            aria-pressed={value === o.value}
++            onClick={() => onChange(o.value)}
++            className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase leading-tight border transition-all ${
++              value === o.value ? 'bg-cyan-electric text-black border-cyan-electric' : 'bg-white/5 text-white/60 border-white/10'
++            }`}
++          >
++            {o.label}
++          </button>
++        ))}
++      </div>
++    </fieldset>
++  );
++}
+diff --git a/src/content/toolsCatalog.js b/src/content/toolsCatalog.js
+new file mode 100644
+index 0000000..3476652
+--- /dev/null
++++ b/src/content/toolsCatalog.js
+@@ -0,0 +1,59 @@
++// src/content/toolsCatalog.js
++// Fonte única das ferramentas públicas: usada pelo hub (/ferramentas), pelo
++// rodapé de cada ferramenta, pelo pré-render (title/description) e pelo sitemap.
++// Só entram aqui ferramentas que EXISTEM e funcionam.
++
++export const TOOLS = [
++  {
++    slug: 'sorteador',
++    path: '/ferramentas/sorteador',
++    name: 'Sorteador de times equilibrados',
++    short: 'Cole a lista, defina nível e posição e sorteie times parelhos.',
++    title: 'Sorteador de Times Equilibrados para Baba | Draft Play',
++    description:
++      'Sorteie times de futebol equilibrados por nível e posição, com goleiros distribuídos e reservas. Grátis, sem cadastro, direto no navegador.',
++  },
++  {
++    slug: 'calculadora-torneio',
++    path: '/ferramentas/calculadora-torneio',
++    name: 'Calculadora de torneio',
++    short: 'Quantos jogos e quanto tempo dura um mata-mata, pontos corridos ou grupos.',
++    title: 'Calculadora de Torneio: Quantidade de Jogos e Duração | Draft Play',
++    description:
++      'Calcule quantos jogos e quanto tempo leva um torneio de mata-mata, pontos corridos ou fase de grupos, com número de campos, duração das partidas e intervalos.',
++  },
++  {
++    slug: 'tabela-de-jogos',
++    path: '/ferramentas/tabela-de-jogos',
++    name: 'Gerador de tabela de jogos',
++    short: 'Confrontos de mata-mata, pontos corridos ou grupos, com folgas tratadas.',
++    title: 'Gerador de Tabela de Jogos para Torneio | Draft Play',
++    description:
++      'Gere a tabela de jogos do seu torneio de futebol amador: mata-mata com cabeças de chave, pontos corridos em 1 ou 2 turnos e fase de grupos. Copie e compartilhe.',
++  },
++  {
++    slug: 'divisao-de-despesas',
++    path: '/ferramentas/divisao-de-despesas',
++    name: 'Calculadora de divisão de despesas',
++    short: 'Quadra, árbitro, água e extras divididos entre os pagantes.',
++    title: 'Calculadora de Divisão de Despesas do Baba | Draft Play',
++    description:
++      'Divida o custo da quadra, arbitragem, água e outros gastos entre os participantes do baba, com arredondamento e cenários de faltas e convidados.',
++  },
++  {
++    slug: 'lista-de-presenca',
++    path: '/ferramentas/lista-de-presenca',
++    name: 'Organizador de lista de presença',
++    short: 'Cole a lista, marque presenças e veja confirmados, reservas e times possíveis.',
++    title: 'Organizador de Lista de Presença do Baba | Draft Play',
++    description:
++      'Cole a lista de jogadores, marque quem confirmou e veja o total de confirmados, ausentes, reservas e quantos times fecham. Tudo no navegador, sem enviar dados.',
++  },
++];
++
++export const TOOLS_HUB = {
++  path: '/ferramentas',
++  title: 'Ferramentas Gratuitas para Organizar o Baba | Draft Play',
++  description:
++    'Sorteador de times, calculadora de torneio, tabela de jogos, divisão de despesas e lista de presença. Ferramentas gratuitas para quem organiza futebol amador, sem cadastro.',
++};
+diff --git a/src/entry-server.jsx b/src/entry-server.jsx
+index 0129308..1278609 100644
+--- a/src/entry-server.jsx
++++ b/src/entry-server.jsx
+@@ -5,7 +5,13 @@ import { StaticRouter } from 'react-router-dom/server';
+ import LandingPage from './pages/LandingPage';
+ import TermsPage from './pages/TermsPage';
+ import PrivacyPage from './pages/PrivacyPage';
+-import VisitorMode from './pages/VisitorMode';
++import FerramentasPage from './pages/FerramentasPage';
++import SorteadorTimes from './pages/tools/SorteadorTimes';
++import TorneioCalculadora from './pages/tools/TorneioCalculadora';
++import TabelaJogos from './pages/tools/TabelaJogos';
++import DivisaoDespesas from './pages/tools/DivisaoDespesas';
++import OrganizadorPresenca from './pages/tools/OrganizadorPresenca';
++import { TOOLS, TOOLS_HUB } from './content/toolsCatalog';
+ import AboutPage from './pages/AboutPage';
+ import PublicProfilePage from './pages/PublicProfilePage.jsx';
+ 
+@@ -20,10 +26,17 @@ export const PRERENDER_ROUTES = [
+   '/',
+   '/termos',
+   '/privacidade',
+-  '/visitor',
+   '/sobre',
++  TOOLS_HUB.path,
++  ...TOOLS.map((t) => t.path),
+ ];
+ 
++// Metadados (title/description) das rotas novas, consumidos por scripts/prerender.mjs.
++export const EXTRA_ROUTE_META = {
++  [TOOLS_HUB.path]: { title: TOOLS_HUB.title, description: TOOLS_HUB.description },
++  ...Object.fromEntries(TOOLS.map((t) => [t.path, { title: t.title, description: t.description }])),
++};
++
+ // ---------------------------------------------------------
+ // PÁGINAS ESTÁTICAS
+ // ---------------------------------------------------------
+@@ -32,8 +45,13 @@ const PAGES = {
+   '/': LandingPage,
+   '/termos': TermsPage,
+   '/privacidade': PrivacyPage,
+-  '/visitor': VisitorMode,
+   '/sobre': AboutPage,
++  '/ferramentas': FerramentasPage,
++  '/ferramentas/sorteador': SorteadorTimes,
++  '/ferramentas/calculadora-torneio': TorneioCalculadora,
++  '/ferramentas/tabela-de-jogos': TabelaJogos,
++  '/ferramentas/divisao-de-despesas': DivisaoDespesas,
++  '/ferramentas/lista-de-presenca': OrganizadorPresenca,
+ };
+ 
+ // ---------------------------------------------------------
+diff --git a/src/hooks/usePageMeta.js b/src/hooks/usePageMeta.js
+new file mode 100644
+index 0000000..817f662
+--- /dev/null
++++ b/src/hooks/usePageMeta.js
+@@ -0,0 +1,17 @@
++// src/hooks/usePageMeta.js
++// Atualiza <title> e meta description na navegação client-side (o HTML
++// pré-renderizado já traz os valores certos para rastreadores; isto cobre quem
++// navega dentro do app sem recarregar).
++import { useEffect } from 'react';
++
++export function usePageMeta(title, description) {
++  useEffect(() => {
++    if (title) document.title = title;
++    if (description) {
++      const el = document.querySelector('meta[name="description"]');
++      if (el) el.setAttribute('content', description);
++    }
++  }, [title, description]);
++}
++
++export default usePageMeta;
+diff --git a/src/pages/AboutPage.jsx b/src/pages/AboutPage.jsx
+index 55b34cb..9912ac5 100644
+--- a/src/pages/AboutPage.jsx
++++ b/src/pages/AboutPage.jsx
+@@ -73,12 +73,13 @@ export default function AboutPage() {
+           </p>
+         </Section>
+ 
+-        <Section title="Modo Visitante">
++        <Section title="Ferramentas gratuitas">
+           <p>
+-            Quem só quer sortear os times de uma pelada avulsa, sem criar conta nem
+-            vincular a um grupo fixo, pode usar o{' '}
+-            <a href="/visitor" className="text-cyan-electric underline">Modo Visitante</a>{' '}
+-            — sorteio de times equilibrados na hora, de graça, sem cadastro.
++            Quem só quer resolver uma etapa do baba, sem criar conta nem vincular a um
++            grupo fixo, pode usar as{' '}
++            <a href="/ferramentas" className="text-cyan-electric underline">ferramentas gratuitas</a>{' '}
++            — sorteador de times equilibrados, calculadora de torneio, tabela de jogos,
++            divisão de despesas e lista de presença, de graça e sem cadastro.
+           </p>
+         </Section>
+ 
+@@ -109,8 +110,8 @@ export default function AboutPage() {
+ 
+         <Section title="Perguntas frequentes">
+           <p>
+-            <strong>Preciso pagar pra usar?</strong> O Modo Visitante é gratuito e não
+-            exige cadastro. Criar conta e gerenciar um baba fixo também tem um plano
++            <strong>Preciso pagar pra usar?</strong> As ferramentas gratuitas não
++            exigem cadastro. Criar conta e gerenciar um baba fixo também tem um plano
+             gratuito, com limite de um grupo.
+           </p>
+           <p>
+diff --git a/src/pages/FerramentasPage.jsx b/src/pages/FerramentasPage.jsx
+new file mode 100644
+index 0000000..7f4f6fb
+--- /dev/null
++++ b/src/pages/FerramentasPage.jsx
+@@ -0,0 +1,70 @@
++// src/pages/FerramentasPage.jsx — hub das ferramentas públicas
++import React from 'react';
++import { Link } from 'react-router-dom';
++import { Shuffle, Calculator, ListOrdered, Wallet, ClipboardCheck } from 'lucide-react';
++import Logo from '../components/Logo';
++import PublicPagesFooter from '../components/PublicPagesFooter';
++import { usePageMeta } from '../hooks/usePageMeta';
++import { TOOLS, TOOLS_HUB } from '../content/toolsCatalog';
++
++const ICONS = {
++  'sorteador': Shuffle,
++  'calculadora-torneio': Calculator,
++  'tabela-de-jogos': ListOrdered,
++  'divisao-de-despesas': Wallet,
++  'lista-de-presenca': ClipboardCheck,
++};
++
++export default function FerramentasPage() {
++  usePageMeta(TOOLS_HUB.title, TOOLS_HUB.description);
++  return (
++    <div className="min-h-screen bg-black text-white font-sans">
++      <div className="max-w-3xl mx-auto px-5 py-6 space-y-8">
++        <header className="flex items-center justify-between">
++          <Link to="/"><Logo size="small" as="p" /></Link>
++          <Link to="/login" className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-electric">Entrar</Link>
++        </header>
++
++        <main id="main-content" className="space-y-8">
++          <div className="space-y-3">
++            <h1 className="text-2xl md:text-3xl font-black italic tracking-tight text-cyan-electric">Ferramentas gratuitas para organizar o baba</h1>
++            <p className="text-sm opacity-70 leading-relaxed">
++              Organizar futebol amador dá trabalho: fechar a lista, dividir a conta da quadra, montar times parelhos,
++              planejar um torneio. Estas ferramentas resolvem cada uma dessas etapas, sem cadastro e sem enviar
++              seus dados a lugar nenhum: tudo é calculado no seu navegador.
++            </p>
++          </div>
++
++          <ul className="grid sm:grid-cols-2 gap-4">
++            {TOOLS.map((t) => {
++              const Icon = ICONS[t.slug] ?? Calculator;
++              return (
++                <li key={t.slug}>
++                  <Link to={t.path} className="block h-full card-glass p-5 rounded-2xl border border-border-mid hover:border-cyan-electric/40 transition-colors">
++                    <Icon size={22} className="text-cyan-electric mb-3" aria-hidden="true" />
++                    <h2 className="text-base font-black">{t.name}</h2>
++                    <p className="text-xs opacity-65 mt-1.5 leading-relaxed">{t.short}</p>
++                  </Link>
++                </li>
++              );
++            })}
++          </ul>
++
++          <section aria-labelledby="ordem" className="card-glass p-5 rounded-2xl border border-border-mid space-y-3">
++            <h2 id="ordem" className="text-base font-black">Por onde começar?</h2>
++            <ul className="list-disc pl-5 space-y-2 text-sm opacity-75 leading-relaxed">
++              <li>Baba semanal: use a <strong>lista de presença</strong> para fechar quem joga, o <strong>sorteador</strong> para montar os times e a <strong>divisão de despesas</strong> para acertar a quadra.</li>
++              <li>Torneio interno: use a <strong>calculadora de torneio</strong> para saber quantos jogos e quanto tempo você precisa e o <strong>gerador de tabela</strong> para montar os confrontos.</li>
++            </ul>
++            <p className="text-xs opacity-55 leading-relaxed">
++              As ferramentas são independentes do aplicativo e não usam dados de nenhum baba cadastrado. Para guardar
++              histórico, ranking, presença e caixa do seu grupo, conheça o <Link to="/login" className="text-cyan-electric underline">Draft Play</Link>.
++            </p>
++          </section>
++        </main>
++
++        <PublicPagesFooter current="ferramentas" className="pb-6" />
++      </div>
++    </div>
++  );
++}
+diff --git a/src/pages/LandingPage.jsx b/src/pages/LandingPage.jsx
+index edc0e25..53fa9f7 100644
+--- a/src/pages/LandingPage.jsx
++++ b/src/pages/LandingPage.jsx
+@@ -104,7 +104,7 @@ const appShots = [
+   { file: 'app-comparacao', title: 'Comparação 1v1', desc: 'Dois jogadores lado a lado: gols, assistências, vitórias e aproveitamento.', alt: 'Comparação entre dois jogadores no Draft Play com gols, assistências e vitórias lado a lado' },
+   { file: 'app-perfil', title: 'Perfil público', desc: 'Estatísticas e conquistas num perfil com link pra compartilhar.', alt: 'Perfil público de jogador no Draft Play com estatísticas, conquistas e botão de copiar link' },
+   { file: 'app-caixa', title: 'Caixa do baba', desc: 'Arrecadado, despesas e saldo, com nova cobrança e nova despesa.', alt: 'Tela financeira do Draft Play com caixa do baba, arrecadado, despesas e saldo atual' },
+-  { file: 'app-visitante', title: 'Modo Visitante', desc: 'Sorteie os times sem conta: jogadores por time, reserva e nível.', alt: 'Modo ferramenta rápida do Draft Play para sortear times sem conta' },
++  { file: 'app-visitante', title: 'Sorteador sem conta', desc: 'Sorteie os times sem conta: jogadores por time, reserva e nível.', alt: 'Modo ferramenta rápida do Draft Play para sortear times sem conta' },
+ ];
+ 
+ // Print do app em moldura de celular; se o arquivo faltar, mostra um espaço reservado.
+@@ -134,7 +134,7 @@ const AppShot = ({ file, alt }) => {
+ };
+ 
+ const faqs = [
+-  { q: 'Dá pra testar sem me cadastrar?', a: 'Não pra testar: no Modo Visitante você sorteia os times na hora, sem cadastro. Pra criar um baba e guardar histórico e ranking, é preciso ter conta.' },
++  { q: 'Dá pra testar sem me cadastrar?', a: 'Dá. As ferramentas gratuitas (sorteador de times, calculadora de torneio, tabela de jogos, divisão de despesas e lista de presença) funcionam sem cadastro. Pra criar um baba e guardar histórico e ranking, é preciso ter conta.' },
+   { q: 'Posso entrar só como jogador?', a: 'Pode. Você entra pelo convite do coordenador, confirma presença, acompanha o placar e ganha avaliação, badges e ranking, de graça.' },
+   { q: 'O sorteio é automático?', a: 'Sim. O app distribui os confirmados em times equilibrados, com base no nível de cada jogador, definido por votação do próprio grupo.' },
+   { q: 'Como o app decide o nível de cada jogador?', a: 'Pela votação do próprio grupo. Os votos extremos são descartados quando há 4 ou mais, e o resultado vira o nível usado no sorteio.' },
+@@ -273,7 +273,7 @@ const LandingPage = () => {
+     return () => { root.style.scrollBehavior = prev; };
+   }, []);
+ 
+-  // Par de CTAs usado no topo e no fim. O Modo Visitante segue em /visitor.
++  // Par de CTAs usado no topo e no fim. As ferramentas sem conta ficam em /ferramentas.
+   const Ctas = ({ center = false }) => (
+     <div className={`flex flex-col sm:flex-row gap-3 ${center ? 'justify-center' : ''}`}>
+       <button
+@@ -285,11 +285,11 @@ const LandingPage = () => {
+         Organizar meu baba
+       </button>
+       <button
+-        onClick={() => navigate('/visitor')}
++        onClick={() => navigate('/ferramentas')}
+         className="px-8 py-4 rounded-2xl font-bold border border-cyan-electric/40 text-cyan-electric hover:bg-cyan-electric/10 transition-all active:scale-95 flex items-center justify-center gap-3 text-sm"
+       >
+         <Zap size={18} />
+-        Testar sem conta
++        Ferramentas grátis
+       </button>
+     </div>
+   );
+@@ -330,7 +330,7 @@ const LandingPage = () => {
+           <Ctas />
+           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs opacity-70">
+             <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Convidados entram pelo convite</li>
+-            <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Modo Visitante sem cadastro</li>
++            <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Ferramentas grátis, sem cadastro</li>
+             <li className="flex items-center gap-1.5"><Lock size={13} className="text-cyan-electric" /> Dados protegidos (LGPD)</li>
+             <li className="flex items-center gap-1.5"><Smartphone size={13} className="text-cyan-electric" /> Instala como app</li>
+           </ul>
+diff --git a/src/pages/MatchPageVisitor.jsx b/src/pages/MatchPageVisitor.jsx
+index 98f52e8..4c90660 100644
+--- a/src/pages/MatchPageVisitor.jsx
++++ b/src/pages/MatchPageVisitor.jsx
+@@ -6,7 +6,6 @@ import React, { useState, useEffect, useCallback } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import toast from 'react-hot-toast';
+ import ConfirmModal from '../components/ConfirmModal';
+-import RewardedAdGate from '../components/RewardedAdGate';
+ import TeamsShareButton from '../components/TeamsShareButton';
+ import { supabase } from '../services/supabase';
+ 
+@@ -19,7 +18,6 @@ const MatchPageVisitor = () => {
+   const [isActive,     setIsActive]     = useState(false);
+   const [confirmExit,  setConfirmExit]  = useState(false);
+   const [reserves,     setReserves]     = useState([]);
+-  const [showStartGate, setShowStartGate] = useState(false);
+ 
+   // Empate: aguarda escolha de quem ganhou o par ou ímpar antes de reordenar a fila
+   const [tieChoice, setTieChoice] = useState(null); // { teamA, teamB, rest }
+@@ -50,16 +48,16 @@ const MatchPageVisitor = () => {
+           });
+         } else {
+           toast.error('Número insuficiente de times.');
+-          navigate('/visitor');
++          navigate('/ferramentas/sorteador');
+         }
+       } catch (e) {
+         console.error('Erro ao carregar dados:', e);
+         localStorage.removeItem('temp_teams');
+-        navigate('/visitor');
++        navigate('/ferramentas/sorteador');
+       }
+     } else {
+       toast.error('Nenhum time encontrado!');
+-      navigate('/visitor');
++      navigate('/ferramentas/sorteador');
+     }
+   }, [navigate]);
+ 
+@@ -134,7 +132,7 @@ const MatchPageVisitor = () => {
+       localStorage.removeItem('temp_teams');
+       localStorage.removeItem('temp_reserves');
+       localStorage.removeItem('temp_match_id');
+-      setTimeout(() => navigate('/visitor'), 2000);
++      setTimeout(() => navigate('/ferramentas/sorteador'), 2000);
+       return;
+     }
+ 
+@@ -260,7 +258,7 @@ const MatchPageVisitor = () => {
+           {!isRealtime && (
+             <>
+               <button
+-                onClick={() => (isActive ? setIsActive(false) : setShowStartGate(true))}
++                onClick={() => (isActive ? setIsActive(false) : setIsActive(true))}
+                 className={`mt-10 w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[4px] transition-all ${
+                   isActive
+                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+@@ -420,26 +418,17 @@ const MatchPageVisitor = () => {
+         </div>
+       )}
+ 
+-      <RewardedAdGate
+-        open={showStartGate}
+-        placementName="iniciar-partida"
+-        title="Prontos pra jogar!"
+-        description="Assista a um anúncio curto pra iniciar a partida."
+-        onGranted={() => { setShowStartGate(false); setIsActive(true); }}
+-        onCancel={() => setShowStartGate(false)}
+-      />
+-
+       <ConfirmModal
+         open={confirmExit}
+         message="Sair da partida?"
+-        description="O progresso desta partida será perdido e você voltará para o modo visitante."
++        description="O progresso desta partida será perdido e você voltará para o sorteador de times."
+         confirmLabel="Sair"
+         danger
+         onConfirm={() => {
+           localStorage.removeItem('temp_teams');
+           localStorage.removeItem('temp_reserves');
+           localStorage.removeItem('temp_match_id');
+-          navigate('/visitor');
++          navigate('/ferramentas/sorteador');
+         }}
+         onCancel={() => setConfirmExit(false)}
+       />
+diff --git a/src/pages/VisitorMode.jsx b/src/pages/VisitorMode.jsx
+deleted file mode 100644
+index c3c8655..0000000
+--- a/src/pages/VisitorMode.jsx
++++ /dev/null
+@@ -1,370 +0,0 @@
+-import React, { useState, useEffect } from 'react';
+-import { useNavigate } from 'react-router-dom';
+-import Logo from '../components/Logo';
+-import { Users, ArrowLeft, Shuffle, Settings2, Trash2 } from 'lucide-react';
+-import toast from 'react-hot-toast';
+-
+-const STORAGE_KEY = 'visitor_players_list';
+-
+-// Fisher-Yates — embaralhamento sem viés (diferente de sort(() => Math.random() - 0.5),
+-// que não distribui as permutações de forma uniforme)
+-const shuffle = (arr) => {
+-  const a = [...arr];
+-  for (let i = a.length - 1; i > 0; i--) {
+-    const j = Math.floor(Math.random() * (i + 1));
+-    [a[i], a[j]] = [a[j], a[i]];
+-  }
+-  return a;
+-};
+-
+-const StarRating = ({ value, onChange }) => (
+-  <div className="flex items-center gap-0.5">
+-    {[1, 2, 3].map((star) => (
+-      <button
+-        key={star}
+-        type="button"
+-        onClick={() => onChange(star)}
+-        className={`text-base leading-none transition-transform active:scale-90 ${star <= value ? 'opacity-100' : 'opacity-20'}`}
+-        style={{ color: star <= value ? '#FFD700' : '#ffffff' }}
+-      >
+-        ★
+-      </button>
+-    ))}
+-  </div>
+-);
+-
+-const balanceTeams = (players, numTeams, playersPerTeam, leftoverStrategy) => {
+-  let goalies  = shuffle(players.filter(p => p.position === 'goleiro'));
+-  let outfield = shuffle(players.filter(p => p.position === 'linha'));
+-
+-  const teams = Array.from({ length: numTeams }, (_, i) => ({
+-    id:      Date.now() + i,
+-    name:    `TIME ${String.fromCharCode(65 + i)}`,
+-    players: [],
+-    starSum: 0,
+-  }));
+-
+-  // Capacidade de cada time.
+-  // - 'reserve': todos os times têm playersPerTeam; quem sobra vira reserva.
+-  // - 'fill': todos os jogadores entram. Quando não fecha certinho, os times
+-  //   do INÍCIO ficam com 1 a mais e os times do FINAL ficam com 1 a menos
+-  //   (ex.: 15 jogadores em 4 times => A=4, B=4, C=4, D=3).
+-  const capacities = Array(numTeams).fill(playersPerTeam);
+-  if (leftoverStrategy !== 'reserve') {
+-    const base  = Math.floor(players.length / numTeams);
+-    const extra = players.length % numTeams;
+-    for (let i = 0; i < numTeams; i++) {
+-      capacities[i] = i < extra ? base + 1 : base;
+-    }
+-  }
+-
+-  goalies.sort((a, b) => b.stars - a.stars);
+-  for (let i = 0; i < numTeams && goalies.length > 0; i++) {
+-    const g = goalies.shift();
+-    teams[i].players.push(g);
+-    teams[i].starSum += g.stars;
+-  }
+-  outfield = [...outfield, ...goalies];
+-  outfield.sort((a, b) => b.stars - a.stars);
+-
+-  let direction  = 1;
+-  let teamIndex  = 0;
+-  const reserves = [];
+-
+-  // Avança o ponteiro no esquema "serpente" (A B C D D C B A ...)
+-  const advance = () => {
+-    teamIndex += direction;
+-    if (teamIndex >= numTeams)    { direction = -1; teamIndex = numTeams - 1; }
+-    else if (teamIndex < 0)       { direction = 1;  teamIndex = 0; }
+-  };
+-
+-  while (outfield.length > 0) {
+-    const allFull = teams.every((t, i) => t.players.length >= capacities[i]);
+-    if (allFull) {
+-      reserves.push(...outfield);
+-      break;
+-    }
+-
+-    // pula times que já estão completos
+-    let guard = 0;
+-    while (teams[teamIndex].players.length >= capacities[teamIndex] && guard < numTeams * 2 + 2) {
+-      advance();
+-      guard++;
+-    }
+-
+-    const player = outfield.shift();
+-    teams[teamIndex].players.push(player);
+-    teams[teamIndex].starSum += player.stars;
+-    advance();
+-  }
+-
+-  return { teams, reserves };
+-};
+-
+-const VisitorMode = () => {
+-  const navigate = useNavigate();
+-
+-  const [playersPerTeam,    setPlayersPerTeam]    = useState(5);
+-  const [leftoverStrategy,  setLeftoverStrategy]  = useState('reserve');
+-  const [newPlayerName,     setNewPlayerName]     = useState('');
+-  const [newPlayerPosition, setNewPlayerPosition] = useState('linha');
+-  const [newPlayerStars,    setNewPlayerStars]    = useState(2);
+-
+-  // UX-006 FIX: inicializa do localStorage
+-  const [players, setPlayers] = useState(() => {
+-    try {
+-      const saved = localStorage.getItem(STORAGE_KEY);
+-      return saved ? JSON.parse(saved) : [];
+-    } catch {
+-      return [];
+-    }
+-  });
+-
+-  // UX-006 FIX: persiste no localStorage sempre que a lista muda
+-  useEffect(() => {
+-    try {
+-      localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+-    } catch {
+-      // silencioso — storage pode estar cheio
+-    }
+-  }, [players]);
+-
+-  const addPlayer = () => {
+-    if (!newPlayerName.trim()) {
+-      toast.error('Digite o nome do jogador!');
+-      return;
+-    }
+-    const player = {
+-      id:       Date.now(),
+-      name:     newPlayerName.trim(),
+-      position: newPlayerPosition,
+-      stars:    newPlayerStars,
+-    };
+-    setPlayers(prev => [...prev, player]);
+-    setNewPlayerName('');
+-    setNewPlayerStars(2);
+-    toast.success(`${player.name} adicionado!`);
+-  };
+-
+-  const removePlayer = (id) => {
+-    setPlayers(prev => prev.filter(p => p.id !== id));
+-  };
+-
+-  const clearAll = () => {
+-    setPlayers([]);
+-    localStorage.removeItem(STORAGE_KEY);
+-    toast.success('Lista limpa!');
+-  };
+-
+-  const drawTeams = () => {
+-    if (players.length < playersPerTeam * 2) {
+-      toast.error(`Você precisa de pelo menos ${playersPerTeam * 2} jogadores!`);
+-      return;
+-    }
+-    let numTeams;
+-    if (leftoverStrategy === 'reserve') {
+-      numTeams = Math.floor(players.length / playersPerTeam);
+-    } else {
+-      numTeams = Math.ceil(players.length / playersPerTeam);
+-    }
+-    if (numTeams < 2) {
+-      toast.error('Jogadores insuficientes para formar 2 times!');
+-      return;
+-    }
+-    const { teams, reserves } = balanceTeams(players, numTeams, playersPerTeam, leftoverStrategy);
+-    localStorage.setItem('temp_teams', JSON.stringify(teams));
+-    if (reserves.length > 0) {
+-      localStorage.setItem('temp_reserves', JSON.stringify(reserves));
+-    } else {
+-      localStorage.removeItem('temp_reserves');
+-    }
+-    toast.success(`${numTeams} times sorteados com equilíbrio!`);
+-    navigate('/visitor-match');
+-  };
+-
+-  const starLabel = { 1: 'Abaixo da média', 2: 'Na média', 3: 'Acima da média' };
+-
+-  return (
+-    <div className="min-h-screen p-6 flex flex-col bg-black text-white font-sans">
+-      <div className="max-w-md w-full mx-auto space-y-6">
+-
+-        {/* Header */}
+-        <div className="flex justify-between items-center">
+-          <Logo size="small" />
+-          <button
+-            onClick={() => navigate('/')}
+-            className="text-[10px] font-black opacity-40 hover:opacity-100 transition-all uppercase tracking-[0.2em] flex items-center gap-2"
+-          >
+-            <ArrowLeft size={12} /> Voltar
+-          </button>
+-        </div>
+-
+-        <div className="text-center">
+-          <h2 className="text-2xl font-black mb-2 uppercase italic tracking-tighter text-cyan-electric">
+-            Modo Ferramenta Rápida
+-          </h2>
+-          <p className="text-xs font-medium opacity-50 uppercase tracking-wide">
+-            Sorteie times sem precisar de conta!
+-          </p>
+-          {/* UX-006: aviso de persistência */}
+-          {players.length > 0 && (
+-            <p className="text-[9px] text-cyan-electric/50 mt-1">
+-              Lista salva automaticamente ({players.length} jogador{players.length !== 1 ? 'es' : ''})
+-            </p>
+-          )}
+-        </div>
+-
+-        {/* Config */}
+-        <div className="card-glass p-6 border border-cyan-electric/30 rounded-[2rem]">
+-          <div className="flex items-center justify-between mb-4">
+-            <div className="flex items-center gap-2">
+-              <Users className="text-cyan-electric" size={20} />
+-              <span className="text-xs font-black uppercase opacity-60">Jogadores por Time</span>
+-            </div>
+-            <div className="flex items-center gap-3">
+-              <button
+-                onClick={() => setPlayersPerTeam(Math.max(2, playersPerTeam - 1))}
+-                className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 font-black text-lg active:scale-90 transition-transform"
+-              >-</button>
+-              <span className="text-3xl font-black w-12 text-center">{playersPerTeam}</span>
+-              <button
+-                onClick={() => setPlayersPerTeam(Math.min(11, playersPerTeam + 1))}
+-                className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 font-black text-lg active:scale-90 transition-transform"
+-              >+</button>
+-            </div>
+-          </div>
+-
+-          <div className="pt-4 border-t border-white/5 space-y-3">
+-            <div className="flex items-center gap-2">
+-              <Settings2 size={14} className="text-cyan-electric opacity-50" />
+-              <span className="text-[10px] font-black uppercase opacity-40 tracking-wider">Se sobrar jogadores:</span>
+-            </div>
+-            <div className="grid grid-cols-2 gap-2">
+-              {[
+-                { value: 'reserve',    label: 'Ficar na Reserva' },
+-                { value: 'substitute', label: 'Time com Suplente' },
+-              ].map(opt => (
+-                <button
+-                  key={opt.value}
+-                  onClick={() => setLeftoverStrategy(opt.value)}
+-                  className={`py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${
+-                    leftoverStrategy === opt.value
+-                      ? 'bg-cyan-electric text-black border-cyan-electric'
+-                      : 'bg-white/5 text-white/40 border-white/10'
+-                  }`}
+-                >
+-                  {opt.label}
+-                </button>
+-              ))}
+-            </div>
+-          </div>
+-
+-          <p className="text-[9px] opacity-40 text-center uppercase tracking-wider mt-4">
+-            Mínimo de {playersPerTeam * 2} jogadores necessários
+-          </p>
+-        </div>
+-
+-        {/* Adicionar jogador */}
+-        <div className="card-glass p-4 border border-white/10 rounded-[2rem]">
+-          <div className="flex gap-2 mb-3">
+-            <input
+-              type="text"
+-              value={newPlayerName}
+-              onChange={e => setNewPlayerName(e.target.value)}
+-              onKeyPress={e => e.key === 'Enter' && addPlayer()}
+-              placeholder="Nome do jogador..."
+-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-cyan-electric transition-colors"
+-            />
+-            <select
+-              value={newPlayerPosition}
+-              onChange={e => setNewPlayerPosition(e.target.value)}
+-              className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-black outline-none cursor-pointer"
+-            >
+-              <option value="linha">⚽ LINHA</option>
+-              <option value="goleiro">🧤 GOLEIRO</option>
+-            </select>
+-          </div>
+-
+-          <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 mb-3 border border-white/5">
+-            <div className="flex flex-col">
+-              <span className="text-[9px] font-black uppercase opacity-40 tracking-widest mb-1">Nível</span>
+-              <span className="text-[10px] font-bold opacity-60">{starLabel[newPlayerStars]}</span>
+-            </div>
+-            <StarRating value={newPlayerStars} onChange={setNewPlayerStars} />
+-          </div>
+-
+-          <button
+-            onClick={addPlayer}
+-            className="w-full py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl font-black text-xs uppercase tracking-[3px] text-cyan-electric active:scale-95 transition-transform"
+-          >
+-            + Adicionar
+-          </button>
+-        </div>
+-
+-        {/* Lista de jogadores */}
+-        {players.length > 0 && (
+-          <div className="card-glass p-4 border border-white/10 rounded-[2rem] max-h-[300px] overflow-y-auto">
+-            <div className="flex items-center justify-between mb-3">
+-              <span className="text-xs font-black uppercase opacity-60">
+-                Jogadores ({players.length})
+-              </span>
+-              <button
+-                onClick={clearAll}
+-                className="flex items-center gap-1 text-[9px] font-black text-red-500/60 hover:text-red-500 uppercase tracking-wider transition-colors"
+-              >
+-                <Trash2 size={10} /> Limpar tudo
+-              </button>
+-            </div>
+-            <div className="space-y-2">
+-              {players.map(player => (
+-                <div
+-                  key={player.id}
+-                  className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5"
+-                >
+-                  <div className="flex items-center gap-3">
+-                    <span className={`text-xs font-black ${player.position === 'goleiro' ? 'text-green-400' : 'text-cyan-electric'}`}>
+-                      {player.position === 'goleiro' ? '🧤' : '⚽'}
+-                    </span>
+-                    <span className="text-sm font-bold">{player.name}</span>
+-                  </div>
+-                  <div className="flex items-center gap-3">
+-                    <div className="flex gap-0.5">
+-                      {[1, 2, 3].map(s => (
+-                        <span key={s} className="text-xs leading-none" style={{ color: s <= player.stars ? '#FFD700' : 'rgba(255,255,255,0.15)' }}>★</span>
+-                      ))}
+-                    </div>
+-                    <button onClick={() => removePlayer(player.id)} className="text-red-500/60 hover:text-red-500 transition-colors p-1">
+-                      <Trash2 size={14} />
+-                    </button>
+-                  </div>
+-                </div>
+-              ))}
+-            </div>
+-          </div>
+-        )}
+-
+-        {/* Botão sortear */}
+-        {players.length >= playersPerTeam * 2 ? (
+-          <button
+-            onClick={drawTeams}
+-            className="w-full py-5 rounded-2xl font-black text-black shadow-[0_10px_30px_rgba(0,242,255,0.25)] transition-all active:scale-95 flex items-center justify-center gap-3 uppercase text-sm tracking-widest"
+-            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+-          >
+-            <Shuffle size={20} />
+-            Sortear Times Equilibrados
+-          </button>
+-        ) : (
+-          <div className="w-full py-5 rounded-2xl font-black bg-white/5 border border-white/10 text-white/30 text-center uppercase text-xs tracking-widest">
+-            Adicione mais {playersPerTeam * 2 - players.length} jogador{playersPerTeam * 2 - players.length !== 1 ? 'es' : ''} para sortear
+-          </div>
+-        )}
+-
+-        <p className="text-[9px] font-bold opacity-20 uppercase tracking-[0.4em] text-center">
+-          Powered by Draft Baba v3.0
+-        </p>
+-      </div>
+-    </div>
+-  );
+-};
+-
+-export default VisitorMode;
+diff --git a/src/pages/tools/DivisaoDespesas.jsx b/src/pages/tools/DivisaoDespesas.jsx
+new file mode 100644
+index 0000000..19c8569
+--- /dev/null
++++ b/src/pages/tools/DivisaoDespesas.jsx
+@@ -0,0 +1,144 @@
++// src/pages/tools/DivisaoDespesas.jsx
++import React, { useMemo, useState } from 'react';
++import { ToolLayout, Panel, Stat, ErrorList, IntField, Field, CopyButton, inputCls, toInt } from '../../components/tools/ui';
++import { TOOLS } from '../../content/toolsCatalog';
++import { parseMoneyToCents, formatBRL, splitEqually, scenarios, sumCents } from '../../utils/expenseSplit';
++
++const tool = TOOLS.find((t) => t.slug === 'divisao-de-despesas');
++
++const ITEMS = [
++  { key: 'quadra', label: 'Quadra / campo' },
++  { key: 'arbitragem', label: 'Arbitragem' },
++  { key: 'agua', label: 'Água e materiais' },
++  { key: 'outros', label: 'Outros gastos' },
++];
++
++const ROUNDINGS = [
++  { value: '1', label: 'Sem arredondar' },
++  { value: '50', label: 'Para cima, R$ 0,50' },
++  { value: '100', label: 'Para cima, R$ 1,00' },
++];
++
++export default function DivisaoDespesas() {
++  const [values, setValues] = useState({ quadra: '', arbitragem: '', agua: '', outros: '' });
++  const [payers, setPayers] = useState('12');
++  const [rounding, setRounding] = useState('1');
++
++  const parsed = useMemo(() => {
++    const errs = [];
++    const cents = {};
++    for (const it of ITEMS) {
++      const raw = values[it.key];
++      if (raw.trim() === '') { cents[it.key] = 0; continue; }
++      const c = parseMoneyToCents(raw);
++      if (c === null) errs.push(`"${it.label}": valor inválido. Use números, por exemplo 120 ou 120,50.`);
++      else cents[it.key] = c;
++    }
++    const n = toInt(payers);
++    if (!Number.isInteger(n) || n < 1) errs.push('Informe pelo menos 1 participante pagante.');
++    else if (n > 500) errs.push('O limite desta calculadora é 500 participantes.');
++    const total = sumCents(Object.values(cents));
++    if (!errs.length && total === 0) errs.push('Informe pelo menos um valor de despesa maior que zero.');
++    return { errs, cents, n, total };
++  }, [values, payers]);
++
++  const result = parsed.errs.length ? null : splitEqually(parsed.total, parsed.n, Number(rounding));
++  const cen = parsed.errs.length ? [] : scenarios(parsed.total, parsed.n);
++
++  const text = result && [
++    'Divisão de despesas do baba',
++    ...ITEMS.filter((it) => parsed.cents[it.key] > 0).map((it) => `${it.label}: ${formatBRL(parsed.cents[it.key])}`),
++    `Total: ${formatBRL(result.total)}`,
++    `Pagantes: ${parsed.n}`,
++    `Valor por participante: ${formatBRL(result.perPerson)}`,
++    result.surplus > 0 ? `Sobra em caixa (por causa do arredondamento): ${formatBRL(result.surplus)}` : null,
++  ].filter(Boolean).join('\n');
++
++  return (
++    <ToolLayout
++      slug={tool.slug}
++      title="Calculadora de divisão de despesas"
++      metaTitle={tool.title}
++      metaDescription={tool.description}
++      intro="Informe quanto o baba custa e quantas pessoas vão pagar. A calculadora mostra o valor por participante, a sobra de caixa quando você arredonda e como o valor muda se alguém faltar ou entrar de última hora."
++      howTo={[
++        'Preencha os custos que se aplicam (deixe em branco o que não existir). Aceita vírgula ou ponto: 120,50.',
++        'Informe o número de participantes que vão pagar (não conte quem joga de graça, como um goleiro isento).',
++        'Escolha se quer arredondar o valor para cima. Veja a tabela de cenários para decidir um valor que feche mesmo com faltas.',
++      ]}
++      premises={[
++        'Total = soma de todos os custos informados. Valor por participante = total ÷ pagantes.',
++        'Quando você escolhe arredondar, o valor sempre sobe até o múltiplo escolhido; a diferença vira sobra de caixa (nunca falta dinheiro).',
++        'Os cenários recalculam o valor com mais ou menos pagantes, mantendo os custos fixos — útil porque a quadra custa o mesmo quando alguém falta.',
++        'Todos os cálculos usam centavos inteiros, para evitar diferenças de arredondamento.',
++      ]}
++      limitations="O resultado depende exclusivamente dos valores que você digitar. A ferramenta não registra pagamentos nem cobra ninguém."
++    >
++      <Panel>
++        <div className="grid sm:grid-cols-2 gap-4">
++          {ITEMS.map((it) => (
++            <Field key={it.key} label={`${it.label} (R$)`}>
++              <input
++                type="text"
++                inputMode="decimal"
++                placeholder="0,00"
++                value={values[it.key]}
++                onChange={(e) => setValues((v) => ({ ...v, [it.key]: e.target.value }))}
++                className={inputCls}
++              />
++            </Field>
++          ))}
++        </div>
++        <IntField label="Participantes pagantes" value={payers} onChange={setPayers} min={1} max={500} />
++        <fieldset className="space-y-1.5">
++          <legend className="text-[11px] font-black uppercase tracking-wider opacity-70">Arredondamento</legend>
++          <div className="grid grid-cols-3 gap-2">
++            {ROUNDINGS.map((r) => (
++              <button key={r.value} type="button" aria-pressed={rounding === r.value} onClick={() => setRounding(r.value)}
++                className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase leading-tight border ${rounding === r.value ? 'bg-cyan-electric text-black border-cyan-electric' : 'bg-white/5 text-white/60 border-white/10'}`}>
++                {r.label}
++              </button>
++            ))}
++          </div>
++        </fieldset>
++        <button type="button" onClick={() => { setValues({ quadra: '', arbitragem: '', agua: '', outros: '' }); setPayers('12'); setRounding('1'); }}
++          className="text-[11px] font-black uppercase tracking-wider opacity-60 hover:opacity-100 underline">
++          Limpar tudo
++        </button>
++      </Panel>
++
++      <ErrorList errors={parsed.errs.filter(() => Object.values(values).some((v) => v.trim() !== ''))} />
++
++      {result && (
++        <section aria-live="polite" aria-labelledby="resultado" className="space-y-4">
++          <h2 id="resultado" className="text-base font-black">Resultado</h2>
++          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
++            <Stat label="Total" value={formatBRL(result.total)} />
++            <Stat label="Por participante" value={formatBRL(result.perPerson)} sub={rounding !== '1' ? `sem arredondar: ${formatBRL(Math.ceil(result.exact))}` : undefined} />
++            <Stat label="Sobra em caixa" value={formatBRL(result.surplus)} sub={`arrecadado ${formatBRL(result.collected)}`} />
++          </div>
++
++          <div className="overflow-x-auto rounded-xl border border-border-mid">
++            <table className="w-full text-sm">
++              <caption className="sr-only">Valor por participante conforme o número de pagantes</caption>
++              <thead className="text-[10px] uppercase tracking-wider opacity-60 text-left">
++                <tr><th scope="col" className="p-3">Pagantes</th><th scope="col" className="p-3">Por pessoa</th><th scope="col" className="p-3">Arrecadado</th></tr>
++              </thead>
++              <tbody>
++                {cen.map((s) => (
++                  <tr key={s.payers} className={`border-t border-white/5 ${s.delta === 0 ? 'bg-cyan-electric/10 font-bold' : ''}`}>
++                    <td className="p-3">{s.payers}{s.delta === 0 ? ' (atual)' : ''}</td>
++                    <td className="p-3">{formatBRL(Math.ceil(s.total / s.payers))}</td>
++                    <td className="p-3">{formatBRL(s.collected)}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
++          </div>
++          <p className="text-xs opacity-55">A tabela mostra o valor exato arredondado ao centavo para cima, sem o arredondamento escolhido acima.</p>
++          <CopyButton text={text} label="Copiar resumo" />
++        </section>
++      )}
++    </ToolLayout>
++  );
++}
+diff --git a/src/pages/tools/OrganizadorPresenca.jsx b/src/pages/tools/OrganizadorPresenca.jsx
+new file mode 100644
+index 0000000..254761f
+--- /dev/null
++++ b/src/pages/tools/OrganizadorPresenca.jsx
+@@ -0,0 +1,112 @@
++// src/pages/tools/OrganizadorPresenca.jsx
++import React, { useMemo, useState } from 'react';
++import { ToolLayout, Panel, Stat, ErrorList, Segmented, IntField, Field, CopyButton, inputCls, toInt } from '../../components/tools/ui';
++import { TOOLS } from '../../content/toolsCatalog';
++import { parsePlayerList, teamCount } from '../../utils/teamBalancer';
++
++const tool = TOOLS.find((t) => t.slug === 'lista-de-presenca');
++
++export default function OrganizadorPresenca() {
++  const [text, setText] = useState('');
++  const [confirmed, setConfirmed] = useState({}); // nome -> true
++  const [perTeam, setPerTeam] = useState('5');
++  const [leftover, setLeftover] = useState('reserve');
++
++  const { names, duplicates } = useMemo(() => parsePlayerList(text), [text]);
++  const ppt = toInt(perTeam);
++  const errors = [];
++  if (!Number.isInteger(ppt) || ppt < 1 || ppt > 15) errors.push('Jogadores por time deve ser um número entre 1 e 15.');
++
++  const present = names.filter((n) => confirmed[n]);
++  const absent = names.filter((n) => !confirmed[n]);
++  const teams = errors.length ? 0 : teamCount(present.length, ppt, leftover);
++  const playing = errors.length ? 0 : (leftover === 'reserve' ? Math.min(present.length, teams * ppt) : present.length);
++  const reserves = present.slice(playing);
++  const missing = errors.length || leftover !== 'reserve' ? 0 : Math.max(0, ppt * 2 - present.length);
++
++  const toggle = (n) => setConfirmed((c) => ({ ...c, [n]: !c[n] }));
++
++  const out = [
++    `Lista de presença (${present.length} confirmado${present.length === 1 ? '' : 's'} de ${names.length})`,
++    '',
++    'Confirmados:',
++    ...present.slice(0, playing || present.length).map((n, i) => `${i + 1}. ${n}`),
++    reserves.length ? '\nReservas:' : null,
++    ...reserves.map((n, i) => `${i + 1}. ${n}`),
++    absent.length ? '\nAusentes / sem resposta:' : null,
++    ...absent.map((n) => `- ${n}`),
++  ].filter((l) => l !== null).join('\n');
++
++  return (
++    <ToolLayout
++      slug={tool.slug}
++      title="Organizador de lista de presença"
++      metaTitle={tool.title}
++      metaDescription={tool.description}
++      intro="Cole a lista de jogadores do grupo, marque quem confirmou e veja na hora quantos estão confirmados, quem está de fora, quantos ficam na reserva e quantos times fecham."
++      howTo={[
++        'Cole os nomes (um por linha). Numeração, marcadores e emojis de confirmação são removidos automaticamente.',
++        'Marque a caixa de quem confirmou presença. Os números atualizam sozinhos.',
++        'Defina quantos jogadores formam um time e o que fazer com os que sobram. Copie o resultado para mandar no grupo.',
++      ]}
++      premises={[
++        'Confirmados = nomes marcados. Ausentes = nomes sem marcação (inclui quem ainda não respondeu).',
++        'Com "Sobra vira reserva", times = confirmados ÷ jogadores por time (arredondado para baixo) e as pessoas que sobram, na ordem da lista, ficam como reservas.',
++        'Com "Times completos com suplente", todos jogam: times = confirmados ÷ jogadores por time (arredondado para cima) e os últimos times ficam com um jogador a menos.',
++        'Nomes repetidos (ignorando maiúsculas e acentos) são contados uma só vez.',
++      ]}
++      limitations="A lista só existe nesta página: se você recarregar, ela é apagada. Copie o resultado antes de sair."
++    >
++      <Panel>
++        <Field label="Lista de jogadores" hint={`${names.length} nome(s) reconhecido(s)${duplicates.length ? ` · ${duplicates.length} repetido(s) ignorado(s)` : ''}`}>
++          <textarea rows={7} placeholder={'1. João\n2. Maria\n3. Pedro'} value={text} onChange={(e) => setText(e.target.value)} className={inputCls} />
++        </Field>
++        <div className="grid sm:grid-cols-2 gap-4">
++          <IntField label="Jogadores por time" value={perTeam} onChange={setPerTeam} min={1} max={15} />
++          <Segmented label="Se sobrar gente" options={[{ value: 'reserve', label: 'Vira reserva' }, { value: 'fill', label: 'Time com suplente' }]} value={leftover} onChange={setLeftover} />
++        </div>
++        <div className="flex flex-wrap gap-4">
++          <button type="button" onClick={() => setConfirmed(Object.fromEntries(names.map((n) => [n, true])))} className="text-[11px] font-black uppercase tracking-wider text-cyan-electric underline">Marcar todos</button>
++          <button type="button" onClick={() => setConfirmed({})} className="text-[11px] font-black uppercase tracking-wider opacity-60 hover:opacity-100 underline">Desmarcar todos</button>
++          <button type="button" onClick={() => { setText(''); setConfirmed({}); }} className="text-[11px] font-black uppercase tracking-wider opacity-60 hover:opacity-100 underline">Limpar lista</button>
++        </div>
++      </Panel>
++
++      <ErrorList errors={errors} />
++
++      {names.length === 0 ? (
++        <p className="text-sm opacity-60">Cole a lista acima para começar. Exemplo: um nome por linha, com ou sem numeração.</p>
++      ) : (
++        <>
++          <fieldset className="card-glass rounded-2xl border border-border-mid p-5">
++            <legend className="px-2 text-base font-black">Quem confirmou?</legend>
++            <ul className="grid sm:grid-cols-2 gap-2 mt-2">
++              {names.map((n) => (
++                <li key={n}>
++                  <label className={`flex items-center gap-3 p-3 rounded-xl border text-sm font-bold cursor-pointer ${confirmed[n] ? 'bg-cyan-electric/10 border-cyan-electric/40' : 'bg-white/5 border-white/10'}`}>
++                    <input type="checkbox" checked={!!confirmed[n]} onChange={() => toggle(n)} className="w-5 h-5 accent-cyan-400" />
++                    {n}
++                  </label>
++                </li>
++              ))}
++            </ul>
++          </fieldset>
++
++          <section aria-live="polite" aria-labelledby="resumo" className="space-y-4">
++            <h2 id="resumo" className="text-base font-black">Resumo</h2>
++            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
++              <Stat label="Confirmados" value={present.length} />
++              <Stat label="Ausentes" value={absent.length} sub="inclui sem resposta" />
++              <Stat label="Reservas" value={reserves.length} />
++              <Stat label="Times possíveis" value={teams} sub={`de ${ppt || '?'} jogadores`} />
++            </div>
++            {missing > 0 && present.length > 0 && (
++              <p role="status" className="text-xs text-yellow-300">Faltam {missing} confirmado(s) para formar 2 times de {ppt}.</p>
++            )}
++            <CopyButton text={out} label="Copiar lista" />
++          </section>
++        </>
++      )}
++    </ToolLayout>
++  );
++}
+diff --git a/src/pages/tools/SorteadorTimes.jsx b/src/pages/tools/SorteadorTimes.jsx
+new file mode 100644
+index 0000000..7e40370
+--- /dev/null
++++ b/src/pages/tools/SorteadorTimes.jsx
+@@ -0,0 +1,245 @@
++// src/pages/tools/SorteadorTimes.jsx
++//
++// Substitui o antigo "Modo Visitante" (/visitor): mesma lógica de sorteio
++// (src/utils/teamBalancer.js), agora como ferramenta pública com explicação,
++// colagem de lista e resultado na própria página (sem anúncio recompensado).
++import React, { useEffect, useMemo, useRef, useState } from 'react';
++import { useNavigate } from 'react-router-dom';
++import { Trash2, Shuffle } from 'lucide-react';
++import { ToolLayout, Panel, ErrorList, Segmented, Field, CopyButton, inputCls } from '../../components/tools/ui';
++import { TOOLS } from '../../content/toolsCatalog';
++import { balanceTeams, teamCount, parsePlayerList } from '../../utils/teamBalancer';
++
++const tool = TOOLS.find((t) => t.slug === 'sorteador');
++const STORAGE_KEY = 'visitor_players_list'; // mesma chave do modo visitante: listas antigas continuam valendo
++const LEVELS = { 1: 'Abaixo da média', 2: 'Na média', 3: 'Acima da média' };
++
++let idSeq = 0;
++const newId = () => `${Date.now()}-${idSeq++}`;
++
++export default function SorteadorTimes() {
++  const navigate = useNavigate();
++  const [players, setPlayers] = useState([]);
++  const [loaded, setLoaded] = useState(false);
++  const [name, setName] = useState('');
++  const [position, setPosition] = useState('linha');
++  const [stars, setStars] = useState(2);
++  const [paste, setPaste] = useState('');
++  const [perTeam, setPerTeam] = useState(5);
++  const [leftover, setLeftover] = useState('reserve');
++  const [result, setResult] = useState(null);
++  const [formError, setFormError] = useState('');
++  const resultRef = useRef(null);
++
++  // Carrega/salva só no navegador (nada vai para servidor).
++  useEffect(() => {
++    try {
++      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
++      if (Array.isArray(saved)) {
++        setPlayers(saved.filter((p) => p && typeof p.name === 'string').map((p) => ({
++          id: p.id ?? newId(), name: p.name, position: p.position === 'goleiro' ? 'goleiro' : 'linha',
++          stars: [1, 2, 3].includes(p.stars) ? p.stars : 2,
++        })));
++      }
++    } catch { /* lista corrompida: começa vazia */ }
++    setLoaded(true);
++  }, []);
++  useEffect(() => {
++    if (!loaded) return;
++    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(players)); } catch { /* storage cheio */ }
++  }, [players, loaded]);
++
++  const need = perTeam * 2;
++  const numTeams = teamCount(players.length, perTeam, leftover);
++  const allEqualLevels = players.length > 0 && players.every((p) => p.stars === players[0].stars);
++
++  const exists = (n) => players.some((p) => p.name.toLowerCase() === n.toLowerCase());
++
++  const addPlayer = () => {
++    const n = name.trim();
++    if (!n) { setFormError('Digite o nome do jogador.'); return; }
++    if (exists(n)) { setFormError(`"${n}" já está na lista.`); return; }
++    setFormError('');
++    setPlayers((prev) => [...prev, { id: newId(), name: n.slice(0, 40), position, stars }]);
++    setName('');
++    setResult(null);
++  };
++
++  const importPaste = () => {
++    const { names, duplicates } = parsePlayerList(paste);
++    const fresh = names.filter((n) => !exists(n));
++    if (!names.length) { setFormError('Nenhum nome encontrado no texto colado.'); return; }
++    setFormError(duplicates.length || fresh.length < names.length ? 'Alguns nomes repetidos foram ignorados.' : '');
++    setPlayers((prev) => [...prev, ...fresh.map((n) => ({ id: newId(), name: n, position: 'linha', stars: 2 }))]);
++    setPaste('');
++    setResult(null);
++  };
++
++  const update = (id, patch) => { setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p))); setResult(null); };
++  const remove = (id) => { setPlayers((prev) => prev.filter((p) => p.id !== id)); setResult(null); };
++
++  const errors = useMemo(() => {
++    const e = [];
++    if (players.length < need) e.push(`Com ${perTeam} por time, são necessários pelo menos ${need} jogadores (faltam ${need - players.length}).`);
++    else if (numTeams < 2) e.push('Jogadores insuficientes para formar 2 times.');
++    return e;
++  }, [players.length, need, perTeam, numTeams]);
++
++  const draw = () => {
++    if (errors.length) return;
++    const r = balanceTeams(players, numTeams, perTeam, leftover);
++    setResult(r);
++    setTimeout(() => resultRef.current?.focus(), 0);
++  };
++
++  const resultText = result && [
++    ...result.teams.map((t) => `${t.name}\n${t.players.map((p) => `- ${p.name}${p.position === 'goleiro' ? ' (goleiro)' : ''}`).join('\n')}`),
++    result.reserves.length ? `RESERVAS\n${result.reserves.map((p) => `- ${p.name}`).join('\n')}` : null,
++  ].filter(Boolean).join('\n\n');
++
++  const toScoreboard = () => {
++    localStorage.setItem('temp_teams', JSON.stringify(result.teams));
++    if (result.reserves.length) localStorage.setItem('temp_reserves', JSON.stringify(result.reserves));
++    else localStorage.removeItem('temp_reserves');
++    navigate('/visitor-match');
++  };
++
++  return (
++    <ToolLayout
++      slug={tool.slug}
++      title="Sorteador de times equilibrados"
++      metaTitle={tool.title}
++      metaDescription={tool.description}
++      intro="Monte a lista de jogadores, informe o nível e a posição de cada um (se quiser) e sorteie times parelhos para o baba. Sem cadastro, direto no navegador."
++      howTo={[
++        'Adicione os jogadores um a um ou cole a lista do grupo (um nome por linha). Quem for colado entra como "na média" e "linha".',
++        'Ajuste o nível (abaixo, na média ou acima) e a posição (linha ou goleiro) de cada jogador na lista.',
++        'Defina quantos jogam por time e o que fazer com quem sobrar. Clique em sortear; sorteie de novo quantas vezes quiser.',
++        'Copie os times para mandar no grupo ou use o placar rápido para marcar a partida.',
++      ]}
++      premises={[
++        'Goleiros são distribuídos primeiro, um por time. Se houver mais goleiros que times, os que sobram jogam na linha.',
++        'Os demais jogadores são ordenados por nível e distribuídos em serpentina (A B C D, D C B A, A B C D…), para que cada time receba craques, medianos e iniciantes em proporção parecida. Dentro do mesmo nível, a ordem é aleatória.',
++        'Com "Sobra vira reserva", todos os times têm o mesmo tamanho e quem sobra fica na reserva. Com "Time com suplente", todos jogam e os primeiros times ficam com um jogador a mais.',
++      ]}
++      limitations="O equilíbrio depende dos níveis que você informar: o método é uma heurística e não garante times idênticos, principalmente com poucos jogadores. Se ninguém tiver nível definido, o sorteio é praticamente aleatório."
++    >
++      <Panel>
++        <div className="grid grid-cols-3 gap-3 items-end">
++          <div className="col-span-3 sm:col-span-1">
++            <Field label="Jogadores por time" hint={`Mínimo de ${need} jogadores`}>
++              <input type="number" min={2} max={11} value={perTeam}
++                onChange={(e) => { setPerTeam(Math.max(2, Math.min(11, Number(e.target.value) || 2))); setResult(null); }}
++                className={inputCls} />
++            </Field>
++          </div>
++          <div className="col-span-3 sm:col-span-2">
++            <Segmented label="Se sobrar gente" options={[{ value: 'reserve', label: 'Vira reserva' }, { value: 'substitute', label: 'Time com suplente' }]} value={leftover} onChange={(v) => { setLeftover(v); setResult(null); }} />
++          </div>
++        </div>
++      </Panel>
++
++      <Panel>
++        <h2 className="text-base font-black">Adicionar jogador</h2>
++        <div className="grid sm:grid-cols-3 gap-3">
++          <Field label="Nome">
++            <input type="text" value={name} maxLength={40} onChange={(e) => setName(e.target.value)}
++              onKeyDown={(e) => e.key === 'Enter' && addPlayer()} className={inputCls} />
++          </Field>
++          <Field label="Posição">
++            <select value={position} onChange={(e) => setPosition(e.target.value)} className={inputCls}>
++              <option value="linha">Linha</option>
++              <option value="goleiro">Goleiro</option>
++            </select>
++          </Field>
++          <Field label="Nível">
++            <select value={stars} onChange={(e) => setStars(Number(e.target.value))} className={inputCls}>
++              {Object.entries(LEVELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
++            </select>
++          </Field>
++        </div>
++        <button type="button" onClick={addPlayer} className="px-5 py-3 rounded-xl border border-cyan-electric/30 bg-cyan-electric/10 text-cyan-electric text-xs font-black uppercase tracking-wider">
++          + Adicionar
++        </button>
++
++        <Field label="Ou cole uma lista (um nome por linha)">
++          <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} className={inputCls} placeholder={'1. João\n2. Maria'} />
++        </Field>
++        <button type="button" onClick={importPaste} disabled={!paste.trim()} className="px-5 py-3 rounded-xl border border-white/15 bg-white/5 text-xs font-black uppercase tracking-wider disabled:opacity-40">
++          Importar lista
++        </button>
++        {formError && <p role="alert" className="text-[12px] text-red-400 font-bold">{formError}</p>}
++      </Panel>
++
++      {players.length > 0 && (
++        <section aria-labelledby="lista" className="card-glass rounded-2xl border border-border-mid p-5 space-y-3">
++          <div className="flex items-center justify-between">
++            <h2 id="lista" className="text-base font-black">Jogadores ({players.length})</h2>
++            <button type="button" onClick={() => { setPlayers([]); setResult(null); }} className="flex items-center gap-1 text-[11px] font-black text-red-400 uppercase tracking-wider">
++              <Trash2 size={12} aria-hidden="true" /> Limpar tudo
++            </button>
++          </div>
++          <ul className="space-y-2">
++            {players.map((p) => (
++              <li key={p.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center bg-white/5 rounded-xl border border-white/5 p-2.5">
++                <span className="text-sm font-bold truncate pl-1">{p.name}</span>
++                <select aria-label={`Posição de ${p.name}`} value={p.position} onChange={(e) => update(p.id, { position: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg text-xs px-2 py-2">
++                  <option value="linha">Linha</option>
++                  <option value="goleiro">Goleiro</option>
++                </select>
++                <select aria-label={`Nível de ${p.name}`} value={p.stars} onChange={(e) => update(p.id, { stars: Number(e.target.value) })} className="bg-black/40 border border-white/10 rounded-lg text-xs px-2 py-2">
++                  {Object.entries(LEVELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
++                </select>
++                <button type="button" aria-label={`Remover ${p.name}`} onClick={() => remove(p.id)} className="p-2 text-red-400">
++                  <Trash2 size={14} aria-hidden="true" />
++                </button>
++              </li>
++            ))}
++          </ul>
++          <p className="text-[11px] opacity-50">A lista fica salva só neste navegador, para você não perdê-la ao recarregar. "Limpar tudo" apaga.</p>
++        </section>
++      )}
++
++      {players.length > 0 && <ErrorList errors={errors} />}
++
++      {players.length > 0 && (
++        <div className="space-y-2">
++          <button type="button" onClick={draw} disabled={errors.length > 0}
++            className="w-full py-4 rounded-2xl font-black text-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 disabled:opacity-40"
++            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
++            <Shuffle size={18} aria-hidden="true" /> {result ? 'Sortear de novo' : 'Sortear times'}
++          </button>
++          {allEqualLevels && !errors.length && (
++            <p role="status" className="text-xs text-yellow-300">Todos os jogadores estão com o mesmo nível: o sorteio será praticamente aleatório. Ajuste os níveis para equilibrar melhor.</p>
++          )}
++        </div>
++      )}
++
++      {result && (
++        <section ref={resultRef} tabIndex={-1} aria-live="polite" aria-labelledby="times" className="space-y-4 outline-none">
++          <h2 id="times" className="text-base font-black">Times sorteados</h2>
++          <div className="grid sm:grid-cols-2 gap-3">
++            {result.teams.map((t) => (
++              <div key={t.id} className="card-glass rounded-xl border border-border-mid p-4">
++                <h3 className="text-sm font-black text-cyan-electric">{t.name}</h3>
++                <p className="text-[11px] opacity-50 mb-2">{t.players.length} jogadores · soma de níveis {t.starSum}</p>
++                <ul className="text-sm space-y-1">
++                  {t.players.map((p) => <li key={p.id}>{p.name}{p.position === 'goleiro' ? ' 🧤' : ''}</li>)}
++                </ul>
++              </div>
++            ))}
++          </div>
++          {result.reserves.length > 0 && (
++            <p className="text-sm"><strong>Reservas:</strong> {result.reserves.map((p) => p.name).join(', ')}</p>
++          )}
++          <div className="flex flex-wrap items-center gap-3">
++            <CopyButton text={resultText} label="Copiar times" />
++            <button type="button" onClick={toScoreboard} className="text-xs font-black uppercase tracking-wider text-cyan-electric underline">
++              Usar no placar rápido →
++            </button>
++          </div>
++        </section>
++      )}
++    </ToolLayout>
++  );
++}
+diff --git a/src/pages/tools/TabelaJogos.jsx b/src/pages/tools/TabelaJogos.jsx
+new file mode 100644
+index 0000000..02cf0bc
+--- /dev/null
++++ b/src/pages/tools/TabelaJogos.jsx
+@@ -0,0 +1,179 @@
++// src/pages/tools/TabelaJogos.jsx
++import React, { useMemo, useState } from 'react';
++import { ToolLayout, Panel, ErrorList, Segmented, IntField, CopyButton, Field, inputCls, toInt } from '../../components/tools/ui';
++import { TOOLS } from '../../content/toolsCatalog';
++import {
++  validateConfig, roundRobinSchedule, knockoutSchedule, drawGroups, groupLabel,
++  scheduleToText, shuffle, groupSizes,
++} from '../../utils/tournamentMath';
++import { parsePlayerList } from '../../utils/teamBalancer';
++
++const tool = TOOLS.find((t) => t.slug === 'tabela-de-jogos');
++
++const FORMATS = [
++  { value: 'knockout', label: 'Mata-mata' },
++  { value: 'roundrobin', label: 'Pontos corridos' },
++  { value: 'groups', label: 'Grupos' },
++];
++
++const DEFAULT_NAMES = 'Time A\nTime B\nTime C\nTime D\nTime E\nTime F';
++
++function buildSections(cfg, teamNames, order, rng = Math.random) {
++  const base = order === 'random' ? shuffle(teamNames, rng) : teamNames;
++  if (cfg.format === 'knockout') {
++    return [{ title: null, rounds: knockoutSchedule(base, { thirdPlace: cfg.thirdPlace }) }];
++  }
++  if (cfg.format === 'roundrobin') {
++    return [{ title: null, rounds: roundRobinSchedule(base, { legs: cfg.legs }) }];
++  }
++  // groups
++  const groups = drawGroups(base, cfg.groupCount, { mode: 'seeded' });
++  const sections = groups.map((g, i) => ({
++    title: `${groupLabel(i)}: ${g.join(', ')}`,
++    rounds: roundRobinSchedule(g, { legs: cfg.legs }),
++  }));
++  if (cfg.knockoutAfterGroups) {
++    // 1ºs colocados primeiro, depois 2ºs etc. (ordem de cabeça de chave)
++    const seeds = [];
++    for (let pos = 1; pos <= cfg.advancePerGroup; pos++) {
++      groups.forEach((_, gi) => seeds.push(`${pos}º do ${groupLabel(gi)}`));
++    }
++    sections.push({
++      title: 'Fase eliminatória',
++      note: 'Os classificados entram na ordem de cabeça de chave (1ºs colocados primeiro). Em chaves grandes, dois classificados do mesmo grupo podem se cruzar antes da final.',
++      rounds: knockoutSchedule(seeds, { thirdPlace: cfg.thirdPlace }),
++    });
++  }
++  return sections;
++}
++
++const sectionsToText = (sections, title) =>
++  [title, '']
++    .concat(sections.map((s) => [s.title ? `== ${s.title} ==` : null, scheduleToText(s.rounds)].filter(Boolean).join('\n')))
++    .join('\n\n');
++
++export default function TabelaJogos() {
++  const [format, setFormat] = useState('roundrobin');
++  const [namesText, setNamesText] = useState(DEFAULT_NAMES);
++  const [legs, setLegs] = useState('1');
++  const [thirdPlace, setThirdPlace] = useState(false);
++  const [groupCount, setGroupCount] = useState('2');
++  const [knockoutAfterGroups, setKnockoutAfterGroups] = useState(true);
++  const [advancePerGroup, setAdvancePerGroup] = useState('2');
++  const [order, setOrder] = useState('listed');
++  const [out, setOut] = useState(null);
++
++  const parsed = useMemo(() => parsePlayerList(namesText), [namesText]);
++  const cfg = useMemo(() => ({
++    format, teams: parsed.names.length, legs: legs === '2' ? 2 : 1, thirdPlace,
++    groupCount: toInt(groupCount), knockoutAfterGroups, advancePerGroup: toInt(advancePerGroup),
++  }), [format, parsed.names.length, legs, thirdPlace, groupCount, knockoutAfterGroups, advancePerGroup]);
++
++  const errors = useMemo(() => {
++    const e = validateConfig(cfg);
++    if (parsed.duplicates.length) e.push(`Há nomes repetidos: ${parsed.duplicates.join(', ')}. Dê um nome diferente a cada equipe.`);
++    return e;
++  }, [cfg, parsed.duplicates]);
++
++  const inputsKey = JSON.stringify([cfg, parsed.names, order]);
++  const stale = out && out.key !== inputsKey;
++
++  const generate = () => {
++    if (errors.length) return;
++    const sections = buildSections(cfg, parsed.names, order);
++    const label = FORMATS.find((f) => f.value === format).label;
++    setOut({ key: inputsKey, sections, text: sectionsToText(sections, `Tabela de jogos — ${label} — ${parsed.names.length} equipes`) });
++  };
++
++  return (
++    <ToolLayout
++      slug={tool.slug}
++      title="Gerador de tabela de jogos"
++      metaTitle={tool.title}
++      metaDescription={tool.description}
++      intro="Digite os nomes das equipes, escolha o formato e receba a tabela de confrontos pronta para copiar e mandar no grupo. Folgas e byes são tratados automaticamente."
++      howTo={[
++        'Escreva uma equipe por linha (ou cole a lista; numeração e marcadores são ignorados).',
++        'Escolha o formato. No mata-mata, a ordem da lista define os cabeças de chave: a primeira equipe é a favorita.',
++        'Se preferir sortear a ordem, escolha "Sortear ordem". Clique em "Gerar tabela" e copie o resultado.',
++      ]}
++      premises={[
++        'Pontos corridos usa o método do círculo: em cada rodada todas as equipes jogam uma vez; com número ímpar, uma equipe folga por rodada. Em ida e volta, o returno repete as rodadas com o mando invertido.',
++        'Mata-mata: os cabeças de chave são posicionados de forma que o 1º e o 2º só se encontrem na final. Quando o número de equipes não é potência de 2, as melhores cabeças de chave avançam direto na primeira rodada (bye).',
++        'Grupos: as equipes são distribuídas em serpentina pela ordem da lista (ou da ordem sorteada), e cada grupo joga todos contra todos. As eliminatórias, se escolhidas, usam os primeiros colocados de cada grupo como cabeças de chave.',
++      ]}
++      limitations="A tabela define os confrontos e a ordem das rodadas; ela não distribui horários nem campos. Para estimar a duração, use a calculadora de torneio."
++    >
++      <Panel>
++        <Segmented label="Formato" options={FORMATS} value={format} onChange={setFormat} />
++        <Field label="Equipes (uma por linha)" hint={`${parsed.names.length} equipe(s) reconhecida(s)`}>
++          <textarea rows={7} value={namesText} onChange={(e) => setNamesText(e.target.value)} className={inputCls} />
++        </Field>
++
++        {(format === 'roundrobin' || format === 'groups') && (
++          <Segmented label="Turnos" options={[{ value: '1', label: 'Só ida' }, { value: '2', label: 'Ida e volta' }]} value={legs} onChange={setLegs} />
++        )}
++        {format === 'groups' && (
++          <div className="grid sm:grid-cols-2 gap-4">
++            <IntField label="Quantidade de grupos" value={groupCount} onChange={setGroupCount} min={2} max={32}
++              hint={cfg.groupCount >= 2 && cfg.teams >= 4 && cfg.groupCount <= cfg.teams / 2 ? `Tamanhos: ${groupSizes(cfg.teams, cfg.groupCount).join(' + ')}` : undefined} />
++            <label className="flex items-center gap-3 text-sm font-bold sm:mt-6">
++              <input type="checkbox" checked={knockoutAfterGroups} onChange={(e) => setKnockoutAfterGroups(e.target.checked)} className="w-5 h-5 accent-cyan-400" />
++              Eliminatórias depois dos grupos
++            </label>
++            {knockoutAfterGroups && <IntField label="Classificados por grupo" value={advancePerGroup} onChange={setAdvancePerGroup} min={1} max={16} />}
++          </div>
++        )}
++        {(format === 'knockout' || (format === 'groups' && knockoutAfterGroups)) && (
++          <label className="flex items-center gap-3 text-sm font-bold">
++            <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="w-5 h-5 accent-cyan-400" />
++            Incluir disputa de 3º lugar
++          </label>
++        )}
++        <Segmented label="Ordem das equipes" options={[{ value: 'listed', label: 'Como listei' }, { value: 'random', label: 'Sortear ordem' }]} value={order} onChange={setOrder} />
++
++        <div className="flex flex-wrap gap-3">
++          <button type="button" onClick={generate} disabled={errors.length > 0}
++            className="px-6 py-3 rounded-xl font-black text-black text-xs uppercase tracking-widest disabled:opacity-40"
++            style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}>
++            {out ? 'Gerar novamente' : 'Gerar tabela'}
++          </button>
++          <button type="button" onClick={() => { setNamesText(DEFAULT_NAMES); setOut(null); }} className="text-[11px] font-black uppercase tracking-wider opacity-60 hover:opacity-100 underline">
++            Restaurar exemplo
++          </button>
++        </div>
++      </Panel>
++
++      <ErrorList errors={errors} />
++
++      {out && (
++        <section aria-live="polite" aria-labelledby="tabela" className="space-y-5">
++          <h2 id="tabela" className="text-base font-black">Tabela de jogos</h2>
++          {stale && <p role="status" className="text-xs text-yellow-300">Você alterou os dados depois de gerar. Clique em "Gerar novamente" para atualizar.</p>}
++          {out.sections.map((s, si) => (
++            <div key={si} className="space-y-3">
++              {s.title && <h3 className="text-sm font-black text-cyan-electric">{s.title}</h3>}
++              {s.note && <p className="text-xs opacity-60 leading-relaxed">{s.note}</p>}
++              {s.rounds.map((r, ri) => (
++                <div key={ri} className="card-glass rounded-xl border border-border-mid p-4">
++                  <h4 className="text-xs font-black uppercase tracking-wider opacity-70 mb-2">{r.label ?? `Rodada ${r.round}`}</h4>
++                  <ul className="space-y-1.5 text-sm">
++                    {r.games.map((g, gi) => (
++                      <li key={gi}>
++                        {g.bye
++                          ? <><strong>{g.home}</strong> <span className="opacity-60">avança direto (bye)</span></>
++                          : <>{g.id ? <span className="opacity-50">Jogo {g.id}: </span> : null}<strong>{g.home}</strong> x <strong>{g.away}</strong></>}
++                      </li>
++                    ))}
++                    {r.rest && <li className="opacity-60">Folga: {r.rest}</li>}
++                  </ul>
++                </div>
++              ))}
++            </div>
++          ))}
++          <CopyButton text={out.text} label="Copiar tabela" />
++        </section>
++      )}
++    </ToolLayout>
++  );
++}
+diff --git a/src/pages/tools/TorneioCalculadora.jsx b/src/pages/tools/TorneioCalculadora.jsx
+new file mode 100644
+index 0000000..12727fe
+--- /dev/null
++++ b/src/pages/tools/TorneioCalculadora.jsx
+@@ -0,0 +1,165 @@
++// src/pages/tools/TorneioCalculadora.jsx
++import React, { useMemo, useState } from 'react';
++import { Link } from 'react-router-dom';
++import { ToolLayout, IntField, Panel, Stat, ErrorList, Segmented, CopyButton, toInt } from '../../components/tools/ui';
++import { TOOLS } from '../../content/toolsCatalog';
++import { validateConfig, summarize, formatDuration } from '../../utils/tournamentMath';
++
++const tool = TOOLS.find((t) => t.slug === 'calculadora-torneio');
++
++const FORMATS = [
++  { value: 'knockout', label: 'Mata-mata' },
++  { value: 'roundrobin', label: 'Pontos corridos' },
++  { value: 'groups', label: 'Grupos' },
++];
++
++export default function TorneioCalculadora() {
++  const [format, setFormat] = useState('knockout');
++  const [teams, setTeams] = useState('8');
++  const [legs, setLegs] = useState('1');
++  const [thirdPlace, setThirdPlace] = useState(false);
++  const [groupCount, setGroupCount] = useState('2');
++  const [knockoutAfterGroups, setKnockoutAfterGroups] = useState(true);
++  const [advancePerGroup, setAdvancePerGroup] = useState('2');
++  const [fields, setFields] = useState('1');
++  const [matchMinutes, setMatchMinutes] = useState('20');
++  const [breakMinutes, setBreakMinutes] = useState('5');
++
++  const cfg = useMemo(() => ({
++    format,
++    teams: toInt(teams),
++    legs: legs === '2' ? 2 : 1,
++    thirdPlace,
++    groupCount: toInt(groupCount),
++    knockoutAfterGroups,
++    advancePerGroup: toInt(advancePerGroup),
++    fields: toInt(fields),
++    matchMinutes: toInt(matchMinutes),
++    breakMinutes: breakMinutes === '' ? 0 : toInt(breakMinutes),
++  }), [format, teams, legs, thirdPlace, groupCount, knockoutAfterGroups, advancePerGroup, fields, matchMinutes, breakMinutes]);
++
++  const errors = useMemo(() => validateConfig(cfg), [cfg]);
++  const result = useMemo(() => (errors.length ? null : summarize(cfg)), [errors, cfg]);
++
++  const reset = () => {
++    setFormat('knockout'); setTeams('8'); setLegs('1'); setThirdPlace(false); setGroupCount('2');
++    setKnockoutAfterGroups(true); setAdvancePerGroup('2'); setFields('1'); setMatchMinutes('20'); setBreakMinutes('5');
++  };
++
++  const summaryText = result && [
++    `Torneio ${FORMATS.find((f) => f.value === format).label.toLowerCase()} com ${cfg.teams} equipes`,
++    `Jogos: ${result.totalGames}`,
++    `Rodadas/etapas: ${result.totalRounds}`,
++    `Duração estimada: ${formatDuration(result.estimatedMinutes)} (${cfg.fields} campo(s), ${cfg.matchMinutes} min por jogo, ${cfg.breakMinutes} min de intervalo)`,
++    '',
++    ...result.rounds.map((r) => `${r.label}: ${r.games} jogo(s)`),
++  ].join('\n');
++
++  return (
++    <ToolLayout
++      slug={tool.slug}
++      title="Calculadora de torneio"
++      metaTitle={tool.title}
++      metaDescription={tool.description}
++      intro="Antes de convidar as equipes, descubra quantos jogos o seu torneio terá e quanto tempo ele deve durar. Escolha o formato, o número de campos e a duração das partidas."
++      howTo={[
++        'Escolha o formato: mata-mata, pontos corridos ou fase de grupos (com ou sem eliminatórias depois).',
++        'Informe o número de equipes e, se houver mais de um campo ou quadra, quantos estarão disponíveis.',
++        'Preencha a duração de cada partida e o intervalo entre elas. Veja jogos, etapas e a duração estimada.',
++        'Use o botão de copiar para mandar o resumo no grupo, ou vá ao gerador de tabela para montar os confrontos.',
++      ]}
++      premises={[
++        'Mata-mata simples: sempre há n − 1 jogos (cada jogo elimina uma equipe). Se o número de equipes não for potência de 2, as melhores cabeças de chave ganham "bye" (avançam direto) e a primeira rodada tem n − p/2 jogos, onde p é a próxima potência de 2.',
++        'Pontos corridos: cada turno tem n(n − 1)/2 jogos. Com número par de equipes há n − 1 rodadas; com número ímpar há n rodadas e uma equipe folga em cada uma.',
++        'Fase de grupos: as equipes são divididas o mais uniformemente possível (por exemplo, 7 equipes em 2 grupos viram 4 + 3). Cada grupo joga todos contra todos; se escolhida, a fase eliminatória usa a quantidade de classificados (grupos × classificados por grupo).',
++        'Duração estimada: para cada etapa, jogos ÷ campos (arredondado para cima) faixas de horário; cada faixa dura o tempo da partida, com o intervalo entre faixas. Uma etapa só começa quando a anterior termina.',
++      ]}
++      limitations="É uma estimativa: não inclui atrasos, aquecimento, cerimônias, prorrogação ou pênaltis, nem a restrição de que uma mesma equipe descanse entre jogos. Se o seu regulamento tiver disputa de 3º lugar, marque a opção correspondente."
++    >
++      <Panel>
++        <Segmented label="Formato" options={FORMATS} value={format} onChange={setFormat} />
++
++        <div className="grid sm:grid-cols-2 gap-4">
++          <IntField label="Equipes" value={teams} onChange={setTeams} min={2} max={64} />
++          <IntField label="Campos ou quadras" value={fields} onChange={setFields} min={1} max={32} />
++          <IntField label="Minutos por partida" value={matchMinutes} onChange={setMatchMinutes} min={1} max={240} />
++          <IntField label="Intervalo entre partidas (min)" value={breakMinutes} onChange={setBreakMinutes} min={0} max={120} />
++        </div>
++
++        {(format === 'roundrobin' || format === 'groups') && (
++          <Segmented
++            label="Turnos"
++            options={[{ value: '1', label: 'Só ida' }, { value: '2', label: 'Ida e volta' }]}
++            value={legs}
++            onChange={setLegs}
++          />
++        )}
++
++        {format === 'groups' && (
++          <div className="grid sm:grid-cols-2 gap-4">
++            <IntField label="Quantidade de grupos" value={groupCount} onChange={setGroupCount} min={2} max={32} />
++            <label className="flex items-center gap-3 text-sm font-bold sm:mt-6">
++              <input type="checkbox" checked={knockoutAfterGroups} onChange={(e) => setKnockoutAfterGroups(e.target.checked)} className="w-5 h-5 accent-cyan-400" />
++              Eliminatórias depois dos grupos
++            </label>
++            {knockoutAfterGroups && (
++              <IntField label="Classificados por grupo" value={advancePerGroup} onChange={setAdvancePerGroup} min={1} max={16} />
++            )}
++          </div>
++        )}
++
++        {(format === 'knockout' || (format === 'groups' && knockoutAfterGroups)) && (
++          <label className="flex items-center gap-3 text-sm font-bold">
++            <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="w-5 h-5 accent-cyan-400" />
++            Incluir disputa de 3º lugar
++          </label>
++        )}
++
++        <button type="button" onClick={reset} className="text-[11px] font-black uppercase tracking-wider opacity-60 hover:opacity-100 underline">
++          Restaurar valores iniciais
++        </button>
++      </Panel>
++
++      <ErrorList errors={errors} />
++
++      {result && (
++        <section aria-live="polite" aria-labelledby="resultado" className="space-y-4">
++          <h2 id="resultado" className="text-base font-black">Resultado</h2>
++          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
++            <Stat label="Jogos" value={result.totalGames} />
++            <Stat label="Etapas" value={result.totalRounds} sub="rodadas em sequência" />
++            <Stat label="Duração estimada" value={formatDuration(result.estimatedMinutes)} sub={`${result.slots} faixas de horário`} />
++            {result.byes !== undefined && (
++              <Stat label={format === 'knockout' ? 'Byes' : 'Folgas'} value={result.byes} sub={format === 'knockout' ? 'equipes que avançam direto' : 'no total, 1 por rodada'} />
++            )}
++            {result.groupGames !== undefined && <Stat label="Jogos nos grupos" value={result.groupGames} sub={`+ ${result.knockoutGames} nas eliminatórias`} />}
++          </div>
++
++          <div className="overflow-x-auto rounded-xl border border-border-mid">
++            <table className="w-full text-sm">
++              <caption className="sr-only">Jogos por etapa</caption>
++              <thead className="text-[10px] uppercase tracking-wider opacity-60 text-left">
++                <tr><th scope="col" className="p-3">Etapa</th><th scope="col" className="p-3">Jogos</th></tr>
++              </thead>
++              <tbody>
++                {result.rounds.map((r, i) => (
++                  <tr key={`${r.label}-${i}`} className="border-t border-white/5">
++                    <td className="p-3">{r.label}</td>
++                    <td className="p-3 font-bold">{r.games}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
++          </div>
++
++          <div className="flex flex-wrap items-center gap-3">
++            <CopyButton text={summaryText} label="Copiar resumo" />
++            <Link to="/ferramentas/tabela-de-jogos" className="text-xs font-black uppercase tracking-wider text-cyan-electric underline">
++              Gerar a tabela de jogos →
++            </Link>
++          </div>
++        </section>
++      )}
++    </ToolLayout>
++  );
++}
+diff --git a/src/utils/adEligibility.js b/src/utils/adEligibility.js
+new file mode 100644
+index 0000000..77bae1b
+--- /dev/null
++++ b/src/utils/adEligibility.js
+@@ -0,0 +1,30 @@
++// src/utils/adEligibility.js
++//
++// POLÍTICA ÚNICA de elegibilidade de anúncios. Antes, a lista de rotas vivia
++// duplicada em AdsenseScriptGate.jsx e CookieConsentBanner.jsx; agora ambos
++// (e o AdBanner) consultam este módulo.
++//
++// Regra: anúncio só em página com conteúdo editorial próprio e estável.
++//   - Eligível: landing, sobre, guias (conteúdo textual original) e perfil
++//     público (o próprio componente só renderiza o banner quando o jogador
++//     tem partidas ou conquistas).
++//   - NÃO eligível: ferramentas interativas (/ferramentas/*) — formulário
++//     isolado, mesmo com texto explicativo; telas de ação (placar rápido);
++//     login, convites, termos/privacidade, 404 e toda área autenticada.
++// Para tornar uma página elegível, adicione o padrão aqui e confirme que ela
++// tem conteúdo próprio, sem estados vazios/erro/carregamento com anúncio.
++
++import { matchPath } from 'react-router-dom';
++
++export const AD_ELIGIBLE_PATTERNS = [
++  '/',
++  '/sobre',
++  '/player/:userId',
++  // Central de guias (conteúdo editorial). Só passam a valer quando as rotas existirem.
++  '/guias',
++  '/guias/:slug',
++];
++
++export function isAdEligiblePath(pathname) {
++  return AD_ELIGIBLE_PATTERNS.some((pattern) => matchPath({ path: pattern, end: true }, pathname));
++}
+diff --git a/src/utils/expenseSplit.js b/src/utils/expenseSplit.js
+new file mode 100644
+index 0000000..91f5e51
+--- /dev/null
++++ b/src/utils/expenseSplit.js
+@@ -0,0 +1,69 @@
++// src/utils/expenseSplit.js
++// Divisão de despesas de um baba. Todo cálculo é feito em CENTAVOS (inteiros)
++// para evitar erro de ponto flutuante (0,1 + 0,2 ≠ 0,3 em JS).
++
++/**
++ * Converte texto digitado em centavos. Aceita "1.234,50", "1234,5", "12,5",
++ * "R$ 80" e "80.5" (ponto decimal só quando há no máximo 2 casas depois dele).
++ * Retorna null para vazio/inválido/negativo.
++ */
++export function parseMoneyToCents(input) {
++  if (input === null || input === undefined) return null;
++  let s = String(input).trim().replace(/R\$/gi, '').replace(/\s/g, '');
++  if (s === '') return null;
++  if (!/^[\d.,]+$/.test(s)) return null;
++
++  const lastComma = s.lastIndexOf(',');
++  const lastDot = s.lastIndexOf('.');
++  if (lastComma !== -1) {
++    // vírgula é o separador decimal; pontos são milhar
++    s = s.replace(/\./g, '').replace(',', '.');
++  } else if (lastDot !== -1) {
++    const decimals = s.length - lastDot - 1;
++    // "1.234" (3 casas) = milhar; "12.5" / "12.50" = decimal
++    s = decimals === 3 && s.indexOf('.') === lastDot ? s.replace('.', '') : s;
++    if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
++  }
++  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
++  const cents = Math.round(parseFloat(s) * 100);
++  return Number.isFinite(cents) && cents >= 0 ? cents : null;
++}
++
++export function formatBRL(cents) {
++  if (cents === null || cents === undefined || !Number.isFinite(cents)) return '—';
++  const sign = cents < 0 ? '-' : '';
++  const abs = Math.abs(Math.round(cents));
++  const reais = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
++  const c = String(abs % 100).padStart(2, '0');
++  return `${sign}R$ ${reais},${c}`;
++}
++
++/**
++ * Divide o total entre `payers` pagantes.
++ * `roundUpTo` (em centavos; 1 = sem arredondar): o valor por pessoa é arredondado
++ * PARA CIMA a esse múltiplo, e a sobra vira "folga de caixa" (nunca falta).
++ *
++ * @returns {{ total:number, perPerson:number, collected:number, surplus:number, exact:number }}
++ */
++export function splitEqually(totalCents, payers, roundUpTo = 1) {
++  if (!Number.isInteger(payers) || payers < 1) return null;
++  const step = Math.max(1, Math.round(roundUpTo));
++  const exact = totalCents / payers;
++  const perPerson = Math.ceil(totalCents / payers / step) * step;
++  const collected = perPerson * payers;
++  return { total: totalCents, perPerson, collected, surplus: collected - totalCents, exact };
++}
++
++/**
++ * Cenários: variação do número de pagantes (faltas/convidados de última hora)
++ * e arredondamentos usuais. Ajuda a decidir um valor "redondo" sem deixar o
++ * caixa no vermelho.
++ */
++export function scenarios(totalCents, payers, deltas = [-2, -1, 0, 1, 2]) {
++  return deltas
++    .map((d) => ({ payers: payers + d, delta: d }))
++    .filter((s) => s.payers >= 1)
++    .map((s) => ({ ...s, ...splitEqually(totalCents, s.payers, 1) }));
++}
++
++export const sumCents = (items) => items.reduce((s, i) => s + (i ?? 0), 0);
+diff --git a/src/utils/teamBalancer.js b/src/utils/teamBalancer.js
+new file mode 100644
+index 0000000..ed61891
+--- /dev/null
++++ b/src/utils/teamBalancer.js
+@@ -0,0 +1,114 @@
++// src/utils/teamBalancer.js
++// Sorteio equilibrado em "serpentina" para as ferramentas públicas.
++// Extraído do antigo Modo Visitante (src/pages/VisitorMode.jsx) sem alterar o
++// algoritmo, e com rng injetável para ser testável.
++//
++// Como funciona: goleiros são distribuídos primeiro (um por time, do mais bem
++// avaliado para o menos); os demais jogadores são ordenados por nível e
++// distribuídos de time em time, indo e voltando (A B C D D C B A ...).
++// Limitação: com poucos jogadores ou níveis muito concentrados, a soma dos
++// níveis pode diferir entre times — o método é uma heurística, não uma garantia.
++
++import { shuffle } from './tournamentMath';
++
++export const POSITIONS = { LINE: 'linha', GK: 'goleiro' };
++
++/**
++ * @param {Array<{id:any,name:string,position:'linha'|'goleiro',stars:number}>} players
++ * @param {number} numTeams
++ * @param {number} playersPerTeam
++ * @param {'reserve'|'fill'|'substitute'} leftoverStrategy
++ *   'reserve': todos os times têm playersPerTeam; quem sobra vira reserva.
++ *   'fill' / 'substitute': todos entram; times do início ficam com 1 a mais.
++ */
++export function balanceTeams(players, numTeams, playersPerTeam, leftoverStrategy = 'reserve', rng = Math.random) {
++  const goalies = shuffle(players.filter((p) => p.position === POSITIONS.GK), rng);
++  let outfield = shuffle(players.filter((p) => p.position !== POSITIONS.GK), rng);
++
++  const teams = Array.from({ length: numTeams }, (_, i) => ({
++    id: i + 1,
++    name: `TIME ${String.fromCharCode(65 + i)}`,
++    players: [],
++    starSum: 0,
++  }));
++
++  const capacities = Array(numTeams).fill(playersPerTeam);
++  if (leftoverStrategy !== 'reserve') {
++    const base = Math.floor(players.length / numTeams);
++    const extra = players.length % numTeams;
++    for (let i = 0; i < numTeams; i++) capacities[i] = i < extra ? base + 1 : base;
++  }
++
++  goalies.sort((a, b) => b.stars - a.stars);
++  for (let i = 0; i < numTeams && goalies.length > 0; i++) {
++    const g = goalies.shift();
++    teams[i].players.push(g);
++    teams[i].starSum += g.stars;
++  }
++  // Goleiros que sobraram jogam na linha / viram reserva.
++  outfield = [...outfield, ...goalies];
++  // sort estável: empates mantêm a ordem aleatória do shuffle
++  outfield.sort((a, b) => b.stars - a.stars);
++
++  let direction = 1;
++  let teamIndex = 0;
++  const reserves = [];
++  const advance = () => {
++    teamIndex += direction;
++    if (teamIndex >= numTeams) { direction = -1; teamIndex = numTeams - 1; }
++    else if (teamIndex < 0) { direction = 1; teamIndex = 0; }
++  };
++
++  while (outfield.length > 0) {
++    if (teams.every((t, i) => t.players.length >= capacities[i])) {
++      reserves.push(...outfield);
++      break;
++    }
++    let guard = 0;
++    while (teams[teamIndex].players.length >= capacities[teamIndex] && guard < numTeams * 2 + 2) {
++      advance();
++      guard++;
++    }
++    const player = outfield.shift();
++    teams[teamIndex].players.push(player);
++    teams[teamIndex].starSum += player.stars;
++    advance();
++  }
++  return { teams, reserves };
++}
++
++/** Número de times possível para uma lista de jogadores. */
++export function teamCount(totalPlayers, playersPerTeam, leftoverStrategy = 'reserve') {
++  if (!Number.isInteger(playersPerTeam) || playersPerTeam < 1) return 0;
++  return leftoverStrategy === 'reserve'
++    ? Math.floor(totalPlayers / playersPerTeam)
++    : Math.ceil(totalPlayers / playersPerTeam);
++}
++
++/**
++ * Lê uma lista colada (WhatsApp, planilha, anotação): uma pessoa por linha.
++ * Remove numeração ("1.", "2)", "3 -"), marcadores ("-", "•", "*") e emojis de
++ * confirmação (✅ ☑️ ✔️ ❌). Ignora linhas vazias e títulos comuns ("Lista", "Baba")
++ * só quando terminam em ":" . Nomes repetidos (sem diferenciar maiúsculas e
++ * acentos) são mantidos uma única vez e reportados em `duplicates`.
++ */
++export function parsePlayerList(text) {
++  const names = [];
++  const duplicates = [];
++  const seen = new Set();
++  const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
++
++  for (const raw of String(text ?? '').split(/\r?\n|;/)) {
++    let line = raw
++      .replace(/[✅☑️✔️❌✖️🟢🔴]/gu, '')
++      .replace(/^\s*(?:\d{1,3}\s*[.)\-–:]\s*|[-•*]\s+)/, '')
++      .trim();
++    if (!line || /:$/.test(line)) continue;
++    if (line.length > 40) line = line.slice(0, 40).trim();
++    const key = norm(line);
++    if (seen.has(key)) { duplicates.push(line); continue; }
++    seen.add(key);
++    names.push(line);
++  }
++  return { names, duplicates };
++}
+diff --git a/src/utils/tournamentMath.js b/src/utils/tournamentMath.js
+new file mode 100644
+index 0000000..059bef3
+--- /dev/null
++++ b/src/utils/tournamentMath.js
+@@ -0,0 +1,388 @@
++// src/utils/tournamentMath.js
++//
++// Cálculos e geração de tabelas de torneio. Funções puras, sem React e sem
++// acesso a rede/banco — usadas pelas ferramentas públicas (/ferramentas/*).
++//
++// Formatos suportados:
++//   - 'knockout'   mata-mata simples (derrota elimina; sem disputa de 3º lugar
++//                  por padrão)
++//   - 'roundrobin' pontos corridos (todos contra todos, 1 ou 2 turnos)
++//   - 'groups'     fase de grupos (todos contra todos dentro de cada grupo)
++//                  seguida, opcionalmente, de mata-mata entre os classificados
++//
++// A estrutura de um torneio é descrita como uma lista de RODADAS
++// ({ phase, label, games }). A mesma lista alimenta a contagem de jogos e a
++// estimativa de duração, então as duas nunca divergem.
++
++export const FORMATS = ['knockout', 'roundrobin', 'groups'];
++
++export const nextPow2 = (n) => {
++  let p = 1;
++  while (p < n) p *= 2;
++  return p;
++};
++
++const isInt = (n) => Number.isInteger(n);
++
++// ---------------------------------------------------------------------------
++// ESTRUTURA (rodadas e jogos por rodada)
++// ---------------------------------------------------------------------------
++
++const knockoutRoundLabel = (gamesInRound, totalRounds, roundIndex) => {
++  const fromEnd = totalRounds - roundIndex; // 1 = final
++  if (fromEnd === 1) return 'Final';
++  if (fromEnd === 2) return 'Semifinais';
++  if (fromEnd === 3) return 'Quartas de final';
++  if (fromEnd === 4) return 'Oitavas de final';
++  return `Rodada ${roundIndex + 1} (${gamesInRound} jogos)`;
++};
++
++/** Rodadas de um mata-mata simples com `n` equipes. */
++export function knockoutRounds(n, { thirdPlace = false } = {}) {
++  if (!isInt(n) || n < 2) return [];
++  const size = nextPow2(n);
++  const totalRounds = Math.log2(size);
++  const rounds = [];
++  // 1ª rodada: só jogam as equipes sem "bye". n - size/2 jogos.
++  let games = n - size / 2;
++  rounds.push({ phase: 'knockout', games });
++  games = size / 4;
++  for (let r = 1; r < totalRounds; r++) {
++    rounds.push({ phase: 'knockout', games });
++    games /= 2;
++  }
++  const labelled = rounds.map((r, i) => ({
++    ...r,
++    label: knockoutRoundLabel(r.games, totalRounds, i),
++  }));
++  if (thirdPlace && n >= 4) {
++    // A disputa de 3º lugar acontece junto da final (mesma "rodada" de tempo
++    // só se houver campo livre; aqui conservadoramente conta como rodada própria).
++    labelled.splice(labelled.length - 1, 0, {
++      phase: 'knockout',
++      label: 'Disputa de 3º lugar',
++      games: 1,
++    });
++  }
++  return labelled;
++}
++
++/** Quantidade de rodadas e jogos por rodada de um todos-contra-todos. */
++export function roundRobinRounds(n, { legs = 1, label = 'Rodada', phase = 'roundrobin' } = {}) {
++  if (!isInt(n) || n < 2) return [];
++  const roundsPerLeg = n % 2 === 0 ? n - 1 : n;
++  const gamesPerRound = Math.floor(n / 2);
++  const rounds = [];
++  for (let leg = 0; leg < legs; leg++) {
++    for (let r = 0; r < roundsPerLeg; r++) {
++      rounds.push({
++        phase,
++        label: `${label} ${leg * roundsPerLeg + r + 1}`,
++        games: gamesPerRound,
++        byes: n % 2 === 0 ? 0 : 1,
++      });
++    }
++  }
++  return rounds;
++}
++
++/** Tamanho dos grupos: equipes distribuídas o mais uniformemente possível. */
++export function groupSizes(n, groupCount) {
++  const base = Math.floor(n / groupCount);
++  const extra = n % groupCount;
++  return Array.from({ length: groupCount }, (_, i) => (i < extra ? base + 1 : base));
++}
++
++/**
++ * Valida a configuração. Retorna lista de mensagens de erro (vazia = válida).
++ */
++export function validateConfig(cfg) {
++  const errors = [];
++  const { format, teams } = cfg;
++  if (!FORMATS.includes(format)) errors.push('Escolha um formato de competição.');
++  if (!isInt(teams) || teams < 2) errors.push('Informe pelo menos 2 equipes.');
++  else if (teams > 64) errors.push('O limite desta calculadora é 64 equipes.');
++
++  if (format === 'groups' && isInt(teams) && teams >= 2) {
++    const { groupCount, advancePerGroup } = cfg;
++    if (!isInt(groupCount) || groupCount < 2) {
++      errors.push('Informe pelo menos 2 grupos.');
++    } else if (groupCount > teams / 2) {
++      errors.push('Cada grupo precisa de pelo menos 2 equipes: reduza a quantidade de grupos.');
++    } else if (cfg.knockoutAfterGroups) {
++      const smallest = Math.min(...groupSizes(teams, groupCount));
++      if (!isInt(advancePerGroup) || advancePerGroup < 1) {
++        errors.push('Informe quantas equipes classificam por grupo.');
++      } else if (advancePerGroup > smallest) {
++        errors.push(`O menor grupo tem ${smallest} equipes; não dá para classificar ${advancePerGroup} por grupo.`);
++      } else if (groupCount * advancePerGroup < 2) {
++        errors.push('É preciso classificar pelo menos 2 equipes para a fase eliminatória.');
++      }
++    }
++  }
++  if (cfg.fields !== undefined && (!isInt(cfg.fields) || cfg.fields < 1 || cfg.fields > 32)) {
++    errors.push('O número de campos/quadras deve ser um inteiro entre 1 e 32.');
++  }
++  if (cfg.matchMinutes !== undefined && (!Number.isFinite(cfg.matchMinutes) || cfg.matchMinutes < 1 || cfg.matchMinutes > 240)) {
++    errors.push('A duração da partida deve estar entre 1 e 240 minutos.');
++  }
++  if (cfg.breakMinutes !== undefined && (!Number.isFinite(cfg.breakMinutes) || cfg.breakMinutes < 0 || cfg.breakMinutes > 120)) {
++    errors.push('O intervalo entre partidas deve estar entre 0 e 120 minutos.');
++  }
++  return errors;
++}
++
++/**
++ * Monta a estrutura completa (lista de rodadas) de acordo com a configuração.
++ * Pressupõe configuração válida (use validateConfig antes).
++ */
++export function buildStructure(cfg) {
++  const { format, teams } = cfg;
++  const legs = cfg.legs === 2 ? 2 : 1;
++
++  if (format === 'knockout') {
++    return knockoutRounds(teams, { thirdPlace: !!cfg.thirdPlace });
++  }
++  if (format === 'roundrobin') {
++    return roundRobinRounds(teams, { legs });
++  }
++  // groups
++  const sizes = groupSizes(teams, cfg.groupCount);
++  const perGroup = sizes.map((s) => roundRobinRounds(s, { legs, label: 'Grupos – rodada', phase: 'groups' }));
++  const maxRounds = Math.max(...perGroup.map((r) => r.length));
++  const rounds = [];
++  // A rodada k de todos os grupos acontece "em paralelo" (mesma etapa).
++  for (let k = 0; k < maxRounds; k++) {
++    const games = perGroup.reduce((sum, g) => sum + (g[k]?.games ?? 0), 0);
++    rounds.push({ phase: 'groups', label: `Grupos – rodada ${k + 1}`, games });
++  }
++  if (cfg.knockoutAfterGroups) {
++    const qualified = cfg.groupCount * cfg.advancePerGroup;
++    rounds.push(...knockoutRounds(qualified, { thirdPlace: !!cfg.thirdPlace }));
++  }
++  return rounds;
++}
++
++// ---------------------------------------------------------------------------
++// RESUMO + DURAÇÃO ESTIMADA
++// ---------------------------------------------------------------------------
++
++/**
++ * @returns {{
++ *   totalGames:number, totalRounds:number, rounds:Array,
++ *   slots:number, estimatedMinutes:number|null,
++ *   groupGames?:number, knockoutGames?:number, byes?:number
++ * }}
++ *
++ * Duração estimada = soma, para cada rodada, de ceil(jogos / campos) "faixas
++ * de horário" × duração da partida, mais o intervalo entre faixas consecutivas.
++ * Premissas: todos os jogos duram o mesmo tempo; uma rodada só começa quando a
++ * anterior termina (conservador); não considera atrasos, aquecimento,
++ * premiação nem prorrogação/pênaltis.
++ */
++export function summarize(cfg) {
++  const rounds = buildStructure(cfg);
++  const totalGames = rounds.reduce((s, r) => s + r.games, 0);
++  const fields = cfg.fields ?? 1;
++  const slots = rounds.reduce((s, r) => s + Math.ceil(r.games / fields), 0);
++
++  let estimatedMinutes = null;
++  if (cfg.matchMinutes !== undefined) {
++    const brk = cfg.breakMinutes ?? 0;
++    estimatedMinutes = slots * cfg.matchMinutes + Math.max(0, slots - 1) * brk;
++  }
++
++  const out = { totalGames, totalRounds: rounds.length, rounds, slots, estimatedMinutes };
++  if (cfg.format === 'groups') {
++    out.groupGames = rounds.filter((r) => r.phase === 'groups').reduce((s, r) => s + r.games, 0);
++    out.knockoutGames = totalGames - out.groupGames;
++  }
++  if (cfg.format === 'knockout') {
++    out.byes = nextPow2(cfg.teams) - cfg.teams;
++  }
++  if (cfg.format === 'roundrobin' && cfg.teams % 2 === 1) {
++    out.byes = cfg.teams * (cfg.legs === 2 ? 2 : 1); // folgas totais (1 por rodada)
++  }
++  return out;
++}
++
++export function formatDuration(minutes) {
++  if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) return '—';
++  const m = Math.round(minutes);
++  const h = Math.floor(m / 60);
++  const r = m % 60;
++  if (h === 0) return `${r} min`;
++  return r === 0 ? `${h} h` : `${h} h ${String(r).padStart(2, '0')} min`;
++}
++
++// ---------------------------------------------------------------------------
++// GERAÇÃO DE CONFRONTOS
++// ---------------------------------------------------------------------------
++
++export function shuffle(arr, rng = Math.random) {
++  const a = [...arr];
++  for (let i = a.length - 1; i > 0; i--) {
++    const j = Math.floor(rng() * (i + 1));
++    [a[i], a[j]] = [a[j], a[i]];
++  }
++  return a;
++}
++
++/**
++ * Todos contra todos pelo "método do círculo". Retorna rodadas:
++ *   [{ round: 1, games: [{home, away}], rest: 'Equipe X' | null }, ...]
++ * Com número ímpar de equipes, uma equipe folga em cada rodada.
++ * Em 2 turnos, o returno repete as rodadas com mando invertido.
++ */
++export function roundRobinSchedule(teams, { legs = 1 } = {}) {
++  const list = [...teams];
++  if (list.length < 2) return [];
++  const BYE = Symbol('bye');
++  if (list.length % 2 === 1) list.push(BYE);
++  const n = list.length;
++  const roundsPerLeg = n - 1;
++  const half = n / 2;
++
++  let arr = [...list];
++  const firstLeg = [];
++  for (let r = 0; r < roundsPerLeg; r++) {
++    const games = [];
++    let rest = null;
++    for (let i = 0; i < half; i++) {
++      let a = arr[i];
++      let b = arr[n - 1 - i];
++      // alterna o mando da posição fixa para equilibrar mandos
++      if (i === 0 && r % 2 === 1) [a, b] = [b, a];
++      if (a === BYE) rest = b;
++      else if (b === BYE) rest = a;
++      else games.push({ home: a, away: b });
++    }
++    firstLeg.push({ games, rest });
++    // gira todos menos o primeiro
++    arr = [arr[0], arr[n - 1], ...arr.slice(1, n - 1)];
++  }
++
++  const rounds = firstLeg.map((r, i) => ({ round: i + 1, ...r }));
++  if (legs === 2) {
++    firstLeg.forEach((r, i) => {
++      rounds.push({
++        round: roundsPerLeg + i + 1,
++        games: r.games.map((g) => ({ home: g.away, away: g.home })),
++        rest: r.rest,
++      });
++    });
++  }
++  return rounds;
++}
++
++/** Ordem de "cabeças de chave" para um chaveamento de tamanho potência de 2. */
++export function seedPositions(size) {
++  let order = [1];
++  while (order.length < size) {
++    const next = [];
++    const total = order.length * 2;
++    for (const s of order) {
++      next.push(s, total + 1 - s);
++    }
++    order = next;
++  }
++  return order;
++}
++
++/**
++ * Mata-mata simples. `teams` na ordem de cabeça de chave (a 1ª é a favorita).
++ * Equipes com bye avançam direto e são sempre as melhores cabeças de chave.
++ * Retorna rodadas com jogos { id, home, away, bye? } — nas rodadas seguintes,
++ * home/away são descrições como "Vencedor do jogo 1".
++ */
++export function knockoutSchedule(teams, { thirdPlace = false } = {}) {
++  const n = teams.length;
++  if (n < 2) return [];
++  const size = nextPow2(n);
++  const positions = seedPositions(size);
++  const slots = positions.map((seed) => (seed <= n ? teams[seed - 1] : null));
++
++  let gameNo = 0;
++  const rounds = [];
++  const totalRounds = Math.log2(size);
++
++  // Rodada 1
++  const first = [];
++  const winnersLabels = []; // descrição do "vencedor" de cada confronto da rodada
++  for (let i = 0; i < size; i += 2) {
++    const home = slots[i];
++    const away = slots[i + 1];
++    if (home && away) {
++      gameNo++;
++      first.push({ id: gameNo, home, away });
++      winnersLabels.push(`Vencedor do jogo ${gameNo}`);
++    } else {
++      // bye: a equipe real avança direto (sem jogo)
++      winnersLabels.push(home || away);
++      first.push({ id: null, home: home || away, away: null, bye: true });
++    }
++  }
++  // Se não houver bye nenhum, a 1ª rodada é a rodada "cheia".
++  rounds.push({ label: knockoutRoundLabel(first.filter((g) => !g.bye).length, totalRounds, 0), games: first });
++
++  let prevLabels = winnersLabels;
++  for (let r = 1; r < totalRounds; r++) {
++    const games = [];
++    const labels = [];
++    for (let i = 0; i < prevLabels.length; i += 2) {
++      gameNo++;
++      games.push({ id: gameNo, home: prevLabels[i], away: prevLabels[i + 1] });
++      labels.push(`Vencedor do jogo ${gameNo}`);
++    }
++    rounds.push({ label: knockoutRoundLabel(games.length, totalRounds, r), games });
++    prevLabels = labels;
++  }
++
++  if (thirdPlace && n >= 4) {
++    // Perdedores das semifinais (penúltima rodada). A disputa de 3º lugar é
++    // numerada antes da final para manter a ordem do calendário.
++    const semi = rounds[rounds.length - 2].games;
++    const final = rounds[rounds.length - 1].games[0];
++    const third = {
++      id: final.id,
++      home: `Perdedor do jogo ${semi[0].id}`,
++      away: `Perdedor do jogo ${semi[1].id}`,
++    };
++    final.id += 1;
++    rounds.splice(rounds.length - 1, 0, { label: 'Disputa de 3º lugar', games: [third] });
++  }
++  return rounds;
++}
++
++/** Distribui equipes em grupos (serpentina por cabeça de chave ou aleatório). */
++export function drawGroups(teams, groupCount, { mode = 'seeded', rng = Math.random } = {}) {
++  const list = mode === 'random' ? shuffle(teams, rng) : [...teams];
++  const groups = Array.from({ length: groupCount }, () => []);
++  let idx = 0;
++  let dir = 1;
++  for (const team of list) {
++    groups[idx].push(team);
++    idx += dir;
++    if (idx >= groupCount) { dir = -1; idx = groupCount - 1; }
++    else if (idx < 0) { dir = 1; idx = 0; }
++  }
++  return groups;
++}
++
++export const groupLabel = (i) => `Grupo ${String.fromCharCode(65 + i)}`;
++
++/** Converte uma tabela de jogos em texto simples, pronto para copiar. */
++export function scheduleToText(rounds, { title } = {}) {
++  const lines = [];
++  if (title) lines.push(title, '');
++  for (const r of rounds) {
++    lines.push(r.label ?? `Rodada ${r.round}`);
++    for (const g of r.games) {
++      if (g.bye) lines.push(`  ${g.home} — avança direto (sem jogo)`);
++      else lines.push(`  ${g.id ? `Jogo ${g.id}: ` : ''}${g.home} x ${g.away}`);
++    }
++    if (r.rest) lines.push(`  Folga: ${r.rest}`);
++    lines.push('');
++  }
++  return lines.join('\n').trim();
++}
+diff --git a/vercel.json b/vercel.json
+index 3a9e0d8..b90eb6b 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -1,5 +1,10 @@
+ {
+   "redirects": [
++    {
++      "source": "/visitor",
++      "destination": "/ferramentas/sorteador",
++      "permanent": true
++    },
+     {
+       "source": "/(.*)",
+       "has": [
+@@ -79,4 +84,4 @@
+       ]
+     }
+   ]
+-}
+\ No newline at end of file
++}

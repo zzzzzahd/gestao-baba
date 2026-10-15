@@ -31,12 +31,6 @@ const ROUTE_META = {
       'Política de privacidade e tratamento de dados da plataforma Draft Play.',
   },
 
-  '/visitor': {
-    title: 'Modo Visitante - Sorteio de Times | Draft Play',
-    description:
-      'Monte a lista de jogadores e sorteie times equilibrados na hora, sem precisar criar conta.',
-  },
-
   '/sobre': {
     title: 'Sobre - Draft Play',
     description:
@@ -172,7 +166,7 @@ async function main() {
   // IMPORTAR BUNDLE SSR
   // -------------------------------------------------------
 
-  const { render, PRERENDER_ROUTES, getPublicProfileRoutes } = await import(
+  const { render, PRERENDER_ROUTES, EXTRA_ROUTE_META, getPublicProfileRoutes } = await import(
     pathToFileURL(path.join(ssrDir, 'entry-server.js')).href
   );
 
@@ -181,6 +175,9 @@ async function main() {
   // -------------------------------------------------------
 
   const template = await readFile(path.join(distDir, 'index.html'), 'utf-8');
+
+  // Metadados das rotas de ferramentas vêm do catálogo (src/content/toolsCatalog.js)
+  Object.assign(ROUTE_META, EXTRA_ROUTE_META);
 
   // -------------------------------------------------------
   // ROTAS ESTÁTICAS + PERFIS PÚBLICOS
@@ -284,7 +281,7 @@ async function main() {
   const PRIORITY = {
     '/': '1.0',
     '/sobre': '0.5',
-    '/visitor': '0.8',
+    '/ferramentas': '0.8',
     '/termos': '0.3',
     '/privacidade': '0.3',
   };
@@ -292,7 +289,7 @@ async function main() {
   const CHANGEFREQ = {
     '/': 'weekly',
     '/sobre': 'monthly',
-    '/visitor': 'monthly',
+    '/ferramentas': 'monthly',
     '/termos': 'yearly',
     '/privacidade': 'yearly',
   };
@@ -306,7 +303,7 @@ async function main() {
       const isProfile = route.startsWith('/player/');
       const loc = `${SITE_URL}${route}`;
       const changefreq = isProfile ? 'monthly' : CHANGEFREQ[route] ?? 'monthly';
-      const priority = isProfile ? '0.4' : PRIORITY[route] ?? '0.5';
+      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (route.startsWith('/ferramentas/') ? '0.7' : '0.5');
       return `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
     })
     .join('\n');

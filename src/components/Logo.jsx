@@ -1,6 +1,8 @@
 import React from 'react';
 
-const Logo = ({ size = 'large' }) => {
+// `as`: elemento do texto da marca. Páginas que já têm o próprio <h1> passam as="p"
+// para não ficar com dois h1.
+const Logo = ({ size = 'large', as: Heading = 'h1' }) => {
   const isLarge = size === 'large';
 
   // Configurações de tamanho responsivo
@@ -29,7 +31,7 @@ const Logo = ({ size = 'large' }) => {
 
       {/* 2. O TEXTO COM BRILHO TÁTICO (CORRIGIDO SEM CORTAR O 'Y') */}
       <div className="flex flex-col items-center overflow-visible">
-        <h1 
+        <Heading
           className={`font-display font-black italic tracking-tighter leading-none ${dimensions.title} overflow-visible`}
           style={{
             // Gradiente Sólido: Branco -> Azul Cyan Elétrico
@@ -50,7 +52,7 @@ const Logo = ({ size = 'large' }) => {
           }}
         >
           DRAFT PLAY
-        </h1>
+        </Heading>
         
         {/* Subtítulo Clean */}
         <p className={`text-cyan-electric font-semibold tracking-[0.5em] uppercase ${dimensions.sub} mt-1`}>

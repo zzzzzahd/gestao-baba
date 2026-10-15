@@ -5,7 +5,13 @@ import { StaticRouter } from 'react-router-dom/server';
 import LandingPage from './pages/LandingPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
-import VisitorMode from './pages/VisitorMode';
+import FerramentasPage from './pages/FerramentasPage';
+import SorteadorTimes from './pages/tools/SorteadorTimes';
+import TorneioCalculadora from './pages/tools/TorneioCalculadora';
+import TabelaJogos from './pages/tools/TabelaJogos';
+import DivisaoDespesas from './pages/tools/DivisaoDespesas';
+import OrganizadorPresenca from './pages/tools/OrganizadorPresenca';
+import { TOOLS, TOOLS_HUB } from './content/toolsCatalog';
 import AboutPage from './pages/AboutPage';
 import PublicProfilePage from './pages/PublicProfilePage.jsx';
 
@@ -20,9 +26,16 @@ export const PRERENDER_ROUTES = [
   '/',
   '/termos',
   '/privacidade',
-  '/visitor',
   '/sobre',
+  TOOLS_HUB.path,
+  ...TOOLS.map((t) => t.path),
 ];
+
+// Metadados (title/description) das rotas novas, consumidos por scripts/prerender.mjs.
+export const EXTRA_ROUTE_META = {
+  [TOOLS_HUB.path]: { title: TOOLS_HUB.title, description: TOOLS_HUB.description },
+  ...Object.fromEntries(TOOLS.map((t) => [t.path, { title: t.title, description: t.description }])),
+};
 
 // ---------------------------------------------------------
 // PÁGINAS ESTÁTICAS
@@ -32,8 +45,13 @@ const PAGES = {
   '/': LandingPage,
   '/termos': TermsPage,
   '/privacidade': PrivacyPage,
-  '/visitor': VisitorMode,
   '/sobre': AboutPage,
+  '/ferramentas': FerramentasPage,
+  '/ferramentas/sorteador': SorteadorTimes,
+  '/ferramentas/calculadora-torneio': TorneioCalculadora,
+  '/ferramentas/tabela-de-jogos': TabelaJogos,
+  '/ferramentas/divisao-de-despesas': DivisaoDespesas,
+  '/ferramentas/lista-de-presenca': OrganizadorPresenca,
 };
 
 // ---------------------------------------------------------

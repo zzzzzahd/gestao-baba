@@ -5,22 +5,16 @@
 // assim que ele escolher qualquer uma das opções. Não é modal — não bloqueia
 // a leitura do conteúdo enquanto a pessoa decide.
 
-import { useLocation, matchPath } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { isAdScriptPath } from '../utils/adEligibility';
 import { useCookieConsent } from '../hooks/useCookieConsent';
-
-// Mesmas rotas do AdsenseScriptGate — só faz sentido perguntar aqui.
-const AD_ELIGIBLE_PATTERNS = ['/', '/sobre', '/player/:userId', '/visitor-match'];
-
-function isAdEligiblePath(pathname) {
-  return AD_ELIGIBLE_PATTERNS.some((pattern) => matchPath(pattern, pathname));
-}
 
 export function CookieConsentBanner() {
   const location = useLocation();
   const { consent, accept, rejectAds } = useCookieConsent();
 
   if (consent !== null) return null;
-  if (!isAdEligiblePath(location.pathname)) return null;
+  if (!isAdScriptPath(location.pathname)) return null;
 
   return (
     <div

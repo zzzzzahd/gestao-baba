@@ -51,10 +51,10 @@ describe('AboutPage › seções', () => {
     expect(screen.getByText('Pra quem é')).toBeInTheDocument();
   });
 
-  it('exibe seção "Modo Visitante" com link para /visitor', () => {
+  it('exibe seção "Ferramentas gratuitas" com link para /ferramentas', () => {
     wrap();
-    const link = screen.getByRole('link', { name: /Modo Visitante/i });
-    expect(link).toHaveAttribute('href', '/visitor');
+    const link = screen.getByRole('link', { name: /ferramentas gratuitas/i });
+    expect(link).toHaveAttribute('href', '/ferramentas');
   });
 
   it('exibe seção "Contato" com link de e-mail', () => {

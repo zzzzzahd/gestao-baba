@@ -26,7 +26,12 @@ const PublicProfilePage    = lazy(() => import('./pages/PublicProfilePage'));
 const MatchPageVisitor     = lazy(() => import('./pages/MatchPageVisitor'));
 const RankingsPage         = lazy(() => import('./pages/RankingsPage'));
 const FinancialPage        = lazy(() => import('./pages/FinancialPage'));
-const VisitorMode          = lazy(() => import('./pages/VisitorMode'));
+const FerramentasPage      = lazy(() => import('./pages/FerramentasPage'));
+const SorteadorTimes       = lazy(() => import('./pages/tools/SorteadorTimes'));
+const TorneioCalculadora   = lazy(() => import('./pages/tools/TorneioCalculadora'));
+const TabelaJogos          = lazy(() => import('./pages/tools/TabelaJogos'));
+const DivisaoDespesas      = lazy(() => import('./pages/tools/DivisaoDespesas'));
+const OrganizadorPresenca  = lazy(() => import('./pages/tools/OrganizadorPresenca'));
 const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
 const CreatePage           = lazy(() => import('./pages/CreatePage'));
 const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
@@ -159,7 +164,13 @@ const AppInner = () => {
           <Route path="/"              element={<LandingPage />} />
           <Route path="/login"         element={<LoginPage />} />
           <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
-          <Route path="/visitor"       element={<VisitorMode />} />
+          <Route path="/visitor"       element={<Navigate to="/ferramentas/sorteador" replace />} />
+          <Route path="/ferramentas"                       element={<FerramentasPage />} />
+          <Route path="/ferramentas/sorteador"             element={<SorteadorTimes />} />
+          <Route path="/ferramentas/calculadora-torneio"    element={<TorneioCalculadora />} />
+          <Route path="/ferramentas/tabela-de-jogos"        element={<TabelaJogos />} />
+          <Route path="/ferramentas/divisao-de-despesas"    element={<DivisaoDespesas />} />
+          <Route path="/ferramentas/lista-de-presenca"      element={<OrganizadorPresenca />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
           <Route path="/privacidade"   element={<PrivacyPage />} />
           <Route path="/termos"        element={<TermsPage />} />

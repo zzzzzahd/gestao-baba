@@ -3,7 +3,7 @@ Allow: /
 Allow: /$
 Allow: /termos
 Allow: /privacidade
-Allow: /visitor
+Allow: /ferramentas
 Allow: /sobre
 Allow: /player/
 Allow: /followers/
@@ -28,7 +28,7 @@ Allow: /
 Allow: /$
 Allow: /termos
 Allow: /privacidade
-Allow: /visitor
+Allow: /ferramentas
 Allow: /sobre
 Allow: /player/
 Allow: /followers/

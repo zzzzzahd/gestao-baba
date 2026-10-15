@@ -73,12 +73,13 @@ export default function AboutPage() {
           </p>
         </Section>
 
-        <Section title="Modo Visitante">
+        <Section title="Ferramentas gratuitas">
           <p>
-            Quem só quer sortear os times de uma pelada avulsa, sem criar conta nem
-            vincular a um grupo fixo, pode usar o{' '}
-            <a href="/visitor" className="text-cyan-electric underline">Modo Visitante</a>{' '}
-            — sorteio de times equilibrados na hora, de graça, sem cadastro.
+            Quem só quer resolver uma etapa do baba, sem criar conta nem vincular a um
+            grupo fixo, pode usar as{' '}
+            <a href="/ferramentas" className="text-cyan-electric underline">ferramentas gratuitas</a>{' '}
+            — sorteador de times equilibrados, calculadora de torneio, tabela de jogos,
+            divisão de despesas e lista de presença, de graça e sem cadastro.
           </p>
         </Section>
 
@@ -109,8 +110,8 @@ export default function AboutPage() {
 
         <Section title="Perguntas frequentes">
           <p>
-            <strong>Preciso pagar pra usar?</strong> O Modo Visitante é gratuito e não
-            exige cadastro. Criar conta e gerenciar um baba fixo também tem um plano
+            <strong>Preciso pagar pra usar?</strong> As ferramentas gratuitas não
+            exigem cadastro. Criar conta e gerenciar um baba fixo também tem um plano
             gratuito, com limite de um grupo.
           </p>
           <p>

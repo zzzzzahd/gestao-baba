@@ -7,6 +7,8 @@
 //     slot ser preenchido via variável de ambiente (item 1.1 do plano)
 
 import React, { useEffect, useRef } from 'react';
+import { useInRouterContext, useLocation } from 'react-router-dom';
+import { isAdEligiblePath } from '../utils/adEligibility';
 import { usePlan } from '../hooks/usePlan';
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
@@ -16,8 +18,19 @@ const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
  * @param {string} props.slot       - ID do slot de anúncio (AdSense → Unidades de anúncio)
  * @param {string} [props.className]
  */
+function useRouteAllowsAds() {
+  // Sem Router (testes isolados) não há rota para checar: não bloqueia.
+  const inRouter = useInRouterContext();
+  const pathname = inRouter ? useLocation().pathname : null; // eslint-disable-line react-hooks/rules-of-hooks
+  return pathname === null ? true : isAdEligiblePath(pathname);
+}
+
 export function AdBanner({ slot, className = '' }) {
-  const { showAds } = usePlan();
+  const { showAds: planShowsAds } = usePlan();
+  // Política única (src/utils/adEligibility.js): mesmo que alguém coloque um
+  // <AdBanner> numa rota não elegível, ele não renderiza.
+  const routeAllowsAds = useRouteAllowsAds();
+  const showAds = planShowsAds && routeAllowsAds;
   const insRef = useRef(null);
   const pushed = useRef(false);
 

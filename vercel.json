@@ -1,6 +1,11 @@
 {
   "redirects": [
     {
+      "source": "/visitor",
+      "destination": "/ferramentas/sorteador",
+      "permanent": true
+    },
+    {
       "source": "/(.*)",
       "has": [
         {

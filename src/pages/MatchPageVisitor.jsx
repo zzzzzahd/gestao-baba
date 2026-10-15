@@ -6,7 +6,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
-import RewardedAdGate from '../components/RewardedAdGate';
 import TeamsShareButton from '../components/TeamsShareButton';
 import { supabase } from '../services/supabase';
 
@@ -19,7 +18,6 @@ const MatchPageVisitor = () => {
   const [isActive,     setIsActive]     = useState(false);
   const [confirmExit,  setConfirmExit]  = useState(false);
   const [reserves,     setReserves]     = useState([]);
-  const [showStartGate, setShowStartGate] = useState(false);
 
   // Empate: aguarda escolha de quem ganhou o par ou ímpar antes de reordenar a fila
   const [tieChoice, setTieChoice] = useState(null); // { teamA, teamB, rest }
@@ -50,16 +48,16 @@ const MatchPageVisitor = () => {
           });
         } else {
           toast.error('Número insuficiente de times.');
-          navigate('/visitor');
+          navigate('/ferramentas/sorteador');
         }
       } catch (e) {
         console.error('Erro ao carregar dados:', e);
         localStorage.removeItem('temp_teams');
-        navigate('/visitor');
+        navigate('/ferramentas/sorteador');
       }
     } else {
       toast.error('Nenhum time encontrado!');
-      navigate('/visitor');
+      navigate('/ferramentas/sorteador');
     }
   }, [navigate]);
 
@@ -134,7 +132,7 @@ const MatchPageVisitor = () => {
       localStorage.removeItem('temp_teams');
       localStorage.removeItem('temp_reserves');
       localStorage.removeItem('temp_match_id');
-      setTimeout(() => navigate('/visitor'), 2000);
+      setTimeout(() => navigate('/ferramentas/sorteador'), 2000);
       return;
     }
 
@@ -260,7 +258,7 @@ const MatchPageVisitor = () => {
           {!isRealtime && (
             <>
               <button
-                onClick={() => (isActive ? setIsActive(false) : setShowStartGate(true))}
+                onClick={() => (isActive ? setIsActive(false) : setIsActive(true))}
                 className={`mt-10 w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[4px] transition-all ${
                   isActive
                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
@@ -420,26 +418,17 @@ const MatchPageVisitor = () => {
         </div>
       )}
 
-      <RewardedAdGate
-        open={showStartGate}
-        placementName="iniciar-partida"
-        title="Prontos pra jogar!"
-        description="Assista a um anúncio curto pra iniciar a partida."
-        onGranted={() => { setShowStartGate(false); setIsActive(true); }}
-        onCancel={() => setShowStartGate(false)}
-      />
-
       <ConfirmModal
         open={confirmExit}
         message="Sair da partida?"
-        description="O progresso desta partida será perdido e você voltará para o modo visitante."
+        description="O progresso desta partida será perdido e você voltará para o sorteador de times."
         confirmLabel="Sair"
         danger
         onConfirm={() => {
           localStorage.removeItem('temp_teams');
           localStorage.removeItem('temp_reserves');
           localStorage.removeItem('temp_match_id');
-          navigate('/visitor');
+          navigate('/ferramentas/sorteador');
         }}
         onCancel={() => setConfirmExit(false)}
       />

@@ -8,7 +8,7 @@ import { useFeatures } from '../utils/babaMode';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
-const PUBLIC_ROUTES = new Set(['/', '/login', '/redefinir-senha', '/visitor', '/visitor-match']);
+const PUBLIC_ROUTES = new Set(['/', '/login', '/redefinir-senha', '/visitor-match']);
 
 const BottomNav = () => {
   const navigate  = useNavigate();
@@ -19,7 +19,7 @@ const BottomNav = () => {
 
   // Visitante (sem login) nunca vê o menu do app: as abas levam a rotas protegidas
   // que redirecionam pro /login — o Google lê isso como navegação quebrada.
-  if (!user || PUBLIC_ROUTES.has(location.pathname)) return null;
+  if (!user || PUBLIC_ROUTES.has(location.pathname) || location.pathname.startsWith('/ferramentas')) return null;
 
   const handleLogout = async () => {
     await signOut();

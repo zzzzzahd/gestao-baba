@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 
 const LINKS = [
   { to: '/', key: 'home', label: 'Início' },
+  { to: '/ferramentas', key: 'ferramentas', label: 'Ferramentas' },
   { to: '/sobre', key: 'sobre', label: 'Sobre' },
   { to: '/termos', key: 'termos', label: 'Termos de uso' },
   { to: '/privacidade', key: 'privacidade', label: 'Privacidade' },

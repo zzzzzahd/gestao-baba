@@ -13,7 +13,7 @@
 //
 // Este componente resolve isso na raiz: só existe UM <script> de verdade no
 // DOM quando a rota atual é uma página pública com conteúdo do editor
-// (Landing, Sobre, Perfil Público — as mesmas 3 que usam <AdBanner>). Em
+// (ver src/utils/adEligibility.js). Em
 // qualquer outra rota — incluindo login, join, followers, visitor, e claro
 // todas as protegidas — o script é removido do DOM.
 //
@@ -23,19 +23,13 @@
 // pra comprovar propriedade, sem precisar ativar o script pesado.
 
 import { useEffect } from 'react';
-import { useLocation, matchPath } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { isAdScriptPath } from '../utils/adEligibility';
 
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
 const SCRIPT_ID = 'adsbygoogle-script';
 
-// Mesmas rotas que hoje renderizam <AdBanner>, mais a /visitor-match (que
-// usa o rewarded ad de useRewardedAd.js) — todas públicas, sem login. Ajuste
-// aqui junto de qualquer mudança em quais páginas usam anúncio.
-const AD_ELIGIBLE_PATTERNS = ['/', '/sobre', '/player/:userId', '/visitor-match'];
-
-function isAdEligiblePath(pathname) {
-  return AD_ELIGIBLE_PATTERNS.some((pattern) => matchPath(pattern, pathname));
-}
+// A lista de rotas elegíveis fica em src/utils/adEligibility.js (política única).
 
 export function AdsenseScriptGate() {
   const location = useLocation();
@@ -49,7 +43,7 @@ export function AdsenseScriptGate() {
     // do script em si. O script carrega em qualquer rota elegível — sem
     // consentimento, o Google mostra anúncio não-personalizado (ainda gera
     // receita, sem usar dado pessoal); com consentimento, personalizado.
-    const eligible = isAdEligiblePath(location.pathname);
+    const eligible = isAdScriptPath(location.pathname);
     const existing = document.getElementById(SCRIPT_ID);
 
     if (eligible && !existing) {

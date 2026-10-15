@@ -57,8 +57,8 @@ describe('BottomNav', () => {
       expect(container.querySelector('nav')).toBeNull();
     });
 
-    it('não renderiza na rota /visitor', () => {
-      mockUseLocation.mockReturnValue({ pathname: '/visitor', search: '', hash: '' });
+    it('não renderiza na rota /visitor-match', () => {
+      mockUseLocation.mockReturnValue({ pathname: '/visitor-match', search: '', hash: '' });
       const { container } = renderNav();
       expect(container.querySelector('nav')).toBeNull();
     });

@@ -104,7 +104,7 @@ const appShots = [
   { file: 'app-comparacao', title: 'Comparação 1v1', desc: 'Dois jogadores lado a lado: gols, assistências, vitórias e aproveitamento.', alt: 'Comparação entre dois jogadores no Draft Play com gols, assistências e vitórias lado a lado' },
   { file: 'app-perfil', title: 'Perfil público', desc: 'Estatísticas e conquistas num perfil com link pra compartilhar.', alt: 'Perfil público de jogador no Draft Play com estatísticas, conquistas e botão de copiar link' },
   { file: 'app-caixa', title: 'Caixa do baba', desc: 'Arrecadado, despesas e saldo, com nova cobrança e nova despesa.', alt: 'Tela financeira do Draft Play com caixa do baba, arrecadado, despesas e saldo atual' },
-  { file: 'app-visitante', title: 'Modo Visitante', desc: 'Sorteie os times sem conta: jogadores por time, reserva e nível.', alt: 'Modo ferramenta rápida do Draft Play para sortear times sem conta' },
+  { file: 'app-visitante', title: 'Sorteador sem conta', desc: 'Sorteie os times sem conta: jogadores por time, reserva e nível.', alt: 'Modo ferramenta rápida do Draft Play para sortear times sem conta' },
 ];
 
 // Print do app em moldura de celular; se o arquivo faltar, mostra um espaço reservado.
@@ -134,7 +134,7 @@ const AppShot = ({ file, alt }) => {
 };
 
 const faqs = [
-  { q: 'Dá pra testar sem me cadastrar?', a: 'Não pra testar: no Modo Visitante você sorteia os times na hora, sem cadastro. Pra criar um baba e guardar histórico e ranking, é preciso ter conta.' },
+  { q: 'Dá pra testar sem me cadastrar?', a: 'Dá. As ferramentas gratuitas (sorteador de times, calculadora de torneio, tabela de jogos, divisão de despesas e lista de presença) funcionam sem cadastro. Pra criar um baba e guardar histórico e ranking, é preciso ter conta.' },
   { q: 'Posso entrar só como jogador?', a: 'Pode. Você entra pelo convite do coordenador, confirma presença, acompanha o placar e ganha avaliação, badges e ranking, de graça.' },
   { q: 'O sorteio é automático?', a: 'Sim. O app distribui os confirmados em times equilibrados, com base no nível de cada jogador, definido por votação do próprio grupo.' },
   { q: 'Como o app decide o nível de cada jogador?', a: 'Pela votação do próprio grupo. Os votos extremos são descartados quando há 4 ou mais, e o resultado vira o nível usado no sorteio.' },
@@ -273,7 +273,7 @@ const LandingPage = () => {
     return () => { root.style.scrollBehavior = prev; };
   }, []);
 
-  // Par de CTAs usado no topo e no fim. O Modo Visitante segue em /visitor.
+  // Par de CTAs usado no topo e no fim. As ferramentas sem conta ficam em /ferramentas.
   const Ctas = ({ center = false }) => (
     <div className={`flex flex-col sm:flex-row gap-3 ${center ? 'justify-center' : ''}`}>
       <button
@@ -285,11 +285,11 @@ const LandingPage = () => {
         Organizar meu baba
       </button>
       <button
-        onClick={() => navigate('/visitor')}
+        onClick={() => navigate('/ferramentas')}
         className="px-8 py-4 rounded-2xl font-bold border border-cyan-electric/40 text-cyan-electric hover:bg-cyan-electric/10 transition-all active:scale-95 flex items-center justify-center gap-3 text-sm"
       >
         <Zap size={18} />
-        Testar sem conta
+        Ferramentas grátis
       </button>
     </div>
   );
@@ -330,7 +330,7 @@ const LandingPage = () => {
           <Ctas />
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs opacity-70">
             <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Convidados entram pelo convite</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Modo Visitante sem cadastro</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-cyan-electric" /> Ferramentas grátis, sem cadastro</li>
             <li className="flex items-center gap-1.5"><Lock size={13} className="text-cyan-electric" /> Dados protegidos (LGPD)</li>
             <li className="flex items-center gap-1.5"><Smartphone size={13} className="text-cyan-electric" /> Instala como app</li>
           </ul>
