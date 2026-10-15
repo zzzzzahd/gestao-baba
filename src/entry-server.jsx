@@ -6,12 +6,11 @@ import LandingPage from './pages/LandingPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import FerramentasPage from './pages/FerramentasPage';
-import SorteadorTimes from './pages/tools/SorteadorTimes';
-import TorneioCalculadora from './pages/tools/TorneioCalculadora';
-import TabelaJogos from './pages/tools/TabelaJogos';
-import DivisaoDespesas from './pages/tools/DivisaoDespesas';
-import OrganizadorPresenca from './pages/tools/OrganizadorPresenca';
+import { TOOL_PAGES } from './pages/tools/toolPages';
 import { TOOLS, TOOLS_HUB } from './content/toolsCatalog';
+import ModelosTorneioPage from './pages/ModelosTorneioPage';
+import { MODELO_PAGES } from './pages/modelos/modeloPages';
+import { MODELOS, MODELOS_HUB, modeloPath } from './content/modelosCatalog';
 import AboutPage from './pages/AboutPage';
 import PublicProfilePage from './pages/PublicProfilePage.jsx';
 
@@ -29,12 +28,16 @@ export const PRERENDER_ROUTES = [
   '/sobre',
   TOOLS_HUB.path,
   ...TOOLS.map((t) => t.path),
+  MODELOS_HUB.path,
+  ...MODELOS.map((m) => modeloPath(m.slug)),
 ];
 
 // Metadados (title/description) das rotas novas, consumidos por scripts/prerender.mjs.
 export const EXTRA_ROUTE_META = {
   [TOOLS_HUB.path]: { title: TOOLS_HUB.title, description: TOOLS_HUB.description },
   ...Object.fromEntries(TOOLS.map((t) => [t.path, { title: t.title, description: t.description }])),
+  [MODELOS_HUB.path]: { title: MODELOS_HUB.title, description: MODELOS_HUB.description },
+  ...Object.fromEntries(MODELOS.map((m) => [modeloPath(m.slug), { title: m.title, description: m.description }])),
 };
 
 // ---------------------------------------------------------
@@ -47,11 +50,9 @@ const PAGES = {
   '/privacidade': PrivacyPage,
   '/sobre': AboutPage,
   '/ferramentas': FerramentasPage,
-  '/ferramentas/sorteador': SorteadorTimes,
-  '/ferramentas/calculadora-torneio': TorneioCalculadora,
-  '/ferramentas/tabela-de-jogos': TabelaJogos,
-  '/ferramentas/divisao-de-despesas': DivisaoDespesas,
-  '/ferramentas/lista-de-presenca': OrganizadorPresenca,
+  ...TOOL_PAGES,
+  '/modelos-de-torneio': ModelosTorneioPage,
+  ...MODELO_PAGES,
 };
 
 // ---------------------------------------------------------

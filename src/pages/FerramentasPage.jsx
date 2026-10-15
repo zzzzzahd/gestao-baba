@@ -1,7 +1,7 @@
 // src/pages/FerramentasPage.jsx — hub das ferramentas públicas
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shuffle, Calculator, ListOrdered, Wallet, ClipboardCheck } from 'lucide-react';
+import { Shuffle, Calculator, ListOrdered, Wallet, ClipboardCheck, ScrollText, PiggyBank } from 'lucide-react';
 import Logo from '../components/Logo';
 import PublicPagesFooter from '../components/PublicPagesFooter';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -13,6 +13,8 @@ const ICONS = {
   'tabela-de-jogos': ListOrdered,
   'divisao-de-despesas': Wallet,
   'lista-de-presenca': ClipboardCheck,
+  'gerador-de-regulamento': ScrollText,
+  'controle-financeiro': PiggyBank,
 };
 
 export default function FerramentasPage() {
@@ -53,8 +55,8 @@ export default function FerramentasPage() {
           <section aria-labelledby="ordem" className="card-glass p-5 rounded-2xl border border-border-mid space-y-3">
             <h2 id="ordem" className="text-base font-black">Por onde começar?</h2>
             <ul className="list-disc pl-5 space-y-2 text-sm opacity-75 leading-relaxed">
-              <li>Baba semanal: use a <strong>lista de presença</strong> para fechar quem joga, o <strong>sorteador</strong> para montar os times e a <strong>divisão de despesas</strong> para acertar a quadra.</li>
-              <li>Torneio interno: use a <strong>calculadora de torneio</strong> para saber quantos jogos e quanto tempo você precisa e o <strong>gerador de tabela</strong> para montar os confrontos.</li>
+              <li>Baba semanal: use a <strong>lista de presença</strong> para fechar quem joga, o <strong>sorteador</strong> para montar os times, a <strong>divisão de despesas</strong> para acertar a quadra e o <strong>controle financeiro</strong> para acompanhar o caixa do mês.</li>
+              <li>Torneio interno: use a <strong>calculadora de torneio</strong> para saber quantos jogos e quanto tempo você precisa, o <strong>gerador de tabela</strong> para montar os confrontos e o <strong>gerador de regulamento</strong> para registrar as regras por escrito.</li>
             </ul>
             <p className="text-xs opacity-55 leading-relaxed">
               As ferramentas são independentes do aplicativo e não usam dados de nenhum baba cadastrado. Para guardar

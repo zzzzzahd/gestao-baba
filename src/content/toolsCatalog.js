@@ -49,6 +49,24 @@ export const TOOLS = [
     description:
       'Cole a lista de jogadores, marque quem confirmou e veja o total de confirmados, ausentes, reservas e quantos times fecham. Tudo no navegador, sem enviar dados.',
   },
+  {
+    slug: 'gerador-de-regulamento',
+    path: '/ferramentas/gerador-de-regulamento',
+    name: 'Gerador de regulamento',
+    short: 'Modelo editável de regulamento: formato, pontuação, desempate, atrasos e conduta.',
+    title: 'Gerador de Regulamento de Torneio de Futebol Amador | Draft Play',
+    description:
+      'Gere um modelo editável de regulamento para o seu torneio: formato, pontuação, critérios de desempate, atraso e W.O., cartões e disposições finais. Copie, imprima ou baixe.',
+  },
+  {
+    slug: 'controle-financeiro',
+    path: '/ferramentas/controle-financeiro',
+    name: 'Modelo de controle financeiro',
+    short: 'Mensalidades, outras receitas e despesas do baba, com saldo, CSV e folha para imprimir.',
+    title: 'Modelo de Controle Financeiro do Baba: Mensalidades e Caixa | Draft Play',
+    description:
+      'Planilha simples para o baba: marque quem pagou, registre receitas e despesas, veja o saldo e exporte em CSV ou imprima. Funciona no navegador, sem cadastro.',
+  },
 ];
 
 export const TOOLS_HUB = {

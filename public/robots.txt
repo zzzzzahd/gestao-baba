@@ -4,6 +4,7 @@ Allow: /$
 Allow: /termos
 Allow: /privacidade
 Allow: /ferramentas
+Allow: /modelos-de-torneio
 Allow: /sobre
 Allow: /player/
 Allow: /followers/
@@ -29,6 +30,7 @@ Allow: /$
 Allow: /termos
 Allow: /privacidade
 Allow: /ferramentas
+Allow: /modelos-de-torneio
 Allow: /sobre
 Allow: /player/
 Allow: /followers/

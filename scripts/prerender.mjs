@@ -282,6 +282,7 @@ async function main() {
     '/': '1.0',
     '/sobre': '0.5',
     '/ferramentas': '0.8',
+    '/modelos-de-torneio': '0.8',
     '/termos': '0.3',
     '/privacidade': '0.3',
   };
@@ -290,6 +291,7 @@ async function main() {
     '/': 'weekly',
     '/sobre': 'monthly',
     '/ferramentas': 'monthly',
+    '/modelos-de-torneio': 'monthly',
     '/termos': 'yearly',
     '/privacidade': 'yearly',
   };
@@ -303,7 +305,7 @@ async function main() {
       const isProfile = route.startsWith('/player/');
       const loc = `${SITE_URL}${route}`;
       const changefreq = isProfile ? 'monthly' : CHANGEFREQ[route] ?? 'monthly';
-      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (route.startsWith('/ferramentas/') ? '0.7' : '0.5');
+      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (route.startsWith('/ferramentas/') || route.startsWith('/modelos-de-torneio/') ? '0.7' : '0.5');
       return `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
     })
     .join('\n');

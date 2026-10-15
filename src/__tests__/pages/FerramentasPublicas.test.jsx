@@ -149,3 +149,65 @@ describe('Exportar imagem dos times', () => {
     expect(screen.getByRole('button', { name: /Copiar times/i })).toBeInTheDocument();
   });
 });
+
+import GeradorRegulamento from '../../pages/tools/GeradorRegulamento';
+import ControleFinanceiro from '../../pages/tools/ControleFinanceiro';
+
+describe('Gerador de regulamento', () => {
+  it('exige o nome e mantém o botão desabilitado', () => {
+    wrap(<GeradorRegulamento />);
+    expect(screen.getByRole('alert').textContent).toMatch(/nome do torneio/i);
+    expect(screen.getByRole('button', { name: 'Gerar regulamento' })).toBeDisabled();
+  });
+  it('gera o texto, que fica editável, e some a seção de pontuação no mata-mata', () => {
+    wrap(<GeradorRegulamento />);
+    type('Nome do torneio', 'Copa Teste');
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar regulamento' }));
+    const ta = screen.getByLabelText('Texto do regulamento');
+    expect(ta.value).toContain('COPA TESTE');
+    expect(ta.value).toMatch(/PONTUAÇÃO, CLASSIFICAÇÃO E DESEMPATE/);
+    fireEvent.change(ta, { target: { value: 'editado' } });
+    expect(screen.getByLabelText('Texto do regulamento').value).toBe('editado');
+    fireEvent.click(screen.getByRole('button', { name: 'Mata-mata' }));
+    expect(screen.getByRole('status').textContent).toMatch(/Gerar novamente/);
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar novamente' }));
+    expect(screen.getByLabelText('Texto do regulamento').value).not.toMatch(/PONTUAÇÃO/);
+  });
+  it('reordena critérios de desempate', () => {
+    wrap(<GeradorRegulamento />);
+    type('Nome do torneio', 'Copa');
+    fireEvent.click(screen.getByRole('button', { name: /Descer Maior número de vitórias/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar regulamento' }));
+    const t = screen.getByLabelText('Texto do regulamento').value;
+    expect(t.indexOf('saldo de gols')).toBeLessThan(t.indexOf('número de vitórias'));
+  });
+});
+
+describe('Controle financeiro', () => {
+  it('calcula saldo atual e se todos pagarem', () => {
+    wrap(<ControleFinanceiro />);
+    type('Contribuição por jogador (R$)', '50');
+    type('Jogadores (um por linha)', 'Ana\nBia\nCaio\nDavi');
+    fireEvent.click(screen.getByLabelText('Ana'));
+    fireEvent.click(screen.getByLabelText('Bia'));
+    fireEvent.change(screen.getByLabelText('Despesas: descrição 1'), { target: { value: 'Quadra' } });
+    fireEvent.change(screen.getByLabelText('Despesas: valor 1 (R$)'), { target: { value: '120' } });
+    const r = screen.getByLabelText(/^Resumo/, { selector: 'section' });
+    expect(within(r).getByText('Saldo atual').nextSibling.textContent).toBe('-R$ 20,00');
+    expect(within(r).getByText('Se todos pagarem').nextSibling.textContent).toBe('R$ 80,00');
+    expect(r.textContent).toMatch(/Pagaram 2 de 4/);
+    expect(r.textContent).toMatch(/Pendentes: Caio, Davi/);
+  });
+  it('valor inválido gera alerta', () => {
+    wrap(<ControleFinanceiro />);
+    type('Contribuição por jogador (R$)', 'abc');
+    expect(screen.getByRole('alert').textContent).toMatch(/valor inválido/i);
+  });
+  it('linhas de despesa podem ser adicionadas e removidas', () => {
+    wrap(<ControleFinanceiro />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Adicionar linha/i })[1]);
+    expect(screen.getByLabelText('Despesas: descrição 2')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Remover linha 2 de Despesas'));
+    expect(screen.queryByLabelText('Despesas: descrição 2')).toBeNull();
+  });
+});

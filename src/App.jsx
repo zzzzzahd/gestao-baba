@@ -32,6 +32,19 @@ const TorneioCalculadora   = lazy(() => import('./pages/tools/TorneioCalculadora
 const TabelaJogos          = lazy(() => import('./pages/tools/TabelaJogos'));
 const DivisaoDespesas      = lazy(() => import('./pages/tools/DivisaoDespesas'));
 const OrganizadorPresenca  = lazy(() => import('./pages/tools/OrganizadorPresenca'));
+const GeradorRegulamento   = lazy(() => import('./pages/tools/GeradorRegulamento'));
+const ControleFinanceiro   = lazy(() => import('./pages/tools/ControleFinanceiro'));
+const ModelosTorneioPage   = lazy(() => import('./pages/ModelosTorneioPage'));
+const RegulamentoModelo    = lazy(() => import('./pages/modelos/RegulamentoModelo'));
+const CriteriosDesempate   = lazy(() => import('./pages/modelos/CriteriosDesempate'));
+const TabelaMataMata       = lazy(() => import('./pages/modelos/TabelaMataMata'));
+const GruposClassificacao  = lazy(() => import('./pages/modelos/GruposClassificacao'));
+const PontosCorridos       = lazy(() => import('./pages/modelos/PontosCorridos'));
+const CalendarioPartidas   = lazy(() => import('./pages/modelos/CalendarioPartidas'));
+const ControleResultados   = lazy(() => import('./pages/modelos/ControleResultados'));
+const PresencaEquipe       = lazy(() => import('./pages/modelos/PresencaEquipe'));
+const ControleArtilharia   = lazy(() => import('./pages/modelos/ControleArtilharia'));
+const OrcamentoTorneio     = lazy(() => import('./pages/modelos/OrcamentoTorneio'));
 const DashboardPage        = lazy(() => import('./pages/DashboardPage'));
 const CreatePage           = lazy(() => import('./pages/CreatePage'));
 const HistoryPage          = lazy(() => import('./pages/HistoryPage'));
@@ -171,6 +184,19 @@ const AppInner = () => {
           <Route path="/ferramentas/tabela-de-jogos"        element={<TabelaJogos />} />
           <Route path="/ferramentas/divisao-de-despesas"    element={<DivisaoDespesas />} />
           <Route path="/ferramentas/lista-de-presenca"      element={<OrganizadorPresenca />} />
+          <Route path="/ferramentas/gerador-de-regulamento"  element={<GeradorRegulamento />} />
+          <Route path="/ferramentas/controle-financeiro"     element={<ControleFinanceiro />} />
+          <Route path="/modelos-de-torneio"                              element={<ModelosTorneioPage />} />
+          <Route path="/modelos-de-torneio/regulamento-torneio-interno"  element={<RegulamentoModelo />} />
+          <Route path="/modelos-de-torneio/criterios-de-desempate"       element={<CriteriosDesempate />} />
+          <Route path="/modelos-de-torneio/tabela-mata-mata"             element={<TabelaMataMata />} />
+          <Route path="/modelos-de-torneio/grupos-e-classificacao"       element={<GruposClassificacao />} />
+          <Route path="/modelos-de-torneio/pontos-corridos"              element={<PontosCorridos />} />
+          <Route path="/modelos-de-torneio/calendario-de-partidas"       element={<CalendarioPartidas />} />
+          <Route path="/modelos-de-torneio/controle-de-resultados"       element={<ControleResultados />} />
+          <Route path="/modelos-de-torneio/lista-presenca-por-equipe"    element={<PresencaEquipe />} />
+          <Route path="/modelos-de-torneio/artilharia"                   element={<ControleArtilharia />} />
+          <Route path="/modelos-de-torneio/orcamento-do-torneio"         element={<OrcamentoTorneio />} />
           <Route path="/visitor-match" element={<MatchPageVisitor />} />
           <Route path="/privacidade"   element={<PrivacyPage />} />
           <Route path="/termos"        element={<TermsPage />} />
