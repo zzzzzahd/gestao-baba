@@ -1,11 +1,12 @@
 // src/pages/FerramentasPage.jsx — hub das ferramentas públicas
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Shuffle, Calculator, ListOrdered, Wallet, ClipboardCheck, ScrollText, PiggyBank } from 'lucide-react';
+import { Shuffle, Calculator, ListOrdered, Wallet, ClipboardCheck, ScrollText, PiggyBank, Trophy } from 'lucide-react';
 import Logo from '../components/Logo';
 import PublicPagesFooter from '../components/PublicPagesFooter';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { TOOLS, TOOLS_HUB } from '../content/toolsCatalog';
+import { MODELOS_HUB } from '../content/modelosCatalog';
 
 const ICONS = {
   'sorteador': Shuffle,
@@ -50,6 +51,13 @@ export default function FerramentasPage() {
                 </li>
               );
             })}
+            <li>
+              <Link to={MODELOS_HUB.path} className="block h-full card-glass p-5 rounded-2xl border border-border-mid hover:border-cyan-electric/40 transition-colors">
+                <Trophy size={22} className="text-cyan-electric mb-3" aria-hidden="true" />
+                <h2 className="text-base font-black">Modelos de torneio</h2>
+                <p className="text-xs opacity-65 mt-1.5 leading-relaxed">Regulamento, tabelas, classificação, calendário, artilharia e orçamento prontos para copiar, imprimir ou baixar.</p>
+              </Link>
+            </li>
           </ul>
 
           <section aria-labelledby="ordem" className="card-glass p-5 rounded-2xl border border-border-mid space-y-3">
