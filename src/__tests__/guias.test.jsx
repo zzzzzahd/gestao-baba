@@ -1,8 +1,8 @@
 // src/__tests__/guias.test.jsx  (ajuste a pasta ao padrão dos seus outros testes)
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom';
 import { GUIAS, getGuia } from '../data/guias';
 import GuiasPage from '../pages/GuiasPage';
 import GuiaPage from '../pages/GuiaPage';
@@ -62,14 +62,19 @@ describe('GuiasPage', () => {
 });
 
 describe('GuiaPage', () => {
-  const renderAt = (path) =>
-    render(
+  // O setup.js global mocka useParams (sempre {}), então injetamos o slug da URL aqui.
+  afterEach(() => useParams.mockReturnValue({}));
+
+  const renderAt = (path) => {
+    useParams.mockReturnValue({ slug: path.split('/').pop() });
+    return render(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/guias/:slug" element={<GuiaPage />} />
         </Routes>
       </MemoryRouter>
     );
+  };
 
   it('renderiza título, introdução e todas as seções de um guia válido', () => {
     const g = GUIAS[0];

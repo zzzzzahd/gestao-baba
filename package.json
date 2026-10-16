@@ -4,6 +4,7 @@
   "version": "1.1.0",
   "type": "module",
   "scripts": {
+    "verify:prerender": "node scripts/verify-prerender.mjs",
     "dev": "vite",
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.mjs",
     "build:client-only": "vite build",

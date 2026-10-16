@@ -14,8 +14,10 @@ import { Link } from 'react-router-dom';
 
 const LINKS = [
   { to: '/', key: 'home', label: 'Início' },
+  { to: '/guias', key: 'guias', label: 'Guias' },
   { to: '/ferramentas', key: 'ferramentas', label: 'Ferramentas' },
   { to: '/modelos-de-torneio', key: 'modelos', label: 'Modelos de torneio' },
+  { to: '/estatisticas', key: 'estatisticas', label: 'Estatísticas' },
   { to: '/sobre', key: 'sobre', label: 'Sobre' },
   { to: '/termos', key: 'termos', label: 'Termos de uso' },
   { to: '/privacidade', key: 'privacidade', label: 'Privacidade' },

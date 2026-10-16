@@ -97,7 +97,7 @@ function readProfileMarker(appHtml) {
 function applyMeta(
   template,
   appHtml,
-  { title, description, canonicalUrl, noindex }
+  { title, description, canonicalUrl, noindex, ogType, jsonLd }
 ) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
@@ -136,6 +136,22 @@ function applyMeta(
       /<meta property="og:url" content=".*?" \/>/,
       () => `<meta property="og:url" content="${canonicalUrl}" />`
     );
+
+  if (ogType) {
+    html = html.replace(
+      /<meta property="og:type" content=".*?" \/>/,
+      () => `<meta property="og:type" content="${escapeHtml(ogType)}" />`
+    );
+  }
+
+  // JSON-LD (mesmo id que o useDocumentHead usa no cliente, para não duplicar)
+  if (jsonLd) {
+    const json = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
+    html = html.replace(
+      '</head>',
+      () => `    <script type="application/ld+json" id="dp-jsonld">${json}</script>\n  </head>`
+    );
+  }
 
   if (noindex) {
     html = html.replace(
@@ -281,6 +297,8 @@ async function main() {
   const PRIORITY = {
     '/': '1.0',
     '/sobre': '0.5',
+    '/guias': '0.8',
+    '/estatisticas': '0.8',
     '/ferramentas': '0.8',
     '/modelos-de-torneio': '0.8',
     '/termos': '0.3',
@@ -290,6 +308,8 @@ async function main() {
   const CHANGEFREQ = {
     '/': 'weekly',
     '/sobre': 'monthly',
+    '/guias': 'monthly',
+    '/estatisticas': 'monthly',
     '/ferramentas': 'monthly',
     '/modelos-de-torneio': 'monthly',
     '/termos': 'yearly',
@@ -305,7 +325,7 @@ async function main() {
       const isProfile = route.startsWith('/player/');
       const loc = `${SITE_URL}${route}`;
       const changefreq = isProfile ? 'monthly' : CHANGEFREQ[route] ?? 'monthly';
-      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (route.startsWith('/ferramentas/') || route.startsWith('/modelos-de-torneio/') ? '0.7' : '0.5');
+      const priority = isProfile ? '0.4' : PRIORITY[route] ?? (['/guias/', '/ferramentas/', '/modelos-de-torneio/'].some((p) => route.startsWith(p)) ? '0.7' : '0.5');
       return `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
     })
     .join('\n');

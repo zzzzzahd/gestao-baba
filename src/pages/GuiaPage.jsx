@@ -8,8 +8,7 @@ import GuiasLayout from '../components/GuiasLayout';
 import NotFoundPage from './NotFoundPage';
 import useDocumentHead from '../hooks/useDocumentHead';
 import { GUIAS, getGuia } from '../data/guias';
-
-const BASE_URL = 'https://www.draftplay.app.br';
+import { guiaSeo } from '../content/guiasSeo';
 
 // '2026-10-12' -> '12/10/2026' (sem passar por Date, evita deslocamento de fuso)
 const formatDate = (iso) => {
@@ -22,43 +21,8 @@ const GuiaPage = () => {
   const navigate = useNavigate();
   const guia = getGuia(slug);
 
-  const url = guia ? `${BASE_URL}/guias/${guia.slug}` : '';
-
   // Hook sempre chamado; com guia nulo não faz nada.
-  useDocumentHead(
-    guia
-      ? {
-          title: `${guia.title} | Draft Play`,
-          description: guia.description,
-          canonical: url,
-          ogType: 'article',
-          jsonLd: {
-            '@context': 'https://schema.org',
-            '@graph': [
-              {
-                '@type': 'Article',
-                headline: guia.title,
-                description: guia.description,
-                datePublished: guia.published,
-                dateModified: guia.updated,
-                mainEntityOfPage: url,
-                inLanguage: 'pt-BR',
-                author: { '@type': 'Organization', name: 'Draft Play' },
-                publisher: { '@type': 'Organization', name: 'Draft Play', url: BASE_URL },
-              },
-              {
-                '@type': 'BreadcrumbList',
-                itemListElement: [
-                  { '@type': 'ListItem', position: 1, name: 'Início', item: `${BASE_URL}/` },
-                  { '@type': 'ListItem', position: 2, name: 'Guias', item: `${BASE_URL}/guias` },
-                  { '@type': 'ListItem', position: 3, name: guia.title, item: url },
-                ],
-              },
-            ],
-          },
-        }
-      : null
-  );
+  useDocumentHead(guia ? guiaSeo(guia) : null);
 
   if (!guia) return <NotFoundPage />;
 

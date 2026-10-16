@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-const DIVISIONS = [
+export const DIVISIONS = [
   { min: 0,   max: 2.0, id: 'ferro',     label: 'Ferro',     emoji: '⚙️', color: 'text-gray-400  bg-gray-400/10  border-gray-400/20'    },
   { min: 2.0, max: 2.8, id: 'bronze',    label: 'Bronze',    emoji: '🥉', color: 'text-orange-600 bg-orange-600/10 border-orange-600/20' },
   { min: 2.8, max: 3.5, id: 'prata',     label: 'Prata',     emoji: '🥈', color: 'text-gray-300  bg-gray-300/10  border-gray-300/20'    },

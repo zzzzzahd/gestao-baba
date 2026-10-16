@@ -7,27 +7,10 @@ import { BookOpen, ArrowRight } from 'lucide-react';
 import GuiasLayout from '../components/GuiasLayout';
 import useDocumentHead from '../hooks/useDocumentHead';
 import { GUIAS } from '../data/guias';
-
-const GUIAS_BASE_URL = 'https://www.draftplay.app.br';
+import { GUIAS_INDEX_SEO } from '../content/guiasSeo';
 
 const GuiasPage = () => {
-  useDocumentHead({
-    title: 'Guias para organizar seu baba | Draft Play',
-    description:
-      'Guias práticos para organizar o baba: sorteio equilibrado, lista de presença, cobrança de mensalidade, regras de goleiro e reserva, desempate e ranking.',
-    canonical: `${GUIAS_BASE_URL}/guias`,
-    jsonLd: {
-      '@context': 'https://schema.org',
-      '@type': 'CollectionPage',
-      name: 'Guias para organizar seu baba',
-      url: `${GUIAS_BASE_URL}/guias`,
-      hasPart: GUIAS.map((g) => ({
-        '@type': 'Article',
-        headline: g.title,
-        url: `${GUIAS_BASE_URL}/guias/${g.slug}`,
-      })),
-    },
-  });
+  useDocumentHead(GUIAS_INDEX_SEO);
 
   return (
     <GuiasLayout>

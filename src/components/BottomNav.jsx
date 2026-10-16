@@ -19,7 +19,7 @@ const BottomNav = () => {
 
   // Visitante (sem login) nunca vê o menu do app: as abas levam a rotas protegidas
   // que redirecionam pro /login — o Google lê isso como navegação quebrada.
-  if (!user || PUBLIC_ROUTES.has(location.pathname) || location.pathname.startsWith('/ferramentas') || location.pathname.startsWith('/modelos-de-torneio')) return null;
+  if (!user || PUBLIC_ROUTES.has(location.pathname) || location.pathname.startsWith('/ferramentas') || location.pathname.startsWith('/modelos-de-torneio') || location.pathname.startsWith('/guias') || location.pathname === '/estatisticas') return null;
 
   const handleLogout = async () => {
     await signOut();

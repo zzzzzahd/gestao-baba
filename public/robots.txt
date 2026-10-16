@@ -3,7 +3,9 @@ Allow: /
 Allow: /$
 Allow: /termos
 Allow: /privacidade
+Allow: /guias
 Allow: /ferramentas
+Allow: /estatisticas
 Allow: /modelos-de-torneio
 Allow: /sobre
 Allow: /player/
@@ -29,7 +31,9 @@ Allow: /
 Allow: /$
 Allow: /termos
 Allow: /privacidade
+Allow: /guias
 Allow: /ferramentas
+Allow: /estatisticas
 Allow: /modelos-de-torneio
 Allow: /sobre
 Allow: /player/

@@ -24,6 +24,9 @@ const HomePage             = lazy(() => import('./pages/HomePage'));
 const ProfilePage          = lazy(() => import('./pages/ProfilePage'));
 const PublicProfilePage    = lazy(() => import('./pages/PublicProfilePage'));
 const MatchPageVisitor     = lazy(() => import('./pages/MatchPageVisitor'));
+const GuiasPage            = lazy(() => import('./pages/GuiasPage'));
+const EstatisticasPage     = lazy(() => import('./pages/EstatisticasPage'));
+const GuiaPage             = lazy(() => import('./pages/GuiaPage'));
 const RankingsPage         = lazy(() => import('./pages/RankingsPage'));
 const FinancialPage        = lazy(() => import('./pages/FinancialPage'));
 const FerramentasPage      = lazy(() => import('./pages/FerramentasPage'));
@@ -178,6 +181,9 @@ const AppInner = () => {
           <Route path="/login"         element={<LoginPage />} />
           <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
           <Route path="/visitor"       element={<Navigate to="/ferramentas/sorteador" replace />} />
+          <Route path="/guias"                             element={<GuiasPage />} />
+          <Route path="/guias/:slug"                       element={<GuiaPage />} />
+          <Route path="/estatisticas"                      element={<EstatisticasPage />} />
           <Route path="/ferramentas"                       element={<FerramentasPage />} />
           <Route path="/ferramentas/sorteador"             element={<SorteadorTimes />} />
           <Route path="/ferramentas/calculadora-torneio"    element={<TorneioCalculadora />} />
