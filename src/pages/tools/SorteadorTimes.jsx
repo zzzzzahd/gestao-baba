@@ -14,6 +14,8 @@ import { balanceTeams, teamCount, parsePlayerList } from '../../utils/teamBalanc
 const tool = TOOLS.find((t) => t.slug === 'sorteador');
 const STORAGE_KEY = 'visitor_players_list'; // mesma chave do modo visitante: listas antigas continuam valendo
 const LEVELS = { 1: 'Abaixo da média', 2: 'Na média', 3: 'Acima da média' };
+const MIN_PER_TEAM = 2;
+const MAX_PER_TEAM = 11;
 
 let idSeq = 0;
 const newId = () => `${Date.now()}-${idSeq++}`;
@@ -27,6 +29,7 @@ export default function SorteadorTimes() {
   const [stars, setStars] = useState(2);
   const [paste, setPaste] = useState('');
   const [perTeam, setPerTeam] = useState(5);
+  const [perTeamText, setPerTeamText] = useState('5'); // texto digitado (permite apagar/digitar livremente)
   const [leftover, setLeftover] = useState('reserve');
   const [result, setResult] = useState(null);
   const [formError, setFormError] = useState('');
@@ -55,6 +58,23 @@ export default function SorteadorTimes() {
   const allEqualLevels = players.length > 0 && players.every((p) => p.stars === players[0].stars);
 
   const exists = (n) => players.some((p) => p.name.toLowerCase() === n.toLowerCase());
+
+  // Campo "Jogadores por time": deixa digitar/apagar livremente e só aplica o limite ao sair do campo.
+  const handlePerTeamChange = (e) => {
+    const raw = e.target.value;
+    setPerTeamText(raw);
+    const n = Number(raw);
+    if (raw !== '' && Number.isFinite(n) && n >= MIN_PER_TEAM && n <= MAX_PER_TEAM) {
+      setPerTeam(Math.floor(n));
+      setResult(null);
+    }
+  };
+  const handlePerTeamBlur = () => {
+    const n = Math.max(MIN_PER_TEAM, Math.min(MAX_PER_TEAM, Math.floor(Number(perTeamText)) || MIN_PER_TEAM));
+    setPerTeam(n);
+    setPerTeamText(String(n));
+    setResult(null);
+  };
 
   const addPlayer = () => {
     const n = name.trim();
@@ -129,9 +149,16 @@ export default function SorteadorTimes() {
         <div className="grid grid-cols-3 gap-3 items-end">
           <div className="col-span-3 sm:col-span-1">
             <Field label="Jogadores por time" hint={`Mínimo de ${need} jogadores`}>
-              <input type="number" min={2} max={11} value={perTeam}
-                onChange={(e) => { setPerTeam(Math.max(2, Math.min(11, Number(e.target.value) || 2))); setResult(null); }}
-                className={inputCls} />
+              <input
+                type="number"
+                inputMode="numeric"
+                min={MIN_PER_TEAM}
+                max={MAX_PER_TEAM}
+                value={perTeamText}
+                onChange={handlePerTeamChange}
+                onBlur={handlePerTeamBlur}
+                className={inputCls}
+              />
             </Field>
           </div>
           <div className="col-span-3 sm:col-span-2">
