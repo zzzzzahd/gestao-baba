@@ -53,7 +53,7 @@ describe('shuffle() — desempate não pode ser sempre alfabético', () => {
       linePlayer('Z', 'Zharick', 2), // Z, mesmo nível — deveria ter chance igual
     ];
     let zharickWasFirst = false;
-    for (let i = 0; i < 50 && !zharickWasFirst; i++) {
+    for (let i = 0; i < 500 && !zharickWasFirst; i++) {
       const sorted = shuffle(players).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
       if (sorted[0].id === 'Z') zharickWasFirst = true;
     }

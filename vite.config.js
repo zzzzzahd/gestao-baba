@@ -70,11 +70,15 @@ return {
 }),
     VitePWA({
       registerType: 'autoUpdate',
+      // src/main.jsx já registra /sw.js manualmente; evita o registerSW.js duplicado.
+      injectRegister: false,
       includeAssets: ['icons/*.png', 'logo.png', 'offline.html'],
       manifest: {
+        // id estável: preserva a identidade do PWA já instalado (vinha do manifest.json antigo).
+        id:               'app.vercel.gestao_baba',
         name:             'Draft Play - Gestão de Baba',
         short_name:       'Draft Play',
-        description:      'Sistema profissional de gestão de peladas e babas.',
+        description:      'Sistema profissional de gestão de peladas e babas. Sorteio de times, rankings, presenças e financeiro.',
         start_url:        '/',
         scope:            '/',
         display:          'standalone',
@@ -82,6 +86,7 @@ return {
         theme_color:      '#00f2ff',
         orientation:      'portrait-primary',
         lang:             'pt-BR',
+        dir:              'ltr',
         icons: [
           { src: '/icons/icon-72x72.png',   sizes: '72x72',   type: 'image/png' },
           { src: '/icons/icon-96x96.png',   sizes: '96x96',   type: 'image/png' },
@@ -93,35 +98,34 @@ return {
           { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
         shortcuts: [
-          {
-            name:      'Próximo Jogo',
-            short_name: 'Jogo',
-            url:       '/home',
-            icons:     [{ src: '/icons/icon-192x192.png', sizes: '192x192' }],
-          },
-          {
-            name:      'Rankings',
-            short_name: 'Rankings',
-            url:       '/rankings',
-            icons:     [{ src: '/icons/icon-192x192.png', sizes: '192x192' }],
-          },
+          { name: 'Confirmar Presença', short_name: 'Presença', description: 'Confirmar presença no próximo jogo',
+            url: '/dashboard?tab=overview', icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }] },
+          { name: 'Rankings', short_name: 'Rankings', description: 'Ver artilharia e assistências',
+            url: '/rankings', icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }] },
+          { name: 'Sorteio de Times', short_name: 'Sorteio', description: 'Sortear times para o baba',
+            url: '/draw', icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }] },
+          { name: 'Torneio', short_name: 'Torneio', description: 'Modo mata-mata',
+            url: '/tournament', icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }] },
         ],
         categories:                  ['sports', 'utilities'],
         prefer_related_applications: false,
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /supabase\.co/],
+        // Arquivos estáticos de raiz NÃO podem cair no fallback do SPA: sem isso o
+        // service worker serve o index.html pra /ads.txt, /robots.txt etc. (o React
+        // renderiza a tela de 404) em qualquer navegador que já visitou o site.
+        navigateFallbackDenylist: [
+          /^\/api/,
+          /supabase\.co/,
+          /^\/ads\.txt$/,
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/,
+          /^\/google[a-z0-9]+\.html$/,
+          /^\/manifest\.(json|webmanifest)$/,
+        ],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
-            handler:    'CacheFirst',
-            options: {
-              cacheName: 'google-fonts',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
           {
             urlPattern: /^https:\/\/cdnjs\.cloudflare\.com/,
             handler:    'CacheFirst',

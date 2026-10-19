@@ -128,13 +128,13 @@ export default function PublicProfilePage({ initialData = null }) {
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-black flex items-center justify-center outline-none">
       <div className="w-10 h-10 border-4 border-cyan-electric border-t-transparent rounded-full animate-spin" />
-    </div>
+    </main>
   );
 
   if (notFound || !profile) return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-center px-6">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-center px-6 outline-none">
       <p className="text-5xl">🔍</p>
       <h1 className="text-xl font-black text-white uppercase">Jogador não encontrado</h1>
       <p className="text-[10px] text-text-muted font-black uppercase">Perfil inexistente ou privado</p>
@@ -150,7 +150,7 @@ export default function PublicProfilePage({ initialData = null }) {
       >
         Ir pra página inicial
       </Link>
-    </div>
+    </main>
   );
 
   // Conquistas: só o que veio do banco (player_badges) — fonte única, mesma do perfil privado
@@ -162,8 +162,10 @@ export default function PublicProfilePage({ initialData = null }) {
   }));
 
   return (
-    <div
-      className="min-h-screen bg-black text-white pb-12"
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen bg-black text-white pb-12 outline-none"
       data-profile-name={profile.name || ''}
       data-profile-goals={stats?.goals ?? 0}
       data-profile-assists={stats?.assists ?? 0}
@@ -406,6 +408,6 @@ export default function PublicProfilePage({ initialData = null }) {
             dados reais); só existia no estado "não encontrado". */}
         <PublicPagesFooter />
       </div>
-    </div>
+    </main>
   );
 }

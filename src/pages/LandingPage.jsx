@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import '@fontsource/caveat/500.css';
-import '@fontsource/caveat/700.css';
+import '@fontsource/caveat/latin-500.css';
+import '@fontsource/caveat/latin-700.css';
 import AdBanner from '../components/AdBanner';
 import PublicPagesFooter from '../components/PublicPagesFooter';
 import {
@@ -47,12 +47,12 @@ const steps = [
   { icon: UserCheck, mock: 'presenca', title: 'Convidados confirmam', desc: 'Entram pelo convite e confirmam presença. Faltou, a reserva entra.' },
   {
     icon: Shuffle, title: 'Sorteie os times', desc: 'O app monta times equilibrados pelo nível dos jogadores.',
-    image: '/marketing/sorteio-times.png',
+    image: '/marketing/sorteio-times.webp',
     alt: 'Tela do Draft Play com jogadores cadastrados e configuração de sorteio de times',
   },
   {
     icon: Radio, title: 'Jogue e registre', desc: 'Placar, cronômetro e fila ao vivo. Gols e assistências alimentam o ranking e o perfil de cada um.',
-    image: '/marketing/placar-ao-vivo.png',
+    image: '/marketing/placar-ao-vivo.webp',
     alt: 'Tela do Draft Play com partida ao vivo, cronômetro, placar e fila de próximos jogadores',
   },
 ];
@@ -159,7 +159,7 @@ const paperStyle = {
 const HAND_CSS = `
 .font-hand{font-family:'Caveat','Segoe Print','Bradley Hand',cursive}
 .dp-word{display:inline-block;animation:dpIn .5s ease-out both}
-@keyframes dpIn{from{opacity:0;transform:translateY(6px) rotate(-1deg)}to{opacity:1;transform:none}}
+@keyframes dpIn{from{transform:translateY(6px) rotate(-1deg)}to{transform:none}}
 @media (prefers-reduced-motion:reduce){.dp-word{animation:none}}`;
 
 // Texto "escrito" palavra por palavra (continua sendo texto real, indexável).
@@ -311,6 +311,8 @@ const LandingPage = () => {
         </nav>
       </header>
 
+      {/* Alvo do skip link: exatamente um <main> por página (AdBanner e rodapé ficam fora) */}
+      <main id="main-content" tabIndex={-1} className="outline-none">
       {/* 1. Hero: prancheta com a promessa + mascote */}
       <section className="max-w-5xl mx-auto px-6 py-14 md:py-20 grid md:grid-cols-[1.25fr_1fr] gap-12 items-center">
         <div className="space-y-8">
@@ -338,9 +340,11 @@ const LandingPage = () => {
         <div className="relative max-w-xs mx-auto w-full">
           <div className="absolute inset-0 bg-cyan-electric/20 blur-[80px] rounded-full" />
           <img
-            src="/marketing/mascote-prancheta.png"
+            src="/marketing/mascote-prancheta.webp"
             alt="Mascote do Draft Play Baba Manager: um técnico de terno mostrando uma prancheta com a tática do time"
             width="560" height="497"
+            fetchpriority="high"
+            decoding="async"
             className="relative w-full drop-shadow-[0_0_30px_rgba(0,242,255,0.25)]"
           />
           <p className="absolute -top-3 -right-2 font-hand text-2xl font-bold px-4 py-1 rounded-lg shadow-lg rotate-3" style={{ ...paperStyle, color: INK }}>
@@ -539,11 +543,13 @@ const LandingPage = () => {
         </div>
       </section>
 
+      </main>
+
       <div className="max-w-5xl mx-auto px-6 pb-10 space-y-6">
         <AdBanner slot={import.meta.env.VITE_ADSENSE_SLOT_LANDING} className="mt-2" />
         <div className="text-center space-y-3">
           <PublicPagesFooter current="home" className="opacity-80" />
-          <p className="text-center text-[9px] font-bold opacity-20 uppercase tracking-[0.4em]">
+          <p className="text-center text-[9px] font-bold opacity-60 uppercase tracking-[0.4em]">
             Draft Play Baba Manager
           </p>
         </div>

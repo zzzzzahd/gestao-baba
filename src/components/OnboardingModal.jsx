@@ -3,6 +3,7 @@
 // 3 steps máximo. Foca no que o usuário vai fazer AGORA.
 
 import React, { useState } from 'react';
+import { ONBOARDING_KEY } from '../utils/firstVisitGates';
 import { Users, Shuffle, CheckCircle2, X, ChevronRight } from 'lucide-react';
 
 const STEPS = [
@@ -29,12 +30,9 @@ const STEPS = [
   },
 ];
 
-const ONBOARDING_KEY = 'draft_play_onboarding_done_v2';
-
-export const shouldShowOnboarding = () => {
-  try { return !localStorage.getItem(ONBOARDING_KEY); }
-  catch { return false; }
-};
+// shouldShowOnboarding vive em utils/firstVisitGates (o App não precisa carregar este modal
+// só para decidir se ele aparece). Reexportado aqui para manter a API pública.
+export { shouldShowOnboarding } from '../utils/firstVisitGates';
 
 export const markOnboardingDone = () => {
   try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch {}

@@ -68,7 +68,7 @@ export const GUIAS = [
             height: 897,
           },
           {
-            src: "/marketing/sorteio-times.png",
+            src: "/marketing/sorteio-times-guia.webp",
             alt: "Configuração do sorteio de times no Draft Play, com jogadores cadastrados e número de jogadores por time",
             caption: "Você define quantos jogam por time e o app distribui em serpentina pelo nível.",
           },
@@ -314,7 +314,7 @@ export const GUIAS = [
         h2: "Como o Draft Play resolve",
         media: [
           {
-            src: "/marketing/placar-ao-vivo.png",
+            src: "/marketing/placar-ao-vivo-guia.webp",
             alt: "Partida ao vivo no Draft Play com cronômetro, placar dos dois times e a fila dos próximos a jogar",
             caption: "Cronômetro, placar e fila de próximos times na mesma tela.",
           },

@@ -23,6 +23,16 @@ vi.mock('react-hot-toast', () => ({
   }),
 }));
 
+// html2canvas agora é import dinâmico: mock no topo do arquivo (nunca dentro de it()).
+// `unavailable` simula falha ao carregar o módulo (o getter lança dentro do try do componente).
+const h2c = vi.hoisted(() => ({ fn: vi.fn(), unavailable: false }));
+vi.mock('html2canvas', () => ({
+  get default() {
+    if (h2c.unavailable) throw new Error('módulo indisponível');
+    return h2c.fn;
+  },
+}));
+
 import FeedbackModal from '../../components/FeedbackModal';
 import { useAuth }   from '../../contexts/AuthContext';
 import { supabase }  from '../../services/supabase';
@@ -226,10 +236,13 @@ describe('FeedbackModal — submit', () => {
 });
 
 describe('FeedbackModal — screenshot', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h2c.unavailable = false;
+  });
 
   it('chama toast.error quando html2canvas não está disponível', async () => {
-    delete window.html2canvas;
+    h2c.unavailable = true;
     renderModal();
     fireEvent.click(screen.getByLabelText('Capturar screenshot da tela'));
     await waitFor(() => {
@@ -238,7 +251,7 @@ describe('FeedbackModal — screenshot', () => {
   });
 
   it('exibe preview após captura bem-sucedida', async () => {
-    window.html2canvas = vi.fn().mockResolvedValue({
+    h2c.fn.mockResolvedValue({
       toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,abc'),
     });
     renderModal();
@@ -246,11 +259,10 @@ describe('FeedbackModal — screenshot', () => {
     await waitFor(() => {
       expect(screen.getByAltText('Preview')).toBeInTheDocument();
     });
-    delete window.html2canvas;
   });
 
   it('botão X remove o screenshot', async () => {
-    window.html2canvas = vi.fn().mockResolvedValue({
+    h2c.fn.mockResolvedValue({
       toDataURL: vi.fn().mockReturnValue('data:image/jpeg;base64,abc'),
     });
     renderModal();
@@ -258,7 +270,6 @@ describe('FeedbackModal — screenshot', () => {
     await waitFor(() => screen.getByAltText('Preview'));
     fireEvent.click(screen.getByLabelText('Remover screenshot'));
     expect(screen.queryByAltText('Preview')).toBeNull();
-    delete window.html2canvas;
   });
 });
 

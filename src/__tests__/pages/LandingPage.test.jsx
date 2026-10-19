@@ -1,10 +1,10 @@
 // src/__tests__/pages/LandingPage.test.jsx
 // Sprint T-8 — Page: LandingPage
-// Página pública inicial: botões de login/visitante, logo, recursos.
+// Página pública inicial: CTAs (organizar baba / ferramentas grátis), recursos, FAQ.
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ── React Router ──────────────────────────────────────────────────────────────
@@ -13,11 +13,6 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return { ...actual, useNavigate: () => mockNavigate };
 });
-
-// ── Componentes auxiliares ────────────────────────────────────────────────────
-vi.mock('../../components/Logo', () => ({
-  default: ({ size }) => <div data-testid="logo" data-size={size}>Logo</div>,
-}));
 
 import LandingPage from '../../pages/LandingPage';
 
@@ -31,97 +26,105 @@ describe('LandingPage › estrutura', () => {
     expect(() => wrap()).not.toThrow();
   });
 
-  it('exibe Logo com size="large"', () => {
+  it('exibe título principal no h1', () => {
     wrap();
-    const logo = screen.getByTestId('logo');
-    expect(logo.getAttribute('data-size')).toBe('large');
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.textContent).toMatch(/Gerencie seu baba/i);
+    expect(h1.textContent).toMatch(/do sorteio ao caixa/i);
   });
 
-  it('exibe título "Organize o baba sem zap lotado"', () => {
+  it('exibe texto de apresentação do app de gestão', () => {
     wrap();
-    expect(screen.getByText(/Organize o baba sem zap lotado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Presença, sorteio de times balanceados/i)).toBeInTheDocument();
   });
 
-  it('exibe subtítulo sobre o app de gestão', () => {
+  it('exibe rodapé "Draft Play Baba Manager"', () => {
     wrap();
-    expect(screen.getByText(/O Draft Play é o app de gestão/i)).toBeInTheDocument();
+    const rodape = screen.getAllByText(/Draft Play Baba Manager/i);
+    expect(rodape.length).toBeGreaterThan(0);
   });
 
-  it('exibe rodapé "Powered by Draft Baba"', () => {
+  it('exibe link "Sobre" apontando para /sobre', () => {
     wrap();
-    expect(screen.getByText(/Powered by Draft Baba/i)).toBeInTheDocument();
+    const links = screen.getAllByRole('link', { name: /^Sobre$/i });
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((l) => expect(l).toHaveAttribute('href', '/sobre'));
   });
 
-  it('exibe link "Sobre" no rodapé apontando para /sobre', () => {
+  it('menu principal tem âncoras internas e link de entrada', () => {
     wrap();
-    const link = screen.getByRole('link', { name: /^Sobre$/i });
-    expect(link).toHaveAttribute('href', '/sobre');
+    const nav = screen.getByRole('navigation', { name: /Menu principal/i });
+    expect(nav).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Entrar$/i })).toHaveAttribute('href', '/login');
   });
 });
 
-// ─── Botões de ação ───────────────────────────────────────────────────────────
+// ─── Botões de ação (par de CTAs aparece no topo e no fim da página) ─────────
 describe('LandingPage › botões', () => {
-  it('botão "Começar agora" está presente', () => {
+  it('botão "Organizar meu baba" está presente nos dois pares de CTAs', () => {
     wrap();
-    expect(
-      screen.getByRole('button', { name: /Começar agora/i })
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Organizar meu baba/i })).toHaveLength(2);
   });
 
-  it('botão "Modo Visitante (Sem Conta)" está presente', () => {
+  it('botão "Ferramentas grátis" está presente nos dois pares de CTAs', () => {
     wrap();
-    expect(
-      screen.getByRole('button', { name: /Modo Visitante/i })
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Ferramentas grátis/i })).toHaveLength(2);
   });
 
-  it('"Começar agora" navega para /login', () => {
+  it('"Organizar meu baba" navega para /login', () => {
     wrap();
-    fireEvent.click(screen.getByRole('button', { name: /Começar agora/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /Organizar meu baba/i })[0]);
     expect(mockNavigate).toHaveBeenCalledWith('/login');
   });
 
-  it('"Modo Visitante" navega para /visitor', () => {
+  it('"Ferramentas grátis" navega para /ferramentas', () => {
     wrap();
-    fireEvent.click(screen.getByRole('button', { name: /Modo Visitante/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/visitor');
+    fireEvent.click(screen.getAllByRole('button', { name: /Ferramentas grátis/i })[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/ferramentas');
   });
 });
 
 // ─── Recursos listados ────────────────────────────────────────────────────────
 describe('LandingPage › recursos', () => {
-  it('exibe "Presença e falta"', () => {
+  const recursos = [
+    'Presença em tempo real',
+    'Sorteio balanceado',
+    'Placar e fila ao vivo',
+    'Ranking de gols e assistências',
+    'Divisões e conquistas',
+    'Perfil público',
+    'Caixa do baba',
+    'Resumo do dia',
+    'Histórico do grupo',
+  ];
+
+  // Alguns títulos (ex.: "Perfil público") também aparecem em outras seções,
+  // então a busca é restrita à seção "Tudo que o baba precisa" (#recursos).
+  const secaoRecursos = () => {
+    const alvo = document.getElementById('recursos');
+    expect(alvo).not.toBeNull();
+    return within(alvo.closest('section'));
+  };
+
+  it.each(recursos)('exibe o recurso "%s"', (titulo) => {
     wrap();
-    expect(screen.getByText('Presença e falta')).toBeInTheDocument();
+    expect(secaoRecursos().getByText(titulo)).toBeInTheDocument();
   });
 
-  it('exibe "Conquistas e ranking"', () => {
+  it('lista 9 recursos no total', () => {
     wrap();
-    expect(screen.getByText('Conquistas e ranking')).toBeInTheDocument();
-  });
-
-  it('exibe "Cobrança via Pix"', () => {
-    wrap();
-    expect(screen.getByText('Cobrança via Pix')).toBeInTheDocument();
-  });
-
-  it('exibe "Sem zap lotado"', () => {
-    wrap();
-    expect(screen.getByText('Sem zap lotado')).toBeInTheDocument();
-  });
-
-  it('4 recursos listados no total', () => {
-    wrap();
-    const recursos = ['Presença e falta', 'Conquistas e ranking', 'Cobrança via Pix', 'Sem zap lotado'];
-    recursos.forEach(r => expect(screen.getByText(r)).toBeInTheDocument());
+    const secao = secaoRecursos();
+    recursos.forEach((r) => expect(secao.getByText(r)).toBeInTheDocument());
+    expect(recursos).toHaveLength(9);
   });
 });
 
-// ─── Separador visual ─────────────────────────────────────────────────────────
-describe('LandingPage › separador', () => {
-  it('exibe divisor "ou"', () => {
+// ─── Seções de conteúdo ───────────────────────────────────────────────────────
+describe('LandingPage › seções', () => {
+  it('exibe "Como funciona" e "Perguntas frequentes"', () => {
     wrap();
-    expect(screen.getByText('ou')).toBeInTheDocument();
+    expect(screen.getByText('Como funciona', { selector: 'h2, h2 *' })).toBeInTheDocument();
+    expect(screen.getByText('Perguntas frequentes')).toBeInTheDocument();
   });
 });
 
@@ -129,55 +132,42 @@ describe('LandingPage › separador', () => {
 describe('LandingPage › estilos', () => {
   it('botão principal tem gradient cyan', () => {
     wrap();
-    const btn = screen.getByRole('button', { name: /Começar agora/i });
+    const btn = screen.getAllByRole('button', { name: /Organizar meu baba/i })[0];
     expect(btn.style.background).toContain('linear-gradient');
     expect(btn.style.background).toContain('#00f2ff');
   });
 
-  it('botão visitante tem estilo secundário (bg-surface-2)', () => {
+  it('botão secundário tem borda ciano (estilo secundário)', () => {
     wrap();
-    const btn = screen.getByRole('button', { name: /Modo Visitante/i });
-    expect(btn.className).toMatch(/bg-surface-2/);
+    const btn = screen.getAllByRole('button', { name: /Ferramentas grátis/i })[0];
+    expect(btn.className).toMatch(/border-cyan-electric/);
   });
 });
 
 // ─── Acessibilidade ───────────────────────────────────────────────────────────
 describe('LandingPage › acessibilidade', () => {
-  it('h1 contém o título principal', () => {
+  it('há exatamente um h1', () => {
     wrap();
-    const h1 = screen.getByRole('heading', { level: 1 });
-    expect(h1).toBeInTheDocument();
-    expect(h1.textContent).toContain('Organize o baba sem zap lotado');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
-  it('ambos os botões são do tipo button', () => {
+  it('todos os botões são do tipo button', () => {
     wrap();
-    const btns = screen.getAllByRole('button');
-    btns.forEach(b => expect(b.tagName).toBe('BUTTON'));
+    screen.getAllByRole('button').forEach((b) => expect(b.tagName).toBe('BUTTON'));
   });
 
   it('página ocupa min-h-screen', () => {
     const { container } = wrap();
     expect(container.firstChild).not.toBeNull();
-    expect(
-      (container.firstChild).className
-    ).toMatch(/min-h-screen/);
+    expect(container.firstChild.className).toMatch(/min-h-screen/);
   });
 });
 
 // ─── Não requer autenticação ──────────────────────────────────────────────────
 describe('LandingPage › independência de contexto', () => {
   it('renderiza sem AuthContext ou BabaContext', () => {
-    // Sem providers — deve funcionar pois LandingPage não usa contextos
     expect(() =>
       render(<MemoryRouter><LandingPage /></MemoryRouter>)
     ).not.toThrow();
-  });
-
-  it('sem JavaScript: botões têm role correto para links futuros', () => {
-    wrap();
-    const [btn1, btn2] = screen.getAllByRole('button');
-    expect(btn1).toBeTruthy();
-    expect(btn2).toBeTruthy();
   });
 });

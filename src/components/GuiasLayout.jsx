@@ -16,13 +16,13 @@ const GuiasLayout = ({ children }) => (
         <div className="flex items-center gap-5 text-text-mid">
           <Link to="/guias" className="text-white hover:text-cyan-electric transition-colors">Guias</Link>
           <Link to="/sobre" className="hover:text-cyan-electric transition-colors">Sobre</Link>
-          <Link to="/login" className="text-white hover:text-cyan-electric transition-colors">Entrar</Link>
+          <Link to="/login" className="bg-cyan-electric text-black font-black uppercase tracking-widest text-[10px] px-4 py-2 rounded-lg hover:brightness-110 transition">Entrar</Link>
         </div>
       </nav>
     </header>
 
-    {/* Sem <main> aqui: o prerender já envolve a página em <main id="main-content"> */}
-    <div>{children}</div>
+    {/* Alvo do skip link do index.html: exatamente um <main> por página */}
+    <main id="main-content" tabIndex={-1} className="outline-none">{children}</main>
 
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-3 text-center">
       <PublicPagesFooter current="guias" className="opacity-80" />

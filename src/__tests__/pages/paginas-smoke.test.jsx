@@ -58,9 +58,9 @@ describe('Páginas públicas › smoke', () => {
         <LandingPage />
       </MemoryRouter>
     );
-    expect(screen.getByText(/organize o baba sem zap lotado/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /começar agora/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /modo visitante/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/gerencie seu baba/i);
+    expect(screen.getAllByRole('button', { name: /organizar meu baba/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /ferramentas grátis/i }).length).toBeGreaterThan(0);
   });
 
   it('Login renderiza formulário', () => {

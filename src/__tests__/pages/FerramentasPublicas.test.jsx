@@ -1,9 +1,19 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../components/Logo', () => ({ default: () => <div>Logo</div> }));
+
+// html2canvas agora é import dinâmico: mock no topo do arquivo (nunca dentro de it()).
+// `unavailable` simula falha ao carregar o módulo (o getter lança dentro do try do componente).
+const h2c = vi.hoisted(() => ({ fn: vi.fn(), unavailable: false }));
+vi.mock('html2canvas', () => ({
+  get default() {
+    if (h2c.unavailable) throw new Error('módulo indisponível');
+    return h2c.fn;
+  },
+}));
 
 import FerramentasPage from '../../pages/FerramentasPage';
 import TorneioCalculadora from '../../pages/tools/TorneioCalculadora';
@@ -116,6 +126,10 @@ describe('Sorteador', () => {
 });
 
 describe('Exportar imagem dos times', () => {
+  beforeEach(() => {
+    h2c.fn.mockReset();
+    h2c.unavailable = false;
+  });
   const sortear = () => {
     localStorage.clear();
     wrap(<SorteadorTimes />);
@@ -124,28 +138,27 @@ describe('Exportar imagem dos times', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Importar lista' }));
     fireEvent.click(screen.getByRole('button', { name: /Sortear times/i }));
   };
-  it('flag desligada: botão baixa direto, sem modal de anúncio', () => {
+  it('flag desligada: botão baixa direto, sem modal de anúncio', async () => {
     sortear();
-    window.html2canvas = vi.fn().mockResolvedValue({ toBlob: (cb) => cb(new Blob(['x'])) });
+    h2c.fn.mockResolvedValue({ toBlob: (cb) => cb(new Blob(['x'])) });
     URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn();
     fireEvent.click(screen.getByRole('button', { name: /Baixar imagem dos times/i }));
     expect(screen.queryByText(/Assista a um anúncio curto/i)).toBeNull();
-    expect(window.html2canvas).toHaveBeenCalled();
+    await waitFor(() => expect(h2c.fn).toHaveBeenCalled());
   });
   it('flag ligada: abre o modal e só gera a imagem depois', () => {
     vi.stubEnv('VITE_TOOLS_REWARDED_EXPORT', 'true');
     sortear();
-    window.html2canvas = vi.fn();
     fireEvent.click(screen.getByRole('button', { name: /Baixar imagem dos times/i }));
     expect(screen.getByText(/Assista a um anúncio curto/i)).toBeInTheDocument();
-    expect(window.html2canvas).not.toHaveBeenCalled();
+    expect(h2c.fn).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
-  it('sem html2canvas mostra erro amigável e o texto continua copiável', () => {
+  it('sem html2canvas mostra erro amigável e o texto continua copiável', async () => {
     sortear();
-    delete window.html2canvas;
+    h2c.unavailable = true;
     fireEvent.click(screen.getByRole('button', { name: /Baixar imagem dos times/i }));
-    expect(screen.getByRole('alert').textContent).toMatch(/Copiar times/);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Copiar times/);
     expect(screen.getByRole('button', { name: /Copiar times/i })).toBeInTheDocument();
   });
 });

@@ -41,7 +41,7 @@ export default function EstatisticasPage() {
           <Link to="/ferramentas" className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-electric">Ferramentas</Link>
         </header>
 
-        <div className="space-y-12">
+        <main id="main-content" tabIndex={-1} className="space-y-12 outline-none">
           <div className="space-y-4">
             <h1 className="text-2xl md:text-3xl font-black italic tracking-tight text-cyan-electric">Estatísticas do futebol amador: como ler e usar no seu baba</h1>
             <p className="text-sm opacity-70 leading-relaxed">
@@ -89,7 +89,7 @@ export default function EstatisticasPage() {
               </p>
             </Card>
           </Section>
-        </div>
+        </main>
 
         <PublicPagesFooter current="estatisticas" className="pb-6" />
       </div>

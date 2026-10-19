@@ -2,10 +2,8 @@
 // Sprint 6 — Changelog atualizado com novidades dos Sprints 1-5.
 
 import React from 'react';
+import { CHANGELOG_STORAGE_KEY } from '../utils/firstVisitGates';
 import { X, Sparkles, Shield, Zap, Bug, Trophy, Star } from 'lucide-react';
-
-const CURRENT_VERSION = '2.0.0';
-const STORAGE_KEY     = `draft_play_changelog_seen_${CURRENT_VERSION}`;
 
 const CHANGELOG = [
   {
@@ -32,13 +30,12 @@ const TYPE_CONFIG = {
   fix:      { label: 'Correção',  className: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'          },
 };
 
-export const shouldShowChangelog = () => {
-  try { return !localStorage.getItem(STORAGE_KEY); }
-  catch { return false; }
-};
+// shouldShowChangelog vive em utils/firstVisitGates (o App decide sem carregar este modal).
+// Reexportado aqui para manter a API pública.
+export { shouldShowChangelog } from '../utils/firstVisitGates';
 
 export const markChangelogSeen = () => {
-  try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+  try { localStorage.setItem(CHANGELOG_STORAGE_KEY, '1'); } catch {}
 };
 
 export default function ChangelogModal({ isOpen, onClose }) {

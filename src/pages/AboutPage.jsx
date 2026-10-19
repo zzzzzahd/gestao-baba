@@ -54,7 +54,7 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto px-5 py-6 space-y-6">
+      <main id="main-content" tabIndex={-1} className="max-w-xl mx-auto px-5 py-6 space-y-6 outline-none">
 
         <Section title="O que é o Draft Play">
           <p>
@@ -168,7 +168,7 @@ export default function AboutPage() {
 
         <PublicPagesFooter current="sobre" />
 
-      </div>
+      </main>
     </div>
   );
 }

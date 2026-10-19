@@ -1,6 +1,6 @@
 // src/components/FeedbackModal.jsx
 // Feedback in-app: reportar bug ou sugestão, com screenshot opcional.
-// Screenshot via html2canvas (já carregado via CDN no index.html).
+// Screenshot via html2canvas (import dinâmico: só baixa quando o usuário captura).
 
 import React, { useState } from 'react';
 import { X, MessageSquare, Bug, Lightbulb, Send, Image } from 'lucide-react';
@@ -26,11 +26,14 @@ export default function FeedbackModal({ isOpen, onClose }) {
 
   const captureScreen = async () => {
     try {
-      if (typeof window.html2canvas !== 'function') {
+      let html2canvas;
+      try {
+        ({ default: html2canvas } = await import('html2canvas'));
+      } catch {
         toast.error('html2canvas não disponível');
         return;
       }
-      const canvas = await window.html2canvas(document.body, { scale: 0.5, useCORS: true });
+      const canvas = await html2canvas(document.body, { scale: 0.5, useCORS: true });
       setScreenshot(canvas.toDataURL('image/jpeg', 0.6));
       toast.success('Screenshot capturado!');
     } catch (e) {

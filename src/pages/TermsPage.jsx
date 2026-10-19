@@ -33,7 +33,7 @@ export default function TermsPage() {
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto px-5 py-6 space-y-6">
+      <main id="main-content" tabIndex={-1} className="max-w-xl mx-auto px-5 py-6 space-y-6 outline-none">
 
         <div className="p-4 rounded-2xl bg-cyan-electric/5 border border-cyan-electric/15">
           <p className="text-[10px] font-black text-cyan-electric uppercase tracking-widest mb-1">
@@ -155,7 +155,7 @@ export default function TermsPage() {
             Voltar
           </button>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

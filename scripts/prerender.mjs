@@ -105,7 +105,8 @@ function applyMeta(
   let html = template
     .replace(
       '<main id="main-content"></main>',
-      () => `<main id="main-content">${appHtml}</main>`
+      // Cada página prerenderizada traz o próprio <main id="main-content"> (1 por página).
+      () => appHtml
     )
     .replace(/<title>.*?<\/title>/, () => `<title>${t}</title>`)
     .replace(

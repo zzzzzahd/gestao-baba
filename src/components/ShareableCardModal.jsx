@@ -1,6 +1,6 @@
 // src/components/ShareableCardModal.jsx
 // Sprint 12 fix: dois templates — 'ranking' (artilheiro/garçom/mvp) e 'profile' (stats individuais)
-// html2canvas já carregado via CDN no index.html.
+// html2canvas é carregado sob demanda (import dinâmico) ao gerar o card.
 
 import React, { useRef, useState } from 'react';
 import { X, Download, Share2, Star, Instagram, Heart } from 'lucide-react';
@@ -239,8 +239,13 @@ const ShareableCardModal = ({
 
   const captureCard = async () => {
     if (!cardRef.current) throw new Error('Card não encontrado');
-    if (!window.html2canvas) throw new Error('html2canvas indisponível');
-    return window.html2canvas(cardRef.current, {
+    let html2canvas;
+    try {
+      ({ default: html2canvas } = await import('html2canvas'));
+    } catch {
+      throw new Error('html2canvas indisponível');
+    }
+    return html2canvas(cardRef.current, {
       useCORS: true, backgroundColor: '#000000',
       scale: 3, logging: false,
       width: cardRef.current.offsetWidth,

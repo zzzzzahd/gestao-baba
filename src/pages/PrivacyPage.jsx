@@ -20,7 +20,7 @@ const PrivacyPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-16">
-      <div className="max-w-xl mx-auto px-5 pt-6 space-y-8">
+      <main id="main-content" tabIndex={-1} className="max-w-xl mx-auto px-5 pt-6 space-y-8 outline-none">
 
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -231,7 +231,7 @@ const PrivacyPage = () => {
         <p className="text-center text-[10px] text-text-muted font-bold uppercase tracking-widest pb-4">
           Draft Play · LGPD v1.1 · Ago/2026
         </p>
-      </div>
+      </main>
     </div>
   );
 };

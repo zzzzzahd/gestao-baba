@@ -4,55 +4,82 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// Fontes locais (subset latin: cobre ã, ç, é). Sem Google Fonts = sem CSS bloqueante.
+import '@fontsource/inter/latin-400.css';
+import '@fontsource/inter/latin-500.css';
+import '@fontsource/inter/latin-600.css';
+import '@fontsource/inter/latin-700.css';
+import '@fontsource/inter/latin-900.css';
+import '@fontsource/rajdhani/latin-400.css';
+import '@fontsource/rajdhani/latin-500.css';
+import '@fontsource/rajdhani/latin-600.css';
+import '@fontsource/rajdhani/latin-700.css';
 import './styles/global.css';
-import * as Sentry from '@sentry/react';
 
 // ─── Sentry: inicialização única, limpa e com release tracking ────────────────
+// Carregado depois do evento `load` (import dinâmico) para sair do caminho crítico.
+// Limitação: erros ocorridos antes do `load` não são capturados pelo Sentry.
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'dev';
 
-if (SENTRY_DSN) {
-  Sentry.init({
-    dsn:         SENTRY_DSN,
-    environment: import.meta.env.MODE,
-    release:     `gestao-baba@${APP_VERSION}`,   // rastreamento de releases
+function initSentry() {
+  if (!SENTRY_DSN) return;
+  // Desestruturar só o que é usado preserva o tree-shaking do chunk (o namespace inteiro não).
+  import('@sentry/react').then(({ init, browserTracingIntegration, replayIntegration }) => {
+    init({
+      dsn:         SENTRY_DSN,
+      environment: import.meta.env.MODE,
+      release:     `gestao-baba@${APP_VERSION}`,   // rastreamento de releases
 
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({
-        maskAllText:   true,     // LGPD: mascarar textos
-        blockAllMedia: true,
-      }),
-    ],
+      integrations: [
+        browserTracingIntegration(),
+        replayIntegration({
+          maskAllText:   true,     // LGPD: mascarar textos
+          blockAllMedia: true,
+        }),
+      ],
 
-    tracesSampleRate:     import.meta.env.PROD ? 0.1  : 0,
-    replaysSessionSampleRate:  0,
-    replaysOnErrorSampleRate:  import.meta.env.PROD ? 0.05 : 0,
+      tracesSampleRate:     import.meta.env.PROD ? 0.1  : 0,
+      replaysSessionSampleRate:  0,
+      replaysOnErrorSampleRate:  import.meta.env.PROD ? 0.05 : 0,
 
-    ignoreErrors: [
-      'ResizeObserver loop limit exceeded',
-      'ResizeObserver loop completed with undelivered notifications',
-      'Non-Error promise rejection captured',
-      /^chrome-extension/,
-      /^moz-extension/,
-      /safari-extension/,
-      'NetworkError',
-      'AbortError',
-    ],
+      ignoreErrors: [
+        'ResizeObserver loop limit exceeded',
+        'ResizeObserver loop completed with undelivered notifications',
+        'Non-Error promise rejection captured',
+        /^chrome-extension/,
+        /^moz-extension/,
+        /safari-extension/,
+        'NetworkError',
+        'AbortError',
+      ],
 
-    beforeSend(event) {
-      if (event.user) {
-        delete event.user.email;
-        delete event.user.ip_address;
-        delete event.user.username;
-      }
-      return event;
-    },
+      beforeSend(event) {
+        if (event.user) {
+          delete event.user.email;
+          delete event.user.ip_address;
+          delete event.user.username;
+        }
+        return event;
+      },
 
-    tracePropagationTargets: [
-      /^https:\/\/gestao-baba\.vercel\.app/,
-      /^https:\/\/itvfnargszozygcdhlrq\.supabase\.co/,
-    ],
+      tracePropagationTargets: [
+        /^https:\/\/www\.draftplay\.app\.br/,
+        /^https:\/\/itvfnargszozygcdhlrq\.supabase\.co/,
+      ],
+    });
+  });
+}
+
+if (document.readyState === 'complete') {
+  initSentry();
+} else {
+  window.addEventListener('load', () => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(initSentry, { timeout: 4000 });
+    } else {
+      setTimeout(initSentry, 1);
+    }
   });
 }
 

@@ -55,6 +55,7 @@ export function AdBanner({ slot, className = '' }) {
     <div
       className={`w-full flex justify-center overflow-hidden ${className}`}
       style={{ minHeight: '250px' }}
+      role="group"
       aria-label="Publicidade"
     >
       <ins

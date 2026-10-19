@@ -7,15 +7,11 @@ import { Star, X, Send, MessageSquare } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuth }  from '../contexts/AuthContext';
 import toast        from 'react-hot-toast';
+import { BETA_NPS_SHOWN_KEY } from '../utils/firstVisitGates';
 
-const SHOWN_KEY = 'draft_play_beta_nps_shown';
-
-export const shouldShowBetaFeedback = (gamesPlayed = 0) => {
-  try {
-    if (localStorage.getItem(SHOWN_KEY)) return false;
-    return gamesPlayed >= 3;
-  } catch { return false; }
-};
+// shouldShowBetaFeedback vive em utils/firstVisitGates (o App decide sem carregar este modal).
+// Reexportado aqui para manter a API pública.
+export { shouldShowBetaFeedback } from '../utils/firstVisitGates';
 
 const BetaFeedback = ({ onClose }) => {
   const { user }       = useAuth();
@@ -25,7 +21,7 @@ const BetaFeedback = ({ onClose }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    try { localStorage.setItem(SHOWN_KEY, '1'); } catch {}
+    try { localStorage.setItem(BETA_NPS_SHOWN_KEY, '1'); } catch {}
   }, []);
 
   const handleNPS = (n) => {

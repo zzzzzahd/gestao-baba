@@ -44,8 +44,7 @@ coverage/
 test-report.html
 test-results/
 
-# PWA
-public/icons/*.png
+# PWA (public/icons/*.png é versionado: manifest, index.html e og:image apontam para lá)
 supabase/.temp/
 
 # Playwright
@@ -56,3 +55,10 @@ supabase/.temp/
 /playwright/.auth/
 
 testsprite_tests\tmp\config.json
+
+# Artefatos do service worker gerados pelo vite-plugin-pwa no build (não versionar)
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/registerSW.js

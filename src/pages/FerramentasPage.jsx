@@ -28,7 +28,7 @@ export default function FerramentasPage() {
           <Link to="/login" className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-electric">Entrar</Link>
         </header>
 
-        <div className="space-y-8">
+        <main id="main-content" tabIndex={-1} className="space-y-8 outline-none">
           <div className="space-y-3">
             <h1 className="text-2xl md:text-3xl font-black italic tracking-tight text-cyan-electric">Ferramentas gratuitas para organizar o baba</h1>
             <p className="text-sm opacity-70 leading-relaxed">
@@ -71,7 +71,7 @@ export default function FerramentasPage() {
               histórico, ranking, presença e caixa do seu grupo, conheça o <Link to="/login" className="text-cyan-electric underline">Draft Play</Link>.
             </p>
           </section>
-        </div>
+        </main>
 
         <PublicPagesFooter current="ferramentas" className="pb-6" />
       </div>

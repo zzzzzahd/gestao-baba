@@ -15,8 +15,10 @@ const Logo = ({ size = 'large', as: Heading = 'h1' }) => {
       {/* 1. O ÍCONE (IMAGEM REAL COM GRAVATA BRANCA E FUNDO CORTADO) */}
       <div className="relative mb-2 flex flex-col items-center">
         <img 
-          src="/logo.png" 
+          src="/logo.webp" 
           alt="Draft Play Icon" 
+          width="360" height="345"
+          decoding="async"
           className={`${dimensions.icon} object-contain`} 
           style={{ 
             // BRILHO SUTIL NO ÍCONE:

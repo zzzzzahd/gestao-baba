@@ -36,7 +36,7 @@ export function ToolLayout({
           </Link>
         </header>
 
-        <div className="space-y-8">
+        <main id="main-content" tabIndex={-1} className="space-y-8 outline-none">
           <div className="space-y-3">
             <h1 className="text-2xl md:text-3xl font-black italic tracking-tight text-cyan-electric">{title}</h1>
             <p className="text-sm opacity-70 leading-relaxed">{intro}</p>
@@ -88,7 +88,7 @@ export function ToolLayout({
               Conhecer o Draft Play
             </Link>
           </div>
-        </div>
+        </main>
 
         <PublicPagesFooter current={footerCurrent} className="pb-6" />
       </div>

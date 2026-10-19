@@ -3,7 +3,7 @@
 // "Baixar imagem dos times". Copiar o texto continua livre e sem anúncio.
 // Se VITE_TOOLS_REWARDED_EXPORT=true, o download da IMAGEM passa por um anúncio
 // recompensado opcional (RewardedAdGate); com a variável desligada (padrão),
-// o download é direto. html2canvas vem do CDN já carregado no index.html.
+// o download é direto. html2canvas é carregado sob demanda (import dinâmico).
 import React, { useRef, useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 import RewardedAdGate from '../RewardedAdGate';
@@ -17,13 +17,16 @@ export default function ExportTeamsImage({ teams, reserves = [] }) {
 
   const download = async () => {
     setError('');
-    if (typeof window.html2canvas !== 'function') {
+    let html2canvas;
+    try {
+      ({ default: html2canvas } = await import('html2canvas'));
+    } catch {
       setError('Não foi possível gerar a imagem agora. Use "Copiar times".');
       return;
     }
     setBusy(true);
     try {
-      const canvas = await window.html2canvas(cardRef.current, { backgroundColor: '#000000', scale: 2, useCORS: true });
+      const canvas = await html2canvas(cardRef.current, { backgroundColor: '#000000', scale: 2, useCORS: true });
       const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
       if (!blob) throw new Error('empty');
       const url = URL.createObjectURL(blob);

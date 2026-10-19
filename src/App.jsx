@@ -16,10 +16,10 @@ import CookieConsentBanner from './components/CookieConsentBanner';
 // Rotas de entrada (primeira tela que o usuário vê) ficam eager —
 // não faz sentido lazy-loadear o que já é carregado no primeiro paint.
 import LandingPage        from './pages/LandingPage';
-import LoginPage          from './pages/LoginPage';
-import ResetPasswordPage  from './pages/ResetPasswordPage';
 
 // Todo o resto entra sob demanda, um chunk por página.
+const LoginPage            = lazy(() => import('./pages/LoginPage'));
+const ResetPasswordPage    = lazy(() => import('./pages/ResetPasswordPage'));
 const HomePage             = lazy(() => import('./pages/HomePage'));
 const ProfilePage          = lazy(() => import('./pages/ProfilePage'));
 const PublicProfilePage    = lazy(() => import('./pages/PublicProfilePage'));
@@ -64,17 +64,20 @@ const TournamentMatchPage  = lazy(() => import('./pages/TournamentMatchPage'));
 const DpStorePage          = lazy(() => import('./pages/DpStorePage'));
 const NotFoundPage         = lazy(() => import('./pages/NotFoundPage'));
 
-import BottomNav     from './components/BottomNav';
+// Componentes que só aparecem em certas situações: fora do bundle de entrada.
+const BottomNav        = lazy(() => import('./components/BottomNav'));
+const PushPrompt       = lazy(() => import('./components/PushPrompt'));
+const ConsentModal     = lazy(() => import('./components/ConsentModal'));
+const OnboardingModal  = lazy(() => import('./components/OnboardingModal'));
+const ChangelogModal   = lazy(() => import('./components/ChangelogModal'));
+const BetaFeedback     = lazy(() => import('./components/BetaFeedback'));
+const InstallPWA       = lazy(() => import('./components/InstallPWA'));
+const FeedbackModal    = lazy(() => import('./components/FeedbackModal'));
+
 import OfflineBanner from './components/OfflineBanner';
 import UpdatePrompt  from './components/UpdatePrompt';
 import PageWrapper   from './components/PageWrapper';
-import PushPrompt    from './components/PushPrompt';
-import ConsentModal  from './components/ConsentModal';
-import OnboardingModal, { shouldShowOnboarding } from './components/OnboardingModal';
-import ChangelogModal, { shouldShowChangelog }    from './components/ChangelogModal';
-import FeedbackModal  from './components/FeedbackModal';
-import BetaFeedback, { shouldShowBetaFeedback }   from './components/BetaFeedback';
-import InstallPWA    from './components/InstallPWA';
+import { shouldShowOnboarding, shouldShowChangelog, shouldShowBetaFeedback } from './utils/firstVisitGates';
 
 // Fallback padrão enquanto o chunk da rota carrega (mesmo spinner já usado no ProtectedRoute).
 const PageLoader = () => (
@@ -99,6 +102,7 @@ const AppInner = () => {
   const [showPushPrompt,   setShowPushPrompt]   = useState(false);
   const [showChangelog,    setShowChangelog]    = useState(false);
   const [showFeedback,     setShowFeedback]     = useState(false);
+  const [feedbackMounted,  setFeedbackMounted]  = useState(false); // monta o modal só após a 1ª abertura
   const [showBetaFeedback, setShowBetaFeedback] = useState(false);
   const [needsConsent,     setNeedsConsent]     = useState(null);
 
@@ -229,22 +233,24 @@ const AppInner = () => {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
-      <BottomNav />
-      {needsConsent === true && <ConsentModal onAccepted={() => setNeedsConsent(false)} />}
-      {showPushPrompt && needsConsent === false && <PushPrompt />}
-      {showOnboarding && needsConsent === false && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
-      {showChangelog && needsConsent === false && !showOnboarding && (
-        <ChangelogModal isOpen onClose={() => setShowChangelog(false)} />
-      )}
-      {showBetaFeedback && needsConsent === false && (
-        <BetaFeedback onClose={() => setShowBetaFeedback(false)} />
-      )}
-      {user && needsConsent === false && (
-        <InstallPWA hidden={showPushPrompt || showOnboarding || showChangelog || showBetaFeedback} />
-      )}
+      <Suspense fallback={null}>
+        {user && <BottomNav />}
+        {needsConsent === true && <ConsentModal onAccepted={() => setNeedsConsent(false)} />}
+        {showPushPrompt && needsConsent === false && <PushPrompt />}
+        {showOnboarding && needsConsent === false && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
+        {showChangelog && needsConsent === false && !showOnboarding && (
+          <ChangelogModal isOpen onClose={() => setShowChangelog(false)} />
+        )}
+        {showBetaFeedback && needsConsent === false && (
+          <BetaFeedback onClose={() => setShowBetaFeedback(false)} />
+        )}
+        {user && needsConsent === false && (
+          <InstallPWA hidden={showPushPrompt || showOnboarding || showChangelog || showBetaFeedback} />
+        )}
+      </Suspense>
       {user && needsConsent === false && (
         <button
-          onClick={() => setShowFeedback(true)}
+          onClick={() => { setFeedbackMounted(true); setShowFeedback(true); }}
           aria-label="Enviar feedback"
           className="fixed bottom-28 right-4 z-50 w-10 h-10 rounded-full bg-surface-2 border border-border-mid text-text-low hover:text-cyan-electric hover:border-cyan-electric/30 transition-all shadow-glass flex items-center justify-center active:scale-90"
         >
@@ -253,7 +259,11 @@ const AppInner = () => {
           </svg>
         </button>
       )}
-      <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+      {feedbackMounted && (
+        <Suspense fallback={null}>
+          <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+        </Suspense>
+      )}
     </>
   );
 };
