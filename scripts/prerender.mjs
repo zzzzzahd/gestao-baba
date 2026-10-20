@@ -283,15 +283,11 @@ async function main() {
         }
       }
 
-      // data-prerender-route: o cliente só hidrata se a rota da URL for esta (ver main.jsx).
       let html = applyMeta(template, appHtml, {
         ...meta,
         canonicalUrl,
         noindex,
-      }).replace(
-        '<div id="root">',
-        () => `<div id="root" data-prerender-route="${escapeHtml(route)}">`
-      );
+      });
 
       if (route === '/') {
         html = html.replace('</head>', () => `${LCP_PRELOAD}  </head>`);
