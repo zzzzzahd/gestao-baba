@@ -59,7 +59,8 @@ for (const route of PRERENDER_ROUTES) {
         } catch { fail(route, 'JSON-LD inválido (não é JSON)'); }
       }
     }
-    if (meta.ogType && !html.includes(`<meta property="og:type" content="${meta.ogType}" />`)) fail(route, `og:type deveria ser ${meta.ogType}`);
+    // O beasties reserializa o HTML (<meta ... /> vira <meta ...>), então aceita as duas formas.
+    if (meta.ogType && !new RegExp(`<meta property="og:type" content="${meta.ogType}"\\s*/?>`).test(html)) fail(route, `og:type deveria ser ${meta.ogType}`);
   }
 }
 
