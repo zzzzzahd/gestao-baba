@@ -46,13 +46,40 @@ export function AdsenseScriptGate() {
     const eligible = isAdScriptPath(location.pathname);
     const existing = document.getElementById(SCRIPT_ID);
 
-    if (eligible && !existing) {
+    let cancelled = false;
+    let idleHandle = null;
+    let timeoutHandle = null;
+    let onLoad = null;
+
+    const inject = () => {
+      if (cancelled || document.getElementById(SCRIPT_ID)) return;
       const script = document.createElement('script');
       script.id = SCRIPT_ID;
       script.async = true;
       script.crossOrigin = 'anonymous';
       script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
       document.head.appendChild(script);
+    };
+
+    // O script (~250 KiB + consentimento do Funding Choices) só entra depois do
+    // evento `load` e de um momento ocioso, pra não disputar rede/CPU com a imagem
+    // do LCP e o CSS. Os <AdBanner> já enfileiram o push em window.adsbygoogle,
+    // que o script processa assim que carrega.
+    const scheduleInject = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleHandle = window.requestIdleCallback(inject, { timeout: 3000 });
+      } else {
+        timeoutHandle = setTimeout(inject, 1500);
+      }
+    };
+
+    if (eligible && !existing) {
+      if (document.readyState === 'complete') {
+        scheduleInject();
+      } else {
+        onLoad = scheduleInject;
+        window.addEventListener('load', onLoad, { once: true });
+      }
     } else if (!eligible && existing) {
       existing.remove();
       // Best-effort: evita que um push antigo em fila seja processado se o
@@ -61,6 +88,13 @@ export function AdsenseScriptGate() {
       // nada novo seja enfileirado fora das páginas elegíveis.
       window.adsbygoogle = [];
     }
+
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+      if (onLoad) window.removeEventListener('load', onLoad);
+    };
   }, [location.pathname]);
 
   return null;

@@ -112,6 +112,9 @@ return {
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
+        // PNGs originais de public/marketing (~540 KiB) são só fonte dos .webp e não são
+        // usados pelo app: não precisam baixar no precache do primeiro acesso.
+        globIgnores: ['marketing/*.png'],
         navigateFallback: '/index.html',
         // Arquivos estáticos de raiz NÃO podem cair no fallback do SPA: sem isso o
         // service worker serve o index.html pra /ads.txt, /robots.txt etc. (o React

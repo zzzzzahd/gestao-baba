@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import Beasties from 'beasties';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -164,6 +165,25 @@ function applyMeta(
   return html;
 }
 
+// Preload da imagem do LCP (mascote do hero) — só na home, onde ela existe.
+// Mantém o mesmo srcset/sizes do <img> em LandingPage.jsx.
+const LCP_PRELOAD =
+  '    <link rel="preload" as="image" href="/marketing/mascote-prancheta.webp" ' +
+  'imagesrcset="/marketing/mascote-prancheta-320.webp 320w, /marketing/mascote-prancheta.webp 560w" ' +
+  'imagesizes="(max-width: 367px) calc(100vw - 48px), 320px" fetchpriority="high" />\n';
+
+// CSS crítico inline: o <link rel="stylesheet"> bloqueante vira preload assíncrono e só as
+// regras usadas pelo HTML da página vão inline. O arquivo CSS completo continua em dist/
+// (pruneSource: false), então rotas que só existem no cliente seguem estilizadas.
+const beasties = new Beasties({
+  path: distDir,
+  publicPath: '/',
+  preload: 'swap',
+  pruneSource: false,
+  inlineFonts: false,
+  logLevel: 'warn',
+});
+
 async function main() {
   // -------------------------------------------------------
   // VERIFICAÇÕES
@@ -263,11 +283,17 @@ async function main() {
         }
       }
 
-      const html = applyMeta(template, appHtml, {
+      let html = applyMeta(template, appHtml, {
         ...meta,
         canonicalUrl,
         noindex,
       });
+
+      if (route === '/') {
+        html = html.replace('</head>', () => `${LCP_PRELOAD}  </head>`);
+      }
+
+      html = await beasties.process(html);
 
       // -----------------------------------------------------
       // CAMINHO DE SAÍDA

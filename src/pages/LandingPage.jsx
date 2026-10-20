@@ -18,6 +18,9 @@ const Shot = ({ src, alt, icon: Icon, className = '' }) => {
     return (
       <img
         src={src}
+        srcSet={`${src.replace('.webp', '-202.webp')} 202w, ${src} 360w`}
+        sizes="101px"
+        width="360" height="733"
         alt={alt}
         loading="lazy"
         decoding="async"
@@ -120,7 +123,9 @@ const AppShot = ({ file, alt }) => {
           </div>
         ) : (
           <img
-            src={`/marketing/${file}.webp`}
+            src={`/marketing/${file}-424.webp`}
+            srcSet={`/marketing/${file}-212.webp 212w, /marketing/${file}-424.webp 424w, /marketing/${file}.webp 540w`}
+            sizes="(min-width: 768px) 220px, (min-width: 640px) 40vw, 62vw"
             alt={alt}
             width="540" height="897"
             loading="lazy" decoding="async"
@@ -341,6 +346,8 @@ const LandingPage = () => {
           <div className="absolute inset-0 bg-cyan-electric/20 blur-[80px] rounded-full" />
           <img
             src="/marketing/mascote-prancheta.webp"
+            srcSet="/marketing/mascote-prancheta-320.webp 320w, /marketing/mascote-prancheta.webp 560w"
+            sizes="(max-width: 367px) calc(100vw - 48px), 320px"
             alt="Mascote do Draft Play Baba Manager: um técnico de terno mostrando uma prancheta com a tática do time"
             width="560" height="497"
             fetchpriority="high"
