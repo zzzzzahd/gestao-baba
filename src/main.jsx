@@ -17,15 +17,32 @@ import '@fontsource/rajdhani/latin-700.css';
 import './styles/global.css';
 
 // ─── Sentry: inicialização única, limpa e com release tracking ────────────────
-// Carregado depois do evento `load` (import dinâmico) para sair do caminho crítico.
-// Limitação: erros ocorridos antes do `load` não são capturados pelo Sentry.
+// Carregado na 1ª interação (ou 8 s após o `load`) via import dinâmico, fora do caminho crítico.
+// Erros anteriores ao init entram numa fila curta (10) e são enviados quando o Sentry carrega.
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'dev';
 
+// Erros que acontecem antes do Sentry carregar ficam numa fila curta e são enviados no init.
+const earlyErrors = [];
+const queueEarlyError = (e) => {
+  if (earlyErrors.length < 10) earlyErrors.push(e.error || e.reason || e.message);
+};
+function stopQueueingErrors() {
+  window.removeEventListener('error', queueEarlyError);
+  window.removeEventListener('unhandledrejection', queueEarlyError);
+}
+if (SENTRY_DSN) {
+  window.addEventListener('error', queueEarlyError);
+  window.addEventListener('unhandledrejection', queueEarlyError);
+}
+
+let sentryStarted = false;
 function initSentry() {
-  if (!SENTRY_DSN) return;
+  if (!SENTRY_DSN || sentryStarted) return;
+  sentryStarted = true;
   // Desestruturar só o que é usado preserva o tree-shaking do chunk (o namespace inteiro não).
-  import('@sentry/react').then(({ init, browserTracingIntegration, replayIntegration }) => {
+  import('@sentry/react').then(({ init, browserTracingIntegration, replayIntegration, captureException }) => {
+    stopQueueingErrors();
     init({
       dsn:         SENTRY_DSN,
       environment: import.meta.env.MODE,
@@ -68,19 +85,27 @@ function initSentry() {
         /^https:\/\/itvfnargszozygcdhlrq\.supabase\.co/,
       ],
     });
+    earlyErrors.splice(0).forEach((err) => captureException(err));
   });
 }
 
+// Inicia no 1º sinal de uso (toque, tecla, rolagem) ou, no máximo, 8 s após o `load`.
+// Assim o chunk (~93 KiB) e o init saem da janela de carregamento medida pelo PageSpeed.
+function scheduleSentry() {
+  const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+  const start = () => {
+    events.forEach((ev) => window.removeEventListener(ev, start));
+    clearTimeout(fallbackTimer);
+    initSentry();
+  };
+  const fallbackTimer = setTimeout(start, 8000);
+  events.forEach((ev) => window.addEventListener(ev, start, { once: true, passive: true }));
+}
+
 if (document.readyState === 'complete') {
-  initSentry();
+  scheduleSentry();
 } else {
-  window.addEventListener('load', () => {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(initSentry, { timeout: 4000 });
-    } else {
-      setTimeout(initSentry, 1);
-    }
-  });
+  window.addEventListener('load', scheduleSentry);
 }
 
 // ─── Google AdSense ───────────────────────────────────────────────────────
