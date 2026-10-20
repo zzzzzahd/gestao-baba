@@ -136,8 +136,37 @@ if ('serviceWorker' in navigator && !import.meta.env.DEV) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// ─── Render: hidrata o HTML prerenderizado quando ele corresponde à rota atual ─
+// createRoot descartava o HTML pronto e recriava o DOM (inclusive o mascote do LCP)
+// só depois do JS. hydrateRoot reaproveita o DOM já pintado.
+// Só hidrata quando (1) o prerender é da mesma rota da URL (o fallback do SPA serve o
+// index.html da landing em /login, /home etc.) e (2) não há sessão salva (usuário logado
+// renderiza outra árvore). Caso contrário, mantém o createRoot de sempre.
+function shouldHydrate(rootEl) {
+  try {
+    const route = rootEl.getAttribute('data-prerender-route');
+    if (!route || !rootEl.hasChildNodes()) return false;
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (path !== route) return false;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i) || '';
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const rootEl = document.getElementById('root');
+const app = (
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
+
+if (shouldHydrate(rootEl)) {
+  ReactDOM.hydrateRoot(rootEl, app);
+} else {
+  ReactDOM.createRoot(rootEl).render(app);
+}
