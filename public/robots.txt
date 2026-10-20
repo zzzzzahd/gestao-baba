@@ -24,7 +24,7 @@ Disallow: /draw
 Disallow: /comparison
 Disallow: /torneio/
 Disallow: /join/
-Disallow: /visitor-match
+Disallow: /visitor
 
 User-agent: *
 Allow: /
@@ -52,6 +52,6 @@ Disallow: /draw
 Disallow: /comparison
 Disallow: /torneio/
 Disallow: /join/
-Disallow: /visitor-match
+Disallow: /visitor
 
 Sitemap: https://www.draftplay.app.br/sitemap.xml
