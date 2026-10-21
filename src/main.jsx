@@ -136,8 +136,28 @@ if ('serviceWorker' in navigator && !import.meta.env.DEV) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+const rootEl = document.getElementById('root');
+
+const mountApp = () =>
+  ReactDOM.createRoot(rootEl).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+
+// Página pré-renderizada: o React monta com createRoot (troca o DOM), e renderizar a landing
+// inteira é trabalho pesado. Se isso rodar antes do primeiro frame, o FCP/LCP só acontecem
+// depois dele. rAF + setTimeout(0) garante que o navegador pinta o HTML estático primeiro.
+// O timer de 500 ms cobre abas em segundo plano, onde o rAF fica pausado.
+if (rootEl.hasChildNodes() && typeof window.requestAnimationFrame === 'function') {
+  let mounted = false;
+  const mountOnce = () => {
+    if (mounted) return;
+    mounted = true;
+    mountApp();
+  };
+  window.requestAnimationFrame(() => setTimeout(mountOnce, 0));
+  setTimeout(mountOnce, 500);
+} else {
+  mountApp();
+}

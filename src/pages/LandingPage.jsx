@@ -124,8 +124,10 @@ const AppShot = ({ file, alt }) => {
         ) : (
           <img
             src={`/marketing/${file}-424.webp`}
-            srcSet={`/marketing/${file}-212.webp 212w, /marketing/${file}-424.webp 424w, /marketing/${file}.webp 540w`}
-            sizes="(min-width: 768px) 220px, (min-width: 640px) 40vw, 62vw"
+            srcSet={`/marketing/${file}-212.webp 212w, /marketing/${file}-384.webp 384w, /marketing/${file}-424.webp 424w, /marketing/${file}.webp 540w`}
+            // largura real da imagem = largura do <li> - 14px (p-1.5 + borda do aparelho):
+            // <640px: 62% de (100vw-48px) | sm: 40% | md: grade de 4 colunas | >=1024px: 215px
+            sizes="(min-width: 1024px) 215px, (min-width: 768px) calc((100vw - 108px) / 4 - 14px), (min-width: 640px) calc((100vw - 48px) * 0.4 - 14px), calc((100vw - 48px) * 0.62 - 14px)"
             alt={alt}
             width="540" height="897"
             loading="lazy" decoding="async"

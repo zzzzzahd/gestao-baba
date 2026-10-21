@@ -7,16 +7,17 @@ import sharp from 'sharp';
 
 const DIR = 'public/marketing';
 
+// 384 ≈ 212px x DPR 1,75 (celulares comuns); 424 = DPR 2.
 // arquivo (sem extensão) -> larguras a gerar. O original continua sendo a maior variante.
 const JOBS = {
   'mascote-prancheta': [320],            // exibido a 320px; original 560 cobre telas 2x
-  'app-baba': [212, 424],                // exibidos a 212px; 424 = 2x; original 540 = ~2,5x
-  'app-sorteio': [212, 424],
-  'app-rankings': [212, 424],
-  'app-comparacao': [212, 424],
-  'app-perfil': [212, 424],
-  'app-caixa': [212, 424],
-  'app-visitante': [212, 424],
+  'app-baba': [212, 384, 424],                // exibidos a 212px; 424 = 2x; original 540 = ~2,5x
+  'app-sorteio': [212, 384, 424],
+  'app-rankings': [212, 384, 424],
+  'app-comparacao': [212, 384, 424],
+  'app-perfil': [212, 384, 424],
+  'app-caixa': [212, 384, 424],
+  'app-visitante': [212, 384, 424],
   'sorteio-times': [202],                // exibidos a ~101px; 202 = 2x; original 360 = ~3,5x
   'placar-ao-vivo': [202],
 };
