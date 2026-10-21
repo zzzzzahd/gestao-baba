@@ -40,9 +40,9 @@ export default {
       },
 
       fontFamily: {
-        'sans':     ['Inter', 'sans-serif'],
-        'tactical': ['Rajdhani', 'sans-serif'],
-        'display':  ['Inter', 'sans-serif'],
+        'sans':     ['Inter', 'Inter Fallback', 'sans-serif'],
+        'tactical': ['Rajdhani', 'Rajdhani Fallback', 'sans-serif'],
+        'display':  ['Inter', 'Inter Fallback', 'sans-serif'],
       },
 
       fontVariantNumeric: { 'tabular': 'tabular-nums' },

@@ -180,7 +180,9 @@ const beasties = new Beasties({
   publicPath: '/',
   preload: 'swap',
   pruneSource: false,
-  inlineFonts: false,
+  // @font-face críticos vão inline: a família já existe no primeiro paint (com o
+  // fallback de métricas ajustadas), em vez de só depois do CSS assíncrono.
+  inlineFonts: true,
   logLevel: 'warn',
 });
 

@@ -162,7 +162,9 @@ const paperStyle = {
   backgroundSize: '24px 24px',
 };
 const HAND_CSS = `
-.font-hand{font-family:'Caveat','Segoe Print','Bradley Hand',cursive}
+@font-face{font-family:'Caveat Fallback';src:local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica');font-weight:100 599;size-adjust:76.63%;ascent-override:125.27%;descent-override:39.15%;line-gap-override:0.0%}
+@font-face{font-family:'Caveat Fallback';src:local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica');font-weight:600 900;size-adjust:71.92%;ascent-override:133.48%;descent-override:41.71%;line-gap-override:0.0%}
+.font-hand{font-family:'Caveat','Caveat Fallback','Segoe Print','Bradley Hand',cursive}
 .dp-word{display:inline-block;animation:dpIn .5s ease-out both}
 @keyframes dpIn{from{transform:translateY(6px) rotate(-1deg)}to{transform:none}}
 @media (prefers-reduced-motion:reduce){.dp-word{animation:none}}`;

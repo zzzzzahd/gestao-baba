@@ -76,12 +76,18 @@
 
     <style>
       :root { --cyan-electric: #00f2ff; }
-      .font-display { font-family: 'Rajdhani', sans-serif; }
+      /* Fallbacks com métricas ajustadas (size-adjust etc., medidas contra Arial): a troca da
+         fonte web (font-display: swap) deixa de reflowar o texto e de gerar CLS. */
+      @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica'); font-weight: 100 599; size-adjust: 108.34%; ascent-override: 89.41%; descent-override: 22.26%; line-gap-override: 0.0%; }
+      @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica'); font-weight: 600 900; size-adjust: 103.72%; ascent-override: 93.4%; descent-override: 23.26%; line-gap-override: 0.0%; }
+      @font-face { font-family: 'Rajdhani Fallback'; src: local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica'); font-weight: 100 599; size-adjust: 91.14%; ascent-override: 102.04%; descent-override: 37.97%; line-gap-override: 0.0%; }
+      @font-face { font-family: 'Rajdhani Fallback'; src: local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica'); font-weight: 600 900; size-adjust: 86.63%; ascent-override: 107.36%; descent-override: 39.94%; line-gap-override: 0.0%; }
+      .font-display { font-family: 'Rajdhani', 'Rajdhani Fallback', sans-serif; }
       * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
       body {
         margin: 0; padding: 0;
         background-color: #000000;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', 'Inter Fallback', sans-serif;
         color: white;
         overflow-x: hidden;
         min-height: 100dvh;
@@ -97,7 +103,7 @@
         color: #000;
         padding: 0.5rem 1rem;
         font-weight: bold;
-        font-family: 'Rajdhani', sans-serif;
+        font-family: 'Rajdhani', 'Rajdhani Fallback', sans-serif;
         z-index: 9999;
         border-radius: 0 0 8px 0;
         text-decoration: none;

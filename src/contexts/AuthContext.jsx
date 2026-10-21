@@ -44,10 +44,32 @@ const translateAuthError = (msg) => {
   return msg;
 };
 
+// Precisamos esperar o Supabase (getSession) antes de renderizar o app? Só se
+// existir uma sessão salva OU a URL estiver trazendo um retorno de auth
+// (confirmação de e-mail, recuperação de senha, PKCE).
+// Para o visitante anônimo (landing, guias, ferramentas) o resultado do
+// getSession é sempre "sem usuário" — esperar só apagava o HTML pré-renderizado
+// (createRoot) e atrasava o LCP/CLS. Nesse caso começamos já resolvidos, no
+// mesmo estado final que o getSession entregaria (user=null, profile=null).
+const needsSessionRestore = () => {
+  if (typeof window === 'undefined') return true;
+  try {
+    const { hash, search } = window.location;
+    if (/access_token|refresh_token|error_description|type=(recovery|signup|magiclink|invite|email_change)/.test(hash)) return true;
+    if (/[?&](code|token_hash)=/.test(search)) return true;
+    return Object.keys(window.localStorage).some(
+      (k) => k.startsWith('sb-') && k.endsWith('-auth-token')
+    );
+  } catch {
+    return true; // storage indisponível: comportamento antigo (esperar)
+  }
+};
+
 export const AuthProvider = ({ children }) => {
+  const [restoring] = useState(needsSessionRestore);
   const [user,    setUser]    = useState(null);
-  const [profile, setProfile] = useState(undefined); // undefined = carregando
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(restoring ? undefined : null); // undefined = carregando
+  const [loading, setLoading] = useState(restoring);
 
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }

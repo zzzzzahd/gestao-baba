@@ -1,0 +1,24 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Draft Play",
+    "identifier": "did:web:www.draftplay.app.br",
+    "documentationUrl": "https://www.draftplay.app.br/sobre"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:www.draftplay.app.br:knowledge:llms-txt",
+      "displayName": "Draft Play – índice de conteúdo (llms.txt)",
+      "type": "text/markdown",
+      "url": "https://www.draftplay.app.br/llms.txt",
+      "description": "Índice em Markdown das ferramentas gratuitas, guias e modelos de torneio do Draft Play, plataforma brasileira para organizar baba (pelada de futebol): sorteio de times, lista de presença, rankings e caixa do grupo.",
+      "tags": ["futebol", "baba", "pelada", "sorteio-de-times", "gestao-esportiva"],
+      "representativeQueries": [
+        "como sortear times equilibrados no baba",
+        "ferramenta gratuita para organizar lista de presença do racha",
+        "como dividir o custo da quadra entre os jogadores",
+        "modelo de regulamento de torneio interno de futebol"
+      ]
+    }
+  ]
+}

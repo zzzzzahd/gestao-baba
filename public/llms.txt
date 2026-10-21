@@ -1,0 +1,42 @@
+# Draft Play
+
+> Draft Play (gestão de baba) é uma plataforma web gratuita para organizar o baba, o racha ou a pelada de futebol entre amigos: lista de presença, sorteio de times equilibrados, placar ao vivo, rankings de gols e assistências, caixa financeiro do grupo e torneios internos. Feita no Brasil, em português do Brasil.
+
+Parte das ferramentas é pública e funciona sem cadastro. Os recursos de grupo (baba, partidas, rankings, caixa) exigem conta. Perfis de jogadores só aparecem publicamente quando o próprio jogador os torna públicos.
+
+## Ferramentas gratuitas (sem login)
+
+- [Sorteador de times](https://www.draftplay.app.br/ferramentas/sorteador): sorteia times equilibrados a partir da lista de jogadores.
+- [Lista de presença](https://www.draftplay.app.br/ferramentas/lista-de-presenca): organiza quem confirmou presença no baba.
+- [Divisão de despesas](https://www.draftplay.app.br/ferramentas/divisao-de-despesas): divide o custo da quadra entre os jogadores.
+- [Controle financeiro](https://www.draftplay.app.br/ferramentas/controle-financeiro): modelo de controle de mensalidades e caixa do baba.
+- [Calculadora de torneio](https://www.draftplay.app.br/ferramentas/calculadora-torneio): calcula a quantidade de jogos e a duração de um torneio.
+- [Tabela de jogos](https://www.draftplay.app.br/ferramentas/tabela-de-jogos): gera a tabela de jogos de um torneio.
+- [Gerador de regulamento](https://www.draftplay.app.br/ferramentas/gerador-de-regulamento): gera o regulamento de um torneio interno.
+- [Todas as ferramentas](https://www.draftplay.app.br/ferramentas): índice das ferramentas gratuitas.
+
+## Guias
+
+- [Guias do Draft Play](https://www.draftplay.app.br/guias): índice dos guias sobre como organizar o baba.
+- [Como sortear times equilibrados no baba](https://www.draftplay.app.br/guias/como-sortear-times-equilibrados-no-baba)
+- [Como organizar a lista de presença do baba](https://www.draftplay.app.br/guias/como-organizar-a-lista-de-presenca-do-baba)
+- [Como cobrar mensalidade e rateio da quadra](https://www.draftplay.app.br/guias/como-cobrar-mensalidade-e-rateio-da-quadra)
+- [Regras de goleiro e reserva no baba](https://www.draftplay.app.br/guias/regras-de-goleiro-e-reserva-no-baba)
+- [Como resolver empate no baba](https://www.draftplay.app.br/guias/como-resolver-empate-no-baba)
+- [Como montar ranking de gols e assistências](https://www.draftplay.app.br/guias/como-montar-ranking-de-gols-e-assistencias-do-baba)
+
+## Modelos de torneio
+
+- [Modelos de torneio](https://www.draftplay.app.br/modelos-de-torneio): índice de modelos prontos (regulamento, critérios de desempate, mata-mata, grupos, pontos corridos, calendário, artilharia, orçamento).
+
+## Sobre o site
+
+- [Sobre o Draft Play](https://www.draftplay.app.br/sobre): informações institucionais sobre o Draft Play.
+- [Estatísticas do futebol amador](https://www.draftplay.app.br/estatisticas): como ler gols, assistências e rankings, com demonstração em dados fictícios.
+- [Termos de uso](https://www.draftplay.app.br/termos)
+- [Política de privacidade](https://www.draftplay.app.br/privacidade)
+
+## Optional
+
+- [Mapa do site (sitemap.xml)](https://www.draftplay.app.br/sitemap.xml)
+- [Página inicial](https://www.draftplay.app.br/)
