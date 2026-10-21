@@ -8,7 +8,7 @@ export const TOOLS = [
     slug: 'sorteador',
     path: '/ferramentas/sorteador',
     name: 'Sorteador de times equilibrados',
-    short: 'Cole a lista, defina nível e posição e sorteie times parelhos.',
+    short: 'Cole a lista, defina nível e posição, sorteie times parelhos e já comece a partida com placar e cronômetro.',
     title: 'Sorteador de Times Equilibrados para Baba | Draft Play',
     description:
       'Sorteie times de futebol equilibrados por nível e posição, com goleiros distribuídos e reservas. Grátis, sem cadastro, direto no navegador.',

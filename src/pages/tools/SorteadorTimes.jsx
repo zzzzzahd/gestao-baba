@@ -5,7 +5,7 @@
 // colagem de lista e resultado na própria página (sem anúncio recompensado).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Shuffle } from 'lucide-react';
+import { Trash2, Shuffle, Play, Timer, Target, ListOrdered } from 'lucide-react';
 import { ToolLayout, Panel, ErrorList, Segmented, Field, CopyButton, inputCls } from '../../components/tools/ui';
 import ExportTeamsImage from '../../components/tools/ExportTeamsImage';
 import { TOOLS } from '../../content/toolsCatalog';
@@ -136,7 +136,7 @@ export default function SorteadorTimes() {
         'Adicione os jogadores um a um ou cole a lista do grupo (um nome por linha). Quem for colado entra como "na média" e "linha".',
         'Ajuste o nível (abaixo, na média ou acima) e a posição (linha ou goleiro) de cada jogador na lista.',
         'Defina quantos jogam por time e o que fazer com quem sobrar. Clique em sortear; sorteie de novo quantas vezes quiser.',
-        'Copie os times para mandar no grupo ou use o placar rápido para marcar a partida.',
+        'Copie os times para mandar no grupo ou clique em "Começar a partida" para abrir o placar com cronômetro e fila de times.',
       ]}
       premises={[
         'Goleiros são distribuídos primeiro, um por time. Se houver mais goleiros que times, os que sobram jogam na linha.',
@@ -238,7 +238,7 @@ export default function SorteadorTimes() {
             <Shuffle size={18} aria-hidden="true" /> {result ? 'Sortear de novo' : 'Sortear times'}
           </button>
           {allEqualLevels && !errors.length && (
-            <p role="status" className="text-xs text-yellow-300">Todos os jogadores estão com o mesmo nível: o sorteio será praticamente aleatório. Ajuste os níveis para equilibrar melhor.</p>
+            <p role="status" className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-xs text-yellow-300">Todos os jogadores estão com o mesmo nível: o sorteio será praticamente aleatório. Ajuste os níveis na lista acima para equilibrar melhor.</p>
           )}
         </div>
       )}
@@ -260,12 +260,27 @@ export default function SorteadorTimes() {
           {result.reserves.length > 0 && (
             <p className="text-sm"><strong>Reservas:</strong> {result.reserves.map((p) => p.name).join(', ')}</p>
           )}
+          {/* Próximo passo principal: abrir o placar com os times sorteados */}
+          <div className="rounded-3xl border border-cyan-electric/40 bg-gradient-to-br from-cyan-electric/10 to-transparent p-4 space-y-3">
+            <button
+              type="button"
+              onClick={toScoreboard}
+              className="w-full py-4 rounded-2xl font-black text-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 shadow-[0_0_24px_rgba(0,229,255,0.35)] transition hover:brightness-110 active:scale-[0.99]"
+              style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+            >
+              <Play size={18} aria-hidden="true" /> Começar a partida com esses times
+            </button>
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px] leading-tight opacity-80">
+              <span className="flex flex-col items-center gap-1"><Timer size={16} className="text-cyan-electric" aria-hidden="true" />Cronômetro</span>
+              <span className="flex flex-col items-center gap-1"><Target size={16} className="text-cyan-electric" aria-hidden="true" />Placar com toque</span>
+              <span className="flex flex-col items-center gap-1"><ListOrdered size={16} className="text-cyan-electric" aria-hidden="true" />Fila de times</span>
+            </div>
+            <p className="text-center text-[11px] opacity-55">Sem cadastro, direto no navegador. Os times sorteados já entram no placar.</p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <CopyButton text={resultText} label="Copiar times" />
             <ExportTeamsImage teams={result.teams} reserves={result.reserves} />
-            <button type="button" onClick={toScoreboard} className="text-xs font-black uppercase tracking-wider text-cyan-electric underline">
-              Usar no placar rápido →
-            </button>
           </div>
         </section>
       )}
