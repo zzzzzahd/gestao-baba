@@ -29,6 +29,16 @@ import { isAdScriptPath } from '../utils/adEligibility';
 const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID;
 const SCRIPT_ID = 'adsbygoogle-script';
 
+// Carregamento adiado do AdSense (OPCIONAL, desligado por padrão).
+// Com VITE_ADSENSE_LAZY=1 o script só entra na PRIMEIRA INTERAÇÃO do visitante (rolagem, toque,
+// clique ou tecla) ou, no máximo, LAZY_FALLBACK_MS depois do `load` — o que vier primeiro.
+// Quem fica na página vê anúncio normalmente; quem sai antes disso não baixa ~250 KiB de JS de
+// terceiros nem paga ~400 ms de CPU. Contrapartida: visitas que saem sem interagir antes do
+// prazo não geram impressão de anúncio (incluindo Auto ads, se a conta tiver).
+const ADSENSE_LAZY = import.meta.env.VITE_ADSENSE_LAZY === '1';
+const LAZY_FALLBACK_MS = 8000;
+const LAZY_EVENTS = ['scroll', 'pointerdown', 'keydown', 'touchstart'];
+
 // A lista de rotas elegíveis fica em src/utils/adEligibility.js (política única).
 
 export function AdsenseScriptGate() {
@@ -50,6 +60,8 @@ export function AdsenseScriptGate() {
     let idleHandle = null;
     let timeoutHandle = null;
     let onLoad = null;
+    let onInteract = null;
+    let lazyTimeout = null;
 
     const inject = () => {
       if (cancelled || document.getElementById(SCRIPT_ID)) return;
@@ -65,7 +77,23 @@ export function AdsenseScriptGate() {
     // evento `load` e de um momento ocioso, pra não disputar rede/CPU com a imagem
     // do LCP e o CSS. Os <AdBanner> já enfileiram o push em window.adsbygoogle,
     // que o script processa assim que carrega.
+    const stopLazyWatch = () => {
+      if (onInteract) LAZY_EVENTS.forEach((e) => window.removeEventListener(e, onInteract));
+      if (lazyTimeout !== null) clearTimeout(lazyTimeout);
+      onInteract = null;
+      lazyTimeout = null;
+    };
+
     const scheduleInject = () => {
+      if (ADSENSE_LAZY) {
+        onInteract = () => {
+          stopLazyWatch();
+          inject();
+        };
+        LAZY_EVENTS.forEach((e) => window.addEventListener(e, onInteract, { passive: true, once: true }));
+        lazyTimeout = setTimeout(onInteract, LAZY_FALLBACK_MS);
+        return;
+      }
       if (typeof window.requestIdleCallback === 'function') {
         idleHandle = window.requestIdleCallback(inject, { timeout: 3000 });
       } else {
@@ -94,6 +122,7 @@ export function AdsenseScriptGate() {
       if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
       if (timeoutHandle !== null) clearTimeout(timeoutHandle);
       if (onLoad) window.removeEventListener('load', onLoad);
+      stopLazyWatch();
     };
   }, [location.pathname]);
 

@@ -22,26 +22,27 @@ import './styles/global.css';
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'dev';
 
+// Session Replay: só 5% das sessões gravam (buffer enviado apenas se der erro). Em vez de
+// baixar e executar ~42 KiB do Replay em 100% das sessões para depois descartar 95%, o
+// sorteio é feito ANTES: só as sessões sorteadas carregam o Replay (chunk separado), já com
+// taxa de 100% de envio em caso de erro. Estatisticamente é o mesmo 5% de antes.
+const REPLAY_ON_ERROR_RATE = import.meta.env.PROD ? 0.05 : 0;
+
 function initSentry() {
   if (!SENTRY_DSN) return;
+  const sampledForReplay = REPLAY_ON_ERROR_RATE > 0 && Math.random() < REPLAY_ON_ERROR_RATE;
   // Desestruturar só o que é usado preserva o tree-shaking do chunk (o namespace inteiro não).
-  import('@sentry/react').then(({ init, browserTracingIntegration, replayIntegration }) => {
+  import('@sentry/react').then(({ init, browserTracingIntegration, addIntegration }) => {
     init({
       dsn:         SENTRY_DSN,
       environment: import.meta.env.MODE,
       release:     `gestao-baba@${APP_VERSION}`,   // rastreamento de releases
 
-      integrations: [
-        browserTracingIntegration(),
-        replayIntegration({
-          maskAllText:   true,     // LGPD: mascarar textos
-          blockAllMedia: true,
-        }),
-      ],
+      integrations: [browserTracingIntegration()],
 
       tracesSampleRate:     import.meta.env.PROD ? 0.1  : 0,
       replaysSessionSampleRate:  0,
-      replaysOnErrorSampleRate:  import.meta.env.PROD ? 0.05 : 0,
+      replaysOnErrorSampleRate:  sampledForReplay ? 1 : 0, // o sorteio de 5% já foi feito acima
 
       ignoreErrors: [
         'ResizeObserver loop limit exceeded',
@@ -68,6 +69,17 @@ function initSentry() {
         /^https:\/\/itvfnargszozygcdhlrq\.supabase\.co/,
       ],
     });
+
+    if (sampledForReplay) {
+      import('@sentry/replay').then(({ replayIntegration }) => {
+        addIntegration(
+          replayIntegration({
+            maskAllText:   true,     // LGPD: mascarar textos
+            blockAllMedia: true,
+          })
+        );
+      });
+    }
   });
 }
 
