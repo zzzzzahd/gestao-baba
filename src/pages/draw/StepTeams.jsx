@@ -12,6 +12,7 @@ import { supabase } from '../../services/supabase';
 import { POSITION_LABEL } from '../../utils/constants';
 import PresenceCheckModal from '../../components/PresenceCheckModal';
 import TeamsShareButton from '../../components/TeamsShareButton';
+import { toLocalDateStr } from '../../utils/drawSchedule';
 
 const COLORS = [
   { border: 'border-cyan-electric/30',  text: 'text-cyan-electric', bg: 'bg-cyan-electric/10'  },
@@ -49,7 +50,10 @@ const StepTeams = ({ drawResult, onNext, onBack, onUpdateDrawResult }) => {
   const teams    = drawResult?.teams    || [];
   const reserves = drawResult?.reserves || [];
   const totalPlayers = teams.reduce((s, t) => s + (t.players?.length || 0), 0);
-  const gameDate = new Date().toISOString().split('T')[0];
+  // Data do JOGO sorteado (draw_date), não "hoje em UTC": a conferência de
+  // presença/lista de espera busca por essa data, e em Bahia depois das 21h o
+  // toISOString já cai no dia seguinte.
+  const gameDate = drawResult?.drawDate || toLocalDateStr(new Date());
 
   // Se a partida já começou (presença já foi confirmada, existe match
   // in_progress dessa sessão), não faz sentido abrir o checklist de presença

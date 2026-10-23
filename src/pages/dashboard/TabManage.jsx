@@ -2,6 +2,8 @@
 // Corrigido: sem SuspensionPanel separado (suspensão agora no MembersModal),
 // PresidentDashboard e BabaSettings funcionando inline,
 // canManage para coordenadores também verem gestão.
+// Sorteio unificado: prévia dos times vem da sessão ativa (draw_results — manual
+// ou automático), e Convidados usa o GuestManager único.
 
 import React, { useState } from 'react';
 import { useNavigate }    from 'react-router-dom';
@@ -10,16 +12,19 @@ import {
   Settings, BarChart2, ChevronDown, ChevronUp, RefreshCw,
 } from 'lucide-react';
 import BabaSettings       from '../../components/BabaSettings';
+import GuestManager       from '../../components/GuestManager';
 import PresidentDashboard from '../../components/PresidentDashboard';
 
 // ─── Preview dos times ────────────────────────────────────────────────────────
 
-const TeamsPreview = ({ currentMatch, canManage }) => {
+const TeamsPreview = ({ draw, canManage, started }) => {
   const navigate = useNavigate();
-  if (!currentMatch) return null;
+  if (!draw) return null;
 
-  const teams    = currentMatch.teams    || [];
-  const reserves = currentMatch.reserves || [];
+  const teams    = draw.teams    || [];
+  const reserves = draw.reserves || [];
+  // Quem gerencia vai pro wizard (retoma times/partida); os demais só assistem.
+  const goTo     = canManage ? '/draw?resume=1' : '/teams';
 
   const COLORS = [
     { border: 'border-cyan-electric/30', text: 'text-cyan-electric'  },
@@ -38,7 +43,7 @@ const TeamsPreview = ({ currentMatch, canManage }) => {
           </span>
         </div>
         <button
-          onClick={() => navigate('/draw')}
+          onClick={() => navigate(goTo)}
           className="flex items-center gap-1 text-[9px] font-black text-cyan-electric uppercase hover:text-white transition-colors"
         >
           Ver completo <ChevronRight size={10} />
@@ -83,12 +88,12 @@ const TeamsPreview = ({ currentMatch, canManage }) => {
       )}
 
       <button
-        onClick={() => navigate('/draw')}
+        onClick={() => navigate(goTo)}
         className="w-full py-5 rounded-2xl font-black uppercase text-sm active:scale-95 transition-all flex items-center justify-center gap-2 text-black"
         style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
       >
         <Play size={18} />
-        {canManage ? 'Iniciar Partida' : 'Ver Times'}
+        {canManage ? (started ? 'Continuar Partida' : 'Iniciar Partida') : 'Ver Times'}
       </button>
     </div>
   );
@@ -131,7 +136,12 @@ const ExpandableBlock = ({ id, title, icon: Icon, iconColor = 'text-text-low', s
 
 const TabManage = ({
   currentBaba,
-  currentMatch,
+  currentMatch,     // legado: se vier com .teams ainda serve de prévia
+  activeDraw,       // sessão ativa de draw_results (manual ou automático)
+  drawStarted,
+  nextGameDay,
+  gameConfirmations,
+  reloadConfirmations,
   isDrawing,
   isPresident,
   canManage,       // presidente OU coordenador
@@ -144,6 +154,9 @@ const TabManage = ({
 
   const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const draw = activeDraw?.id ? activeDraw : (currentMatch?.teams ? currentMatch : null);
+  const autoOn = !!currentBaba?.auto_draw_enabled;
+
   return (
     <div className="space-y-5">
 
@@ -155,9 +168,9 @@ const TabManage = ({
             Sorteando automaticamente...
           </span>
         </div>
-      ) : currentMatch ? (
+      ) : draw ? (
         <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle">
-          <TeamsPreview currentMatch={currentMatch} canManage={canManage} />
+          <TeamsPreview draw={draw} canManage={canManage} started={drawStarted} />
         </div>
       ) : (
         <div
@@ -166,7 +179,11 @@ const TabManage = ({
         >
           <Swords size={28} className="text-text-muted" />
           <p className="text-[11px] font-black text-text-low uppercase tracking-widest">Iniciar sorteio</p>
-          <p className="text-[9px] text-text-muted font-bold">Toque para configurar e sortear os times</p>
+          <p className="text-[9px] text-text-muted font-bold">
+            {autoOn
+              ? 'Sorteio automático ligado — os times saem na hora marcada'
+              : 'Toque para configurar e sortear os times'}
+          </p>
         </div>
       )}
 
@@ -206,6 +223,15 @@ const TabManage = ({
               <PresidentDashboard babaId={currentBaba?.id} />
             </ExpandableBlock>
           )}
+
+          {/* Convidados do jogo — componente único (não existe mais na Visão Geral) */}
+          <GuestManager
+            babaId={currentBaba?.id}
+            gameDate={nextGameDay?.dateStr}
+            confirmations={gameConfirmations}
+            onReload={reloadConfirmations}
+            locked={!!activeDraw?.id}
+          />
 
           {/* Configurações — presidente e coordenador */}
           <ExpandableBlock

@@ -1,6 +1,8 @@
 // src/components/BabaSettings.jsx
 // Corrigido: após salvar pela RPC, busca baba atualizado do banco
 // e chama updateBaba para sincronizar o estado local (theme_color etc.)
+// Seção "Sorteio": padrões lidos pelo sorteio AUTOMÁTICO e pré-preenchidos no manual
+// (jogadores por time, suplentes, goleiro) + restrições juntos/separados.
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +11,8 @@ import { supabase }  from '../services/supabase';
 import { useBaba }   from '../contexts/BabaContext';
 import { useAuth }   from '../contexts/AuthContext';
 import ConfirmModal  from './ConfirmModal';
+import DrawConstraintsPanel from './DrawConstraintsPanel';
+import { useFeatures } from '../utils/babaMode';
 import toast         from 'react-hot-toast';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -88,6 +92,7 @@ const Section = ({ title, expanded, onToggle, children }) => (
 export default function BabaSettings() {
   const { currentBaba, updateBaba, deleteBaba } = useBaba();
   const { user }                    = useAuth();
+  const features                   = useFeatures();
   const navigate                    = useNavigate();
   const [saving,   setSaving]   = useState(false);
   const [sections, setSections] = useState({ schedule: true, game: false, draw: false, rating: false, advanced: false, danger: false });
@@ -122,6 +127,7 @@ export default function BabaSettings() {
     theme_color:            '#06b6d4',
     pix_key:                '',
     players_per_team:       5,
+    draw_strategy:          'reserve',
     gk_mode:                'fixed',
     gk_fallback:            'lineplayer',
   });
@@ -173,6 +179,7 @@ export default function BabaSettings() {
       theme_color:            currentBaba.theme_color            ?? '#06b6d4',
       pix_key:                currentBaba.pix_key                ?? '',
       players_per_team:       currentBaba.players_per_team       ?? 5,
+      draw_strategy:          currentBaba.draw_strategy === 'substitute' ? 'substitute' : 'reserve',
       gk_mode:                currentBaba.gk_mode                ?? 'fixed',
       gk_fallback:            currentBaba.gk_fallback            ?? 'lineplayer',
     });
@@ -246,6 +253,8 @@ export default function BabaSettings() {
       const cleanDays = [...form.selectedDays].sort((a, b) => a.day - b.day);
       const directUpdate = {
         allow_reserves: form.allow_reserves,
+        // draw_strategy não está na RPC update_baba_settings → update direto (só presidente)
+        ...(canEditAll ? { draw_strategy: form.draw_strategy } : {}),
         ...(canEditAll && form.pix_key !== undefined ? { pix_key: form.pix_key || null } : {}),
         ...(canEditAll ? {
           name:             form.name.trim(),
@@ -494,9 +503,9 @@ export default function BabaSettings() {
       </Section>
 
       {/* Sorteio Automático */}
-      <Section title="Sorteio Automático" expanded={sections.draw} onToggle={() => toggle('draw')}>
+      <Section title="Sorteio" expanded={sections.draw} onToggle={() => toggle('draw')}>
         <p className="text-[10px] text-text-low font-bold leading-relaxed -mt-1">
-          Define se e quando o sorteio roda sozinho. O card "Sorteio de Hoje", na Visão Geral, deixa ajustar jogadores por time só para a partida do dia — aqui embaixo fica o padrão usado sempre que o sorteio automático rodar sozinho.
+          Estes são os padrões do sorteio. O sorteio automático usa exatamente eles (mais as restrições e o nível dos convidados) na hora marcada; no sorteio manual eles já vêm preenchidos e podem ser ajustados só para aquele dia.
         </p>
         <Toggle
           label="Sorteio automático"
@@ -517,10 +526,35 @@ export default function BabaSettings() {
           <>
             <Field
               label="Jogadores por time (padrão)"
-              type="number" min="3" max="11"
+              type="number" min="2" max="11"
               value={form.players_per_team}
               onChange={set('players_per_team')}
             />
+
+            <div>
+              <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
+                Suplentes
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'reserve',    label: 'Reserva',    sub: 'Cada time ganha 1 reserva própria; sobras ficam aguardando' },
+                  { id: 'substitute', label: 'Incompleto', sub: 'Times formados mesmo sem completar; falta concentrada em 1 time' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => set('draw_strategy')(opt.id)}
+                    className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                      form.draw_strategy === opt.id
+                        ? 'bg-cyan-electric/10 border-cyan-electric text-cyan-electric'
+                        : 'bg-surface-2 border-border-mid text-text-low hover:border-border-strong'
+                    }`}
+                  >
+                    <p className="text-[10px] font-black uppercase">{opt.label}</p>
+                    <p className="text-[8px] font-bold mt-0.5 opacity-80">{opt.sub}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div>
               <label className="text-[9px] font-black uppercase tracking-widest text-text-low mb-1.5 block">
@@ -575,6 +609,16 @@ export default function BabaSettings() {
               </div>
             )}
           </>
+        )}
+
+        {/* Restrições — valem pro sorteio manual E pro automático (lidas do banco) */}
+        {features.drawConstraints && (
+          <div className="pt-3 border-t border-border-subtle space-y-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-text-low">
+              Restrições: jogadores juntos / separados
+            </p>
+            <DrawConstraintsPanel />
+          </div>
         )}
       </Section>
 

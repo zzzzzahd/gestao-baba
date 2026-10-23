@@ -1,16 +1,17 @@
 // src/pages/dashboard/TabOverview.jsx
 // Sprint 13 — InvitesPanel + Sprint 7 — ActivityFeed visível
+// Sorteio unificado: a sessão de sorteio ativa (manual OU automático) chega por
+// props (activeDraw/drawStarted, vindos do useActiveDraw na DashboardPage).
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Link2, RefreshCw, Activity, Radio } from 'lucide-react';
+import { Calendar, Link2, RefreshCw, Activity, Radio, Trophy } from 'lucide-react';
 import PresenceBlock       from '../../components/PresenceBlock';
 import DrawConfigBlock     from '../../components/DrawConfigBlock';
 import WaitlistPanel       from '../../components/WaitlistPanel';
 import InvitesPanel        from '../../components/InvitesPanel';
 import ActivityFeed        from '../../components/ActivityFeed';
 import DailyRecapPanel     from '../../components/DailyRecapPanel';
-import { supabase }        from '../../services/supabase';
 
 const TabOverview = ({
   currentBaba,
@@ -26,37 +27,39 @@ const TabOverview = ({
   isPresident,
   canManage,
   loading,
+  activeDraw,
+  drawStarted,
 }) => {
   const navigate        = useNavigate();
   const [showInvites,  setShowInvites]  = useState(!nextGameDay);
   const [showActivity, setShowActivity] = useState(true);
-  const [activeSession, setActiveSession] = useState(false);
-
-  // Ponto 6: sinaliza quando já tem um baba em andamento (sorteio ativo,
-  // ainda não encerrado) — isso é o que trava um novo sorteio simultâneo.
-  // Não filtra por data — só importa se tem sessão ativa pro baba, não em
-  // qual dia ela foi arquivada (o sorteio pode acontecer antes do dia do jogo).
-  useEffect(() => {
-    if (!currentBaba?.id) return;
-    supabase.from('draw_results').select('id')
-      .eq('baba_id', currentBaba.id)
-      .eq('status', 'active')
-      .limit(1).maybeSingle()
-      .then(({ data }) => setActiveSession(!!data));
-  }, [currentBaba?.id]);
 
   return (
     <div className="space-y-5">
 
-      {activeSession && (
+      {/* Sessão de sorteio ativa: mesma fonte pro manual e pro automático.
+          Já começou partida → "em andamento"; senão → "times sorteados". */}
+      {activeDraw?.id && (
         <button
           onClick={() => navigate(canManage ? '/draw?resume=1' : '/teams')}
-          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 transition-colors"
+          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-colors ${
+            drawStarted
+              ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15'
+              : 'bg-cyan-electric/10 border-cyan-electric/30 hover:bg-cyan-electric/15'
+          }`}
         >
-          <Radio size={16} className="text-red-400 animate-pulse shrink-0" />
+          {drawStarted
+            ? <Radio  size={16} className="text-red-400 animate-pulse shrink-0" />
+            : <Trophy size={16} className="text-cyan-electric shrink-0" />}
           <div className="flex-1 text-left">
-            <p className="text-[11px] font-black uppercase text-red-400">Partidas em andamento</p>
-            <p className="text-[9px] font-bold text-text-low">Toque pra acompanhar</p>
+            <p className={`text-[11px] font-black uppercase ${drawStarted ? 'text-red-400' : 'text-cyan-electric'}`}>
+              {drawStarted ? 'Partidas em andamento' : 'Times sorteados'}
+            </p>
+            <p className="text-[9px] font-bold text-text-low">
+              {drawStarted
+                ? 'Toque pra acompanhar'
+                : canManage ? 'Toque pra ver os times e iniciar a partida' : 'Toque pra ver os times'}
+            </p>
           </div>
         </button>
       )}
@@ -86,15 +89,12 @@ const TabOverview = ({
             </div>
           )}
 
-          {canManage && canConfirm && (
+          {canManage && !activeDraw?.id && (
             <DrawConfigBlock
-              drawConfig={drawConfig}
-              setDrawConfig={setDrawConfig}
               gameConfirmations={gameConfirmations}
               isDrawing={isDrawing}
               nextGameDay={nextGameDay}
               currentBaba={currentBaba}
-              onReload={reloadConfirmations}
             />
           )}
 

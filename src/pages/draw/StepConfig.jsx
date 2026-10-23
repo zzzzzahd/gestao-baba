@@ -1,13 +1,28 @@
 // src/pages/draw/StepConfig.jsx
-// Sprint 3/16 — Adiciona sons no sorteio + constraints existentes.
+// ─────────────────────────────────────────────────────────────────────────────
+// Wizard /draw — Step 1: Configuração + sorteio MANUAL.
+//
+// Não tem mais algoritmo próprio: sorteia via drawService.executeDraw(), o
+// mesmo caminho do sorteio automático (cliente e Edge Function usam o mesmo
+// utils/drawAlgorithm.js). Os valores iniciais (jogadores por time, suplentes)
+// vêm do padrão do baba — aqui o presidente só ajusta pra ESTE sorteio.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState } from 'react';
-import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp, UserPlus, X } from 'lucide-react';
+import { Users, RefreshCw, ChevronRight, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useBaba }               from '../../contexts/BabaContext';
 import { useFeatures }           from '../../utils/babaMode';
-import { supabase }              from '../../services/supabase';
 import Tooltip                   from '../../components/Tooltip';
 import DrawConstraintsPanel      from '../../components/DrawConstraintsPanel';
+import GuestManager              from '../../components/GuestManager';
+import ConfirmModal              from '../../components/ConfirmModal';
+import {
+  executeDraw,
+  getDrawDefaults,
+  describeStrategy,
+  isCountedConfirmation,
+  getMinRequired,
+} from '../../services/drawService';
 import { Sounds }                from '../../utils/sounds';
 import toast                     from 'react-hot-toast';
 
@@ -16,235 +31,31 @@ const STRATEGIES = [
   { id: 'substitute', label: 'Incompleto', tip: 'Times são formados mesmo com menos jogadores.'          },
 ];
 
-// ─── Algoritmo de sorteio balanceado ─────────────────────────────────────────
-
-/** Distribui um pool (já ordenado por prioridade) em times respeitando a capacidade de cada um, em formato serpentina (cobra). */
-const snakeDistribute = (pool, capacities) => {
-  const teams = capacities.map(() => []);
-  let dir = 1, poolIdx = 0;
-  while (poolIdx < pool.length) {
-    const order = dir === 1 ? capacities.map((_, i) => i) : capacities.map((_, i) => i).reverse();
-    let placedAny = false;
-    for (const t of order) {
-      if (poolIdx >= pool.length) break;
-      if (teams[t].length < capacities[t]) {
-        teams[t].push(pool[poolIdx]);
-        poolIdx++;
-        placedAny = true;
-      }
-    }
-    if (!placedAny) break;
-    dir *= -1;
-  }
-  return teams;
-};
-
-/** Fisher-Yates — usado antes de ordenar por nota pra empates não caírem sempre
- * pra ordem alfabética do nome (era isso que fazia "Zharick" ficar sempre por
- * último: todo mundo empatado em nota 2, e a query de players vem ordenada por
- * nome — sem embaralhar, o desempate é sempre alfabético, sempre no mesmo sentido). */
-const shuffle = (arr) => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-const drawTeamsWithConstraints = (players, playersPerTeam, strategy, constraints = [], gkMode = 'fixed') => {
-  const gks      = players.filter(p => p.position === 'goleiro');
-  const outfield = players.filter(p => p.position !== 'goleiro');
-
-  const totalTeamsIfFixed    = strategy === 'reserve'
-    ? Math.floor(players.length / (playersPerTeam + 1))
-    : Math.ceil(players.length / playersPerTeam);
-  const totalTeamsIfLineOnly = strategy === 'reserve'
-    ? Math.floor(outfield.length / (playersPerTeam + 1))
-    : Math.ceil(outfield.length / playersPerTeam);
-
-  // court: decide sozinho — goleiro fixo no time se a conta bate exatamente
-  // (1 goleiro por time), senão vira fila própria da quadra (goalkeeperQueue)
-  let mode; // 'fixed' | 'separate' | 'court-fixed' | 'court-queue'
-  if (gkMode === 'separate') mode = 'separate';
-  else if (gkMode === 'court') {
-    mode = (totalTeamsIfFixed > 0 && gks.length === totalTeamsIfFixed) ? 'court-fixed' : 'court-queue';
-  } else mode = 'fixed';
-
-  const totalTeams = (mode === 'separate' || mode === 'court-queue') ? totalTeamsIfLineOnly : totalTeamsIfFixed;
-
-  // Goleiro sempre é distribuído à parte, com vaga garantida (1 por time) quando o
-  // modo exige — nunca dentro do mesmo snake por nota que os jogadores de linha,
-  // senão a ordenação por nota pode deixar times inteiros sem goleiro por acaso.
-  const hasDedicatedGkPerTeam = mode === 'fixed' || mode === 'court-fixed' || mode === 'separate';
-  // separate: goleiro é vaga extra (bônus) — linha usa a capacidade cheia de playersPerTeam.
-  // fixed/court-fixed: goleiro é 1 dos playersPerTeam — linha usa playersPerTeam-1.
-  // court-queue: não tem goleiro dedicado nenhum — linha usa a capacidade cheia.
-  let lineCapacityPerTeam = (mode === 'fixed' || mode === 'court-fixed') ? playersPerTeam - 1 : playersPerTeam;
-  // 'reserve': cada time ganha +1 vaga própria de reserva (fica marcado isReserve),
-  // que pode entrar pra substituir qualquer titular DO MESMO TIME até o fim do baba.
-  if (strategy === 'reserve') lineCapacityPerTeam += 1;
-
-  const sorted      = shuffle(outfield).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
-  const capacities   = Array.from({ length: totalTeams }, () => lineCapacityPerTeam);
-  let distributed;
-  if (strategy === 'substitute' && totalTeams > 0) {
-    // Concentra a falta de jogadores em UM time só (o último), em vez de espalhar
-    // entre vários — mas ainda balanceia por nota dentro dos times completos.
-    const fullTeams    = totalTeams - 1;
-    const fullCapacity = fullTeams * lineCapacityPerTeam;
-    const forFull       = sorted.slice(0, fullCapacity);
-    const forIncomplete = sorted.slice(fullCapacity);
-    distributed = [
-      ...snakeDistribute(forFull, Array.from({ length: fullTeams }, () => lineCapacityPerTeam)),
-      forIncomplete,
-    ];
-  } else {
-    distributed = snakeDistribute(sorted, capacities);
-  }
-  const teams = distributed.map((teamPlayers, i) => ({
-    name:    `Time ${String.fromCharCode(65 + i)}`,
-    // 'reserve': o último jogador alocado no time (a vaga extra) é o reserva do time.
-    // 'substitute': o time pode sobrar incompleto naturalmente (snake respeita a
-    // capacidade mas não força completar — o último time formado pode ficar curto).
-    players: strategy === 'reserve' && teamPlayers.length === lineCapacityPerTeam
-      ? teamPlayers.map((p, idx) => idx === teamPlayers.length - 1 ? { ...p, isReserve: true } : p)
-      : teamPlayers,
-  }));
-
-  let goalkeeperQueue = [];
-  let gkReserves      = [];
-  if (mode === 'court-queue') {
-    // Goleiros não entram no sorteio de time nenhum — ficam numa fila própria,
-    // vinculada à quadra (índices 0/1 = ativos, resto = banco). StepMatch.jsx
-    // gira essa fila em paralelo com a fila de times (ver handleMatchEnd).
-    goalkeeperQueue = shuffle(gks).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
-  } else if (hasDedicatedGkPerTeam) {
-    const sortedGks    = shuffle(gks).sort((a, b) => (b.balance_level || 0) - (a.balance_level || 0));
-    const gkCapacities = Array.from({ length: totalTeams }, () => 1);
-    snakeDistribute(sortedGks, gkCapacities).forEach((assigned, i) => teams[i].players.push(...assigned));
-    gkReserves = sortedGks.slice(totalTeams); // goleiros excedentes (mais goleiro que time)
-  }
-
-  const getTeamOf = (pid) => teams.findIndex(t => t.players.some(p => p.id === pid));
-
-  const swapPlayers = (tAIdx, pAId, tBIdx, pBId) => {
-    const pA = teams[tAIdx].players.find(p => p.id === pAId);
-    const pB = teams[tBIdx].players.find(p => p.id === pBId);
-    if (!pA || !pB) return false;
-    teams[tAIdx].players = teams[tAIdx].players.filter(p => p.id !== pAId);
-    teams[tBIdx].players = teams[tBIdx].players.filter(p => p.id !== pBId);
-    teams[tAIdx].players.push(pB);
-    teams[tBIdx].players.push(pA);
-    return true;
-  };
-
-  constraints.forEach(({ player_a_id, player_b_id, constraint_type }) => {
-    const tA = getTeamOf(player_a_id);
-    const tB = getTeamOf(player_b_id);
-    if (tA === -1 || tB === -1) return;
-
-    if (constraint_type === 'must_together' && tA !== tB) {
-      const playerBObj   = teams[tB].players.find(p => p.id === player_b_id);
-      const ratingTarget = playerBObj?.balance_level || 0;
-      const candidates   = teams[tA].players
-        .filter(p => p.id !== player_a_id)
-        .sort((a, b) => Math.abs((a.balance_level || 0) - ratingTarget) - Math.abs((b.balance_level || 0) - ratingTarget));
-      if (candidates[0]) swapPlayers(tA, candidates[0].id, tB, player_b_id);
-    }
-
-    if (constraint_type === 'must_apart' && tA === tB) {
-      const playerBObj   = teams[tA].players.find(p => p.id === player_b_id);
-      const ratingTarget = playerBObj?.balance_level || 0;
-      const otherTeamIdx = (tA + 1) % totalTeams;
-      const candidates   = teams[otherTeamIdx].players
-        .sort((a, b) => Math.abs((a.balance_level || 0) - ratingTarget) - Math.abs((b.balance_level || 0) - ratingTarget));
-      if (candidates[0]) swapPlayers(tA, player_b_id, otherTeamIdx, candidates[0].id);
-    }
-  });
-
-  const reserves = strategy === 'reserve'
-    ? [...sorted.slice(totalTeams * lineCapacityPerTeam), ...gkReserves]
-    : gkReserves;
-
-  return { teams, reserves, goalkeeperQueue };
-};
-
-// ─── StepConfig ───────────────────────────────────────────────────────────────
-
 const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
-  const { currentBaba, gameConfirmations, isDrawing, nextGameDay, reloadConfirmations, getAllRatings } = useBaba();
+  const { currentBaba, gameConfirmations, nextGameDay, reloadConfirmations, getAllRatings } = useBaba();
   const features = useFeatures();
   const [drawing,         setDrawing]         = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
-  const [showGuestForm,   setShowGuestForm]   = useState(false);
-  const [guestName,       setGuestName]       = useState('');
-  const [guestPosition,   setGuestPosition]   = useState('linha');
-  const [guestLevel,      setGuestLevel]      = useState(2);
-  const [addingGuest,     setAddingGuest]     = useState(false);
+  const [confirmRedraw,   setConfirmRedraw]   = useState(false);
 
-  const safeConfig     = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
-  const confirmedCount = gameConfirmations?.length || 0;
-  const guests          = (gameConfirmations || []).filter(c => c.player?.is_guest);
+  const safeConfig = drawConfig || { playersPerTeam: 5, strategy: 'reserve' };
+  const defaults   = getDrawDefaults(currentBaba);
+  const isDefault  = safeConfig.playersPerTeam === defaults.playersPerTeam
+                  && safeConfig.strategy       === defaults.strategy;
+
+  // Só conta quem está confirmado — lista de espera não entra no sorteio.
+  const confirmedCount = (gameConfirmations || []).filter(isCountedConfirmation).length;
+
   // 'reserve': cada time precisa de +1 vaga própria de reserva pra se formar
-  // (ver lineCapacityPerTeam em drawTeamsWithConstraints) — sem contar isso
-  // aqui, o "mínimo pra sortear" ficava subestimado e liberava o sorteio com
-  // confirmados de menos pra formar 2 times de verdade (ex: playersPerTeam=2
-  // mostrava mínimo 4, mas o algoritmo só forma o 1º time com 3 confirmados
-  // — precisa de 6 pros 2 times, não 4). Isso deixava StepMatch travado pra
-  // sempre em "Preparando partida..." (exige 2+ times pra sair do loading).
-  const perTeamForMin  = safeConfig.strategy === 'reserve' ? safeConfig.playersPerTeam + 1 : safeConfig.playersPerTeam;
-  const minRequired    = perTeamForMin * 2;
-  const totalTeams     = Math.floor(confirmedCount / safeConfig.playersPerTeam);
-  const totalMatches   = Math.floor(totalTeams / 2);
-  const reserveCount   = confirmedCount % safeConfig.playersPerTeam
+  // (ver lineCapacityPerTeam em drawAlgorithm.js). Sem contar isso, o "mínimo
+  // pra sortear" ficava subestimado e StepMatch travava em "Preparando
+  // partida..." (exige 2+ times).
+  const minRequired   = getMinRequired(safeConfig);
+  const totalTeams    = Math.floor(confirmedCount / safeConfig.playersPerTeam);
+  const totalMatches  = Math.floor(totalTeams / 2);
+  const reserveCount  = confirmedCount % safeConfig.playersPerTeam
     + (totalTeams % 2) * safeConfig.playersPerTeam;
-  const canDraw        = confirmedCount >= minRequired && !drawing;
-
-  const handleAddGuest = async () => {
-    if (!currentBaba || !nextGameDay) return;
-    setAddingGuest(true);
-    try {
-      const n     = guests.length + 1;
-      const label = guestName.trim()
-        ? `${guestName.trim()} - Convidado ${n}`
-        : `Convidado ${String(n).padStart(2, '0')}`;
-
-      const { data: newPlayer, error: playerErr } = await supabase
-        .from('players')
-        .insert([{ baba_id: currentBaba.id, name: label, position: guestPosition, is_guest: true, balance_level: guestLevel }])
-        .select().single();
-      if (playerErr) throw playerErr;
-
-      const { error: confirmErr } = await supabase
-        .from('game_confirmations')
-        .insert([{ baba_id: currentBaba.id, player_id: newPlayer.id, game_date: nextGameDay.dateStr, status: 'confirmed' }]);
-      if (confirmErr) throw confirmErr;
-
-      await reloadConfirmations();
-      setGuestName('');
-      setGuestPosition('linha');
-      setGuestLevel(2);
-      toast.success(`${label} adicionado ao sorteio!`);
-    } catch (err) {
-      console.error('[StepConfig] addGuest error:', err);
-      toast.error('Erro ao adicionar convidado');
-    } finally {
-      setAddingGuest(false);
-    }
-  };
-
-  const handleRemoveGuest = async (confirmation) => {
-    try {
-      await supabase.from('game_confirmations').delete().eq('id', confirmation.id);
-      await supabase.from('players').delete().eq('id', confirmation.player_id);
-      await reloadConfirmations();
-      toast.success('Convidado removido');
-    } catch (err) {
-      console.error('[StepConfig] removeGuest error:', err);
-      toast.error('Erro ao remover convidado');
-    }
-  };
+  const canDraw       = confirmedCount >= minRequired && !drawing;
 
   const handleDelta = (delta) => {
     const next = Math.max(2, Math.min(11, safeConfig.playersPerTeam + delta));
@@ -256,158 +67,37 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
     if (!canDraw) return;
     setDrawing(true);
     try {
-      // Usa a data do PRÓXIMO JOGO, não "hoje" — as confirmações (incluindo
-      // convidados) vivem sob nextGameDay.dateStr; se o sorteio salvasse sob
-      // a data do calendário, um sorteio feito num dia diferente do jogo
-      // ficava descolado de quem realmente confirmou presença (times vazios).
-      const today = nextGameDay?.dateStr || new Date().toISOString().split('T')[0];
+      // Data do PRÓXIMO JOGO, não "hoje": as confirmações (incluindo
+      // convidados) vivem sob nextGameDay.dateStr.
+      const dateStr = nextGameDay?.dateStr || new Date().toISOString().split('T')[0];
 
-      const { data: existing } = await supabase
-       .from('draw_results')
-       .select('*')
-       .eq('baba_id', currentBaba.id)
-       .eq('status', 'active')
-       .order('created_at', { ascending: false })
-       .limit(1)
-       .maybeSingle();
-
-      if (!force && existing?.teams?.length >= 2 && existing.status !== 'finished') {
-        Sounds.unlock();
-        onNext({ teams: existing.teams, reserves: existing.reserves || [], goalkeeperQueue: existing.goalkeeper_queue || [], drawResultId: existing.id });
-        return;
-      }
-
-      // Sortear de novo descarta as partidas da sessão anterior (mesmo dia) —
-      // senão a classificação/fila do dia ficaria misturando placares de
-      // sorteios diferentes. match_players e cards apagam em cascata.
-      //
-      // IMPORTANTE: encerra TODAS as sessões ativas do dia (não só a que veio
-      // no `existing`) — isso é o que evita o erro 409 (duplicate key value
-      // violates unique constraint "idx_draw_results_one_active"): se por
-      // qualquer motivo sobrar mais de uma sessão 'active' pro mesmo baba+dia
-      // (corrida entre cliques, sobra de um teste anterior), o insert lá
-      // embaixo quebra até a última sobrar encerrada.
-      if (force) {
-        const { data: staleActives, error: staleErr } = await supabase
-          .from('draw_results')
-          .select('id')
-          .eq('baba_id', currentBaba.id)
-          .eq('status', 'active');
-
-        if (staleErr) throw staleErr;
-
-        if (staleActives?.length > 0) {
-          const staleIds = staleActives.map(r => r.id);
-
-          const { error: finishErr } = await supabase
-            .from('draw_results')
-            .update({
-              status: 'finished',
-              finished_at: new Date().toISOString(),
-            })
-            .in('id', staleIds);
-
-          if (finishErr) throw finishErr;
-
-          const { error: deleteMatchesErr } = await supabase
-            .from('matches')
-            .delete()
-            .in('draw_result_id', staleIds);
-
-          if (deleteMatchesErr) throw deleteMatchesErr;
-        }
-      }
-
-      const { data: constraints } = await supabase.rpc('get_draw_constraints', {
-        p_baba_id: currentBaba.id,
+      const result = await executeDraw({
+        baba:          currentBaba,
+        dateStr,
+        confirmations: gameConfirmations || [],
+        drawConfig:    safeConfig,
+        getRatings:    getAllRatings,
+        force,
+        source:        'manual',
       });
 
-      const ratingsData = await getAllRatings();
-      const levelMap     = new Map(ratingsData.map(r => [r.player_id, r.avg_level ?? 2]));
-
-      // Monta a partir de gameConfirmations (que já traz o player via join,
-      // sempre atualizado por reloadConfirmations) — não do array `players`
-      // do contexto, que fica desatualizado logo depois de adicionar um
-      // convidado: handleAddGuest só chama reloadConfirmations(), nunca
-      // refaz o loadPlayers() do BabaContext. Filtrar por `players` (stale)
-      // fazia o sorteio silenciosamente ignorar convidados recém-adicionados,
-      // formando menos times do que deveria (às vezes só 1, travando o
-      // StepMatch pra sempre em "Preparando partida...").
-      const confirmedPlayers = gameConfirmations
-        .map(c => c.player)
-        .filter(Boolean)
-        .map(p => ({ ...p, balance_level: p.is_guest ? (p.balance_level ?? 2) : (levelMap.get(p.id) ?? 2) }));
-
-      const { teams, reserves, goalkeeperQueue } = drawTeamsWithConstraints(
-        confirmedPlayers,
-        safeConfig.playersPerTeam,
-        safeConfig.strategy,
-        constraints || [],
-        currentBaba.gk_mode || 'fixed',
-      );
-
-      // Nunca cria uma sessão de sorteio sem pelo menos 2 times — com só 1
-      // (ou 0), StepMatch nunca sai da tela "Preparando partida..." (exige
-      // os 2 lados pra montar a partida), e o app fica preso num loading
-      // infinito sem nenhum erro visível. Isso também deixava uma sessão
-      // "active" travada no banco, bloqueando qualquer sorteio seguinte (o
-      // índice único só permite 1 sessão ativa por dia).
-      if (!teams || teams.length < 2) {
-        toast.error(`Sem jogadores suficientes confirmados pra ${today === nextGameDay?.dateStr ? 'esse jogo' : today} — confere as confirmações antes de sortear.`);
-        setDrawing(false);
+      if (!result.ok) {
+        toast.error(
+          result.code === 'insufficient'
+            ? `Faltam confirmados: precisa de ${result.needed}, tem ${result.have}.`
+            : 'Sem jogadores suficientes confirmados pra esse jogo — confere as confirmações antes de sortear.'
+        );
         return;
       }
 
-      const avgRatings   = teams.map(t =>
-        t.players.reduce((s, p) => s + (p.balance_level || 0), 0) / (t.players.length || 1)
-      );
-      const balanceScore = avgRatings.length > 1
-        ? Math.max(...avgRatings) - Math.min(...avgRatings)
-        : 0;
-
-      // Sortear de novo (force=true) gera uma NOVA sessão de sorteio — importante
-      // pra fila/pontuação do dia não se misturar com testes/sorteios anteriores
-      // (ver draw_result_id em StepMatch.jsx e loadDailyStandings).
-      const { data: drawRes, error: drawErr } = await supabase.from('draw_results').insert({
-        baba_id:          currentBaba.id,
-        draw_date:        today,
-        teams,
-        reserves,
-        goalkeeper_queue: goalkeeperQueue,
-        draw_config:      safeConfig,
-        algorithm:        'balanced_snake',
-        constraints_used: constraints || [],
-        balance_score:    Math.round(balanceScore * 100) / 100,
-        teams_snapshot:   teams,
-        status:           'active',
-        finished_at:      null,
-        finished_by:      null,
-      }).select().single();
-
-      if (drawErr) {
-        // Corrida rara: dois cliques quase simultâneos podem os dois passarem
-        // pela checagem acima antes de qualquer um inserir. Em vez de só
-        // falhar, reaproveita a sessão que o outro clique já criou.
-        if (drawErr.code === '23505') {
-          const { data: recovered } = await supabase
-            .from('draw_results').select('*')
-            .eq('baba_id', currentBaba.id)
-            .eq('status', 'active')
-            .order('created_at', { ascending: false })
-            .limit(1).maybeSingle();
-          if (recovered?.teams?.length >= 2) {
-            Sounds.unlock();
-            onNext({ teams: recovered.teams, reserves: recovered.reserves || [], goalkeeperQueue: recovered.goalkeeper_queue || [], drawResultId: recovered.id });
-            return;
-          }
-        }
-        throw drawErr;
-      }
-
-      // Sprint 3 — som de sorteio
       Sounds.unlock();
-      toast.success('Times sorteados! ⚡');
-      onNext({ teams, reserves, goalkeeperQueue, drawResultId: drawRes?.id });
+      if (!result.reused) {
+        toast.success('Times sorteados! ⚡');
+        if (result.constraintsSkipped) {
+          toast('As restrições de sorteio não puderam ser carregadas — sorteio feito sem elas.', { icon: '⚠️' });
+        }
+      }
+      onNext(result.session);
     } catch (err) {
       console.error('[StepConfig] draw error:', err);
       toast.error('Erro ao sortear. Tente novamente.');
@@ -441,100 +131,14 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         )}
       </div>
 
-      {/* Convidados avulsos — participam só deste sorteio, não entram no rank */}
-      <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
-        <button
-          onClick={() => setShowGuestForm(v => !v)}
-          disabled={drawing}
-          className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors disabled:opacity-40"
-        >
-          <div className="flex items-center gap-2">
-            <UserPlus size={14} className="text-cyan-electric" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">
-              Convidados{guests.length > 0 ? ` (${guests.length})` : ''}
-            </span>
-          </div>
-          {showGuestForm
-            ? <ChevronUp   size={14} className="text-text-low" />
-            : <ChevronDown size={14} className="text-text-low" />}
-        </button>
-
-        {guests.length > 0 && (
-          <div className="px-5 pb-3 space-y-2">
-            {guests.map(g => (
-              <div key={g.id} className="flex items-center justify-between bg-surface-2 rounded-xl px-3 py-2 border border-border-subtle">
-                <span className="text-[11px] font-bold truncate">{g.player?.name}</span>
-                <button
-                  onClick={() => handleRemoveGuest(g)}
-                  disabled={drawing}
-                  className="text-text-low hover:text-red-500 transition-colors p-1 disabled:opacity-40"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {showGuestForm && (
-          <div className="px-5 pb-5 border-t border-border-subtle pt-4 space-y-3">
-            <p className="text-[9px] text-text-muted font-bold leading-relaxed">
-              O convidado participa só deste sorteio/partida — não precisa ser integrante do baba,
-              não entra nos rankings nem nas conquistas, mas gols, assistências e cartões dele ficam
-              registrados no histórico da partida.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={guestName}
-                onChange={e => setGuestName(e.target.value)}
-                placeholder="Nome (opcional)"
-                className="flex-1 bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-cyan-electric transition-colors"
-              />
-              <select
-                value={guestPosition}
-                onChange={e => setGuestPosition(e.target.value)}
-                className="bg-surface-2 border border-border-mid rounded-xl px-3 py-2.5 text-sm font-black outline-none cursor-pointer"
-              >
-                <option value="linha">⚽ LINHA</option>
-                <option value="goleiro">🧤 GOL</option>
-              </select>
-            </div>
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-widest text-text-low block mb-1.5">
-                Nível (pro equilíbrio do sorteio)
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 1, label: 'Abaixo' },
-                  { value: 2, label: 'Média' },
-                  { value: 3, label: 'Acima' },
-                ].map(l => (
-                  <button
-                    key={l.value}
-                    type="button"
-                    onClick={() => setGuestLevel(l.value)}
-                    className={`py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${
-                      guestLevel === l.value
-                        ? 'bg-cyan-electric text-black border-cyan-electric'
-                        : 'bg-surface-2 text-text-low border-border-mid hover:border-border-strong'
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={handleAddGuest}
-              disabled={addingGuest}
-              className="w-full py-3 bg-cyan-electric/10 border border-cyan-electric/30 rounded-xl font-black text-xs uppercase tracking-[3px] text-cyan-electric active:scale-95 transition-transform disabled:opacity-40"
-            >
-              {addingGuest ? 'Adicionando...' : '+ Adicionar convidado'}
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Convidados avulsos — componente único (também usado em Gestão) */}
+      <GuestManager
+        babaId={currentBaba?.id}
+        gameDate={nextGameDay?.dateStr}
+        confirmations={gameConfirmations}
+        onReload={reloadConfirmations}
+        disabled={drawing}
+      />
 
       {/* Jogadores por time */}
       <div className="p-5 rounded-3xl bg-surface-1 border border-border-subtle space-y-4">
@@ -589,9 +193,26 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
             ))}
           </div>
         </div>
+
+        {/* Padrão do baba — o que o sorteio automático usa */}
+        {!isDefault && (
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border-subtle">
+            <p className="text-[9px] text-text-muted font-bold leading-relaxed">
+              Ajuste só para este sorteio. Padrão do baba: {defaults.playersPerTeam} por time · {describeStrategy(defaults.strategy)}.
+            </p>
+            <button
+              onClick={() => { setDrawConfig(defaults); Sounds.click(); }}
+              disabled={drawing}
+              className="shrink-0 text-[9px] font-black uppercase text-cyan-electric underline underline-offset-2 disabled:opacity-40"
+            >
+              Usar padrão
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Restrições — Fase 2: "sorteio com restrições" é recurso de Assinante */}
+      {/* Restrições — Fase 2: "sorteio com restrições" é recurso de Assinante.
+          Os mesmos pares valem pro sorteio automático (lidos do banco). */}
       {features.drawConstraints && (
       <div className="rounded-3xl bg-surface-1 border border-border-subtle overflow-hidden">
         <button
@@ -649,23 +270,30 @@ const StepConfig = ({ drawConfig, setDrawConfig, onNext }) => {
         )}
       </button>
 
-      {/* Se já existe um sorteio de hoje em andamento, o botão principal só
-          reabre ele (evita sorteio duplicado sem querer). Esse aqui força um
-          sorteio novo de verdade — útil pra testar ou pra corrigir um sorteio
-          errado sem precisar encerrar o baba primeiro. */}
+      {/* Se já existe um sorteio em andamento, o botão principal só reabre ele
+          (evita sorteio duplicado sem querer). Esse aqui força um sorteio novo
+          de verdade — útil pra corrigir um sorteio errado sem precisar
+          encerrar o baba primeiro. */}
       {canDraw && (
         <button
-          onClick={() => {
-            if (window.confirm('Isso apaga as partidas já jogadas hoje (placar, fila, gols) e sorteia um time novo do zero. Continuar?')) {
-              handleDraw(true);
-            }
-          }}
+          onClick={() => setConfirmRedraw(true)}
           disabled={drawing}
           className="w-full py-2.5 text-[9px] font-black uppercase tracking-widest text-text-muted hover:text-cyan-electric transition-colors disabled:opacity-30"
         >
           Sortear de novo (ignora o sorteio atual)
         </button>
       )}
+
+      <ConfirmModal
+        open={confirmRedraw}
+        message="Sortear de novo?"
+        description="Isso apaga as partidas já jogadas hoje (placar, fila, gols) e sorteia os times do zero."
+        confirmLabel="Sortear de novo"
+        cancelLabel="Cancelar"
+        danger
+        onConfirm={() => handleDraw(true)}
+        onCancel={() => setConfirmRedraw(false)}
+      />
     </div>
   );
 };

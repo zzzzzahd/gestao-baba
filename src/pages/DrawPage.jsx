@@ -10,7 +10,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBaba } from '../contexts/BabaContext';
 import { useDrawWizard, clearDrawWizard } from '../hooks/useDrawWizard';
 import { supabase } from '../services/supabase';
-import { ArrowLeft, Settings2, Users, Play } from 'lucide-react';
+import { getDrawDefaults, describeStrategy, describeGkMode } from '../services/drawService';
+import { getDrawMoment, getTodayGame, formatHM } from '../utils/drawSchedule';
+import { ArrowLeft, Settings2, Users, Play, RefreshCw } from 'lucide-react';
 
 const StepConfig = lazy(() => import('./draw/StepConfig'));
 const StepTeams  = lazy(() => import('./draw/StepTeams'));
@@ -67,7 +69,7 @@ const DrawPage = () => {
   const navigate        = useNavigate();
   const [searchParams]  = useSearchParams();
   const forceResume     = searchParams.get('resume') === '1';
-  const { currentBaba } = useBaba();
+  const { currentBaba, drawTeamsIntelligent, isDrawing, canManageBaba, nextGameDay } = useBaba();
 
   const {
     step, drawConfig, drawResult, matchState,
@@ -115,17 +117,33 @@ const DrawPage = () => {
         if (data?.teams?.length >= 2) {
           console.log('[DrawPage] Sessão ativa encontrada:', data.id);
 
+          // Sorteio feito (manual OU automático) mas partida ainda não criada →
+          // mostra os times (step 2) pro presidente/coordenador conferir e iniciar.
+          // Já tem partida → retoma ao vivo (step 3).
+          const matchRes = await supabase
+            .from('matches').select('id')
+            .eq('draw_result_id', data.id).limit(1);
+          const started = Array.isArray(matchRes?.data) && matchRes.data.length > 0;
+
+          if (cancelled) return;
+
           setDrawResult({
             teams: data.teams,
             reserves: data.reserves || [],
             goalkeeperQueue: data.goalkeeper_queue || [],
             drawResultId: data.id,
+            drawDate: data.draw_date,
           });
 
-          setMatchState(null);
-          setStep(3);
-        } else if (forceResume) {
-          setStep(1);
+          if (started) {
+            setMatchState(null);
+            setStep(3);
+          }
+        } else {
+          // Sem sessão ativa: a configuração do wizard parte do PADRÃO do baba
+          // (Configurações › Sorteio), não de um valor antigo do localStorage.
+          setDrawConfig(getDrawDefaults(currentBaba));
+          if (forceResume) setStep(1);
         }
 
         setSessionChecked(true);
@@ -152,6 +170,20 @@ const DrawPage = () => {
     if (step === 1) navigate('/dashboard');
     else setStep(step - 1);
   };
+
+  // Sorteio automático ligado e ainda sem sorteio: roda agora com os padrões.
+  const handleRunNow = async () => {
+    const session = await drawTeamsIntelligent();
+    if (session) setDrawResult(session);
+  };
+
+  const autoDrawAt = (() => {
+    if (!currentBaba?.auto_draw_enabled) return null;
+    const today = getTodayGame(currentBaba);
+    if (today && !today.isOver) return formatHM(today.drawMoment);
+    return nextGameDay?.date instanceof Date ? formatHM(getDrawMoment(currentBaba, nextGameDay.date)) : null;
+  })();
+  const defaults = getDrawDefaults(currentBaba);
 
   const handleReset = () => {
     clearDrawWizard();
@@ -189,22 +221,41 @@ const DrawPage = () => {
           {!sessionChecked || checkingSession ? (
             <StepLoader />
           ) : step === 1 && currentBaba?.auto_draw_enabled && !showManualOverride ? (
-            <div className="text-center py-16 rounded-3xl bg-surface-1 border border-dashed border-border-mid space-y-3 px-6">
-              <Settings2 size={28} className={`text-cyan-electric mx-auto ${checkingSession ? 'animate-spin' : ''}`} />
+            <div className="text-center py-12 rounded-3xl bg-surface-1 border border-dashed border-border-mid space-y-4 px-6">
+              <Settings2 size={28} className="text-cyan-electric mx-auto" />
               <p className="text-[11px] font-black uppercase tracking-widest text-white">
                 Sorteio automático ligado
               </p>
               <p className="text-[10px] text-text-low font-bold leading-relaxed">
-                {currentBaba.auto_draw_time
-                  ? `O sorteio roda sozinho às ${String(currentBaba.auto_draw_time).substring(0, 5)}. Volte aqui depois desse horário.`
-                  : 'O sorteio roda sozinho no horário configurado. Volte aqui depois desse horário.'}
+                {autoDrawAt
+                  ? `Os times saem sozinhos às ${autoDrawAt}, com as configurações padrão do baba.`
+                  : 'Os times saem sozinhos no horário configurado, com as configurações padrão do baba.'}
+                {' '}Quando saírem, todos veem os times e você inicia a partida por aqui.
               </p>
-              <button
-                onClick={() => setShowManualOverride(true)}
-                className="text-[9px] font-black uppercase text-text-muted underline underline-offset-2 hover:text-text-low"
-              >
-                Sortear manualmente agora mesmo
-              </button>
+              <p className="text-[10px] text-text-muted font-black uppercase">
+                {defaults.playersPerTeam} por time · {describeStrategy(defaults.strategy)} · Goleiro: {describeGkMode(currentBaba?.gk_mode)}
+              </p>
+
+              {canManageBaba && (
+                <div className="space-y-2 pt-1">
+                  <button
+                    onClick={handleRunNow}
+                    disabled={isDrawing}
+                    className="w-full py-4 rounded-2xl font-black uppercase italic tracking-tighter text-black flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40"
+                    style={{ background: 'linear-gradient(135deg, #00f2ff, #0066ff)' }}
+                  >
+                    {isDrawing
+                      ? <><RefreshCw size={16} className="animate-spin" /> Sorteando...</>
+                      : 'Sortear agora com estas configurações'}
+                  </button>
+                  <button
+                    onClick={() => setShowManualOverride(true)}
+                    className="text-[9px] font-black uppercase text-text-muted underline underline-offset-2 hover:text-text-low"
+                  >
+                    Ajustar e sortear manualmente
+                  </button>
+                </div>
+              )}
             </div>
           ) : step === 1 && (
             <StepConfig

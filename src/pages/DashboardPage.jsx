@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../contexts/AuthContext';
 import { useBaba }   from '../contexts/BabaContext';
 import { useFeatures } from '../utils/babaMode';
+import { useActiveDraw } from '../hooks/useActiveDraw';
 import {
   LogOut, Camera, Edit3, ChevronRight, RefreshCw,
   Trophy, Settings, Calendar, Zap, Users,
@@ -54,10 +55,11 @@ const DashboardPage = () => {
     countdown, ratePlayer, getAllRatings,
     gameConfirmations, myConfirmation, canConfirm,
     confirmPresence, cancelConfirmation, reloadConfirmations,
-    drawConfig, setDrawConfig, isDrawing, currentMatch,
+    drawConfig, setDrawConfig, isDrawing, currentMatch, drawVersion,
   } = useBaba();
 
   const features = useFeatures();
+  const { draw: activeDraw, started: drawStarted } = useActiveDraw(currentBaba?.id, drawVersion);
 
   useThemeColor();
   const tc = useThemeStyles();
@@ -144,7 +146,7 @@ const DashboardPage = () => {
     </div>
   );
 
-  const sharedProps = { currentBaba, isPresident, canManage, players: playersWithRatings };
+  const sharedProps = { currentBaba, isPresident, canManage, players: playersWithRatings, activeDraw, drawStarted };
 
   // Badge de modo do baba
   const modeBadge = {
@@ -342,6 +344,9 @@ const DashboardPage = () => {
                 <TabManage
                   {...sharedProps}
                   currentMatch={currentMatch}
+                  nextGameDay={nextGameDay}
+                  gameConfirmations={gameConfirmations}
+                  reloadConfirmations={reloadConfirmations}
                   isDrawing={isDrawing}
                   playersWithRatings={playersWithRatings}
                   getAllRatings={getAllRatings}

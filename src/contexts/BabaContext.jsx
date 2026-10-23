@@ -4,6 +4,10 @@ import { useAuth } from './AuthContext';
 import { usePlan } from '../hooks/usePlan';
 import toast from 'react-hot-toast';
 import { customAlphabet } from 'nanoid';
+import {
+  executeDraw, fetchActiveDraw, fetchConfirmationsForDate, getDrawDefaults,
+} from '../services/drawService';
+import { getTodayGame, getConfirmationDeadline, toLocalDateStr } from '../utils/drawSchedule';
 
 // BUG-008 FIX: nanoid agora está corretamente declarado como dependência em package.json
 const nanoid = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
@@ -81,14 +85,15 @@ export const getNextGameDay = (baba) => {
     const [h, m] = match.time.split(':').map(Number);
     const gameDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     gameDate.setHours(h, m, 0, 0);
-    const deadline = new Date(gameDate.getTime() - 30 * 60 * 1000);
+    // 30 min antes do jogo — ou o horário do sorteio automático, se for antes
+    const deadline = getConfirmationDeadline(baba, gameDate);
     if (now < deadline) {
       return {
         ...match,
         date:     gameDate,
         deadline,
         daysAhead: offset,
-        dateStr:  gameDate.toISOString().split('T')[0],
+        dateStr:  toLocalDateStr(gameDate),
       };
     }
   }
@@ -101,9 +106,9 @@ export const getNextGameDay = (baba) => {
   return {
     ...first,
     date:     gameDate,
-    deadline: new Date(gameDate.getTime() - 30 * 60 * 1000),
+    deadline: getConfirmationDeadline(baba, gameDate),
     daysAhead,
-    dateStr:  gameDate.toISOString().split('T')[0],
+    dateStr:  toLocalDateStr(gameDate),
   };
 };
 
@@ -112,6 +117,9 @@ export const getNextGameDay = (baba) => {
 // balance_level vem de player_rating_summary.avg_level (ou balance_level p/ convidados)
 // — não usa mais final_rating (esse fica só p/ perfil/stats).
 // ─────────────────────────────────────────────
+// LEGADO: o app não usa mais esta função — o sorteio (manual e automático) roda
+// em services/drawService.js + utils/drawAlgorithm.js. Mantida exportada só
+// porque há testes que a cobrem; pode sair junto com eles.
 export const generateBalancedTeams = (players, numTeams = 2) => {
   const n = Math.max(2, numTeams);
 
@@ -172,6 +180,13 @@ export const BabaProvider = ({ children }) => {
   const [drawStatus,   setDrawStatus]   = useState('waiting');
 
   const hasAutoDrawnRef = useRef(false);
+  const drawingRef      = useRef(false);
+  const tryAutoDrawRef  = useRef(null);
+
+  // Sobe a cada sorteio feito por este contexto → hooks de leitura recarregam
+  const [drawVersion,   setDrawVersion]   = useState(0);
+  // Presidente ou coordenador (role 'admin') — só eles rodam o sorteio no cliente
+  const [canManageBaba, setCanManageBaba] = useState(false);
 
   // BUG-007 FIX: ref estável para o último resultado de ratings
   const lastRatingsResultRef = useRef([]);
@@ -708,99 +723,87 @@ export const BabaProvider = ({ children }) => {
   // SORTEIO
   // ─────────────────────────────────────────────
 
-  const drawTeamsIntelligent = async () => {
-    if (isDrawing || !currentBaba || !nextGameDay) return null;
+  // Qual jogo sortear: o de HOJE enquanto ele ainda vale (mesmo com o prazo de
+  // confirmação já vencido — getNextGameDay nessa hora já aponta pra semana
+  // seguinte); senão o próximo.
+  const pickDrawGame = () => {
+    const today = getTodayGame(currentBaba);
+    if (today && !today.isOver) return { dateStr: today.dateStr };
+    return nextGameDay ? { dateStr: nextGameDay.dateStr } : null;
+  };
+
+  /**
+   * Sorteia AGORA com as configurações padrão do baba (players_per_team,
+   * draw_strategy, gk_mode, restrições, nível dos convidados) — exatamente o
+   * mesmo que o sorteio automático do servidor faz. Mesmo caminho do manual:
+   * services/drawService.executeDraw.
+   * Retorna a sessão { teams, reserves, goalkeeperQueue, drawResultId } ou null.
+   */
+  const drawTeamsIntelligent = async ({ silent = false } = {}) => {
+    if (drawingRef.current || !currentBaba) return null;
+    const game = pickDrawGame();
+    if (!game) return null;
+
+    drawingRef.current = true;
     setIsDrawing(true);
     try {
-      const dateStr   = nextGameDay.dateStr;
-      // Sprint 9: usa apenas confirmados (não waitlist) para o sorteio
-      const confirmed = gameConfirmations
-        .filter(c => c.status === 'confirmed')
-        .map(c => c?.player)
-        .filter(p => p && p.id);
+      // Sempre do banco: o estado local pode estar defasado (convidado novo etc.)
+      const confirmations = await fetchConfirmationsForDate(currentBaba.id, game.dateStr);
 
-      if (confirmed.length < drawConfig.playersPerTeam * 2) {
+      const result = await executeDraw({
+        baba:          currentBaba,
+        dateStr:       game.dateStr,
+        confirmations,
+        drawConfig:    getDrawDefaults(currentBaba),
+        getRatings:    getAllRatings,
+        source:        'auto',
+      });
+
+      if (!result.ok) {
         setDrawStatus('insufficient');
+        if (!silent) toast.error(`Faltam confirmados: precisa de ${result.needed}, tem ${result.have}.`);
         return null;
       }
 
-      const ratingsData = await getAllRatings();
-      const levelMap    = new Map(ratingsData.map(r => [r.player_id, r.avg_level ?? 2]));
-
-      const enriched = confirmed.map(p => ({
-        ...p,
-        balance_level: p.is_guest ? (p.balance_level ?? 2) : (levelMap.get(p.id) ?? 2),
-      }));
-
-      const numTeams  = Math.max(2, Math.floor(confirmed.length / drawConfig.playersPerTeam));
-      const teamsRaw  = generateBalancedTeams(enriched, numTeams);
-      const teams     = teamsRaw.map(({ name, players }) => ({ name, players }));
-      const teamSlots = drawConfig.playersPerTeam;
-      const reserves  = teamsRaw.flatMap(t => t.players.slice(teamSlots));
-      const mainTeams = teams.map(t => ({ ...t, players: t.players.slice(0, teamSlots) }));
-
-      const { data: drawResult } = await supabase
-        .from('draw_results')
-        .upsert({
-          baba_id: currentBaba.id, draw_date: dateStr,
-          teams: mainTeams, reserves, players_per_team: drawConfig.playersPerTeam,
-        })
-        .select().single();
-
-      const { data: existingMatch } = await supabase
-        .from('matches').select('id')
-        .eq('baba_id', currentBaba.id).eq('draw_result_id', drawResult.id).maybeSingle();
-
-      if (!existingMatch) {
-        const gameTimeStr = nextGameDay.time?.substring(0, 5) || '20:00';
-        const matchDatetime = `${dateStr}T${gameTimeStr}:00`;
-
-        const { data: match } = await supabase.from('matches').insert([{
-          baba_id:        currentBaba.id,
-          match_date:     matchDatetime,
-          team_a_name:    mainTeams[0]?.name || 'Time A',
-          team_b_name:    mainTeams[1]?.name || 'Time B',
-          draw_result_id: drawResult.id,
-          status:         'scheduled',
-        }]).select().single();
-
-        const mPlayers = mainTeams.slice(0, 2).flatMap((t, i) =>
-          t.players.map(p => ({
-            match_id:  match.id,
-            player_id: p.id,
-            team:      i === 0 ? 'A' : 'B',
-            position:  p.position || 'linha',
-          }))
-        );
-        await supabase.from('match_players').insert(mPlayers);
-      }
-
-      await loadTodayMatch(currentBaba.id, dateStr);
-      return true;
+      setDrawStatus('ready');
+      setDrawVersion(v => v + 1);
+      if (!silent) toast.success(result.reused ? 'O sorteio de hoje já estava feito' : 'Times sorteados! ⚡');
+      return result.session;
     } catch (error) {
       console.error('[drawTeams]', error);
+      if (!silent) toast.error('Erro ao sortear');
       return null;
     } finally {
+      drawingRef.current = false;
       setIsDrawing(false);
     }
   };
 
+  // Rede de segurança do sorteio automático: o servidor (Edge Function
+  // auto-draw, a cada poucos minutos) é quem sorteia. Se um presidente/
+  // coordenador estiver com o app aberto e o servidor não tiver sorteado
+  // 2 min depois da hora, sorteia daqui — mesma função, mesmo resultado.
+  // Só roda com o sorteio automático LIGADO (antes rodava sempre).
   const tryAutoDraw = async () => {
-    if (!currentBaba || hasAutoDrawnRef.current || isDrawing || !nextGameDay) return;
-    if (new Date() < nextGameDay.deadline) return;
-    const { data: existing } = await supabase
-      .from('draw_results').select('id')
-      .eq('baba_id', currentBaba.id).eq('draw_date', nextGameDay.dateStr).maybeSingle();
-    if (existing) { hasAutoDrawnRef.current = true; return; }
-    const confirmedCount = gameConfirmations.filter(c => c.status === 'confirmed').length;
-    if (confirmedCount >= drawConfig.playersPerTeam * 2) {
+    if (!currentBaba?.auto_draw_enabled || !canManageBaba) return;
+    if (hasAutoDrawnRef.current || drawingRef.current) return;
+
+    const game = getTodayGame(currentBaba);
+    if (!game?.isDue) return;
+    if (Date.now() < game.drawMoment.getTime() + 2 * 60 * 1000) return;
+
+    try {
+      const existing = await fetchActiveDraw(currentBaba.id);
+      if (existing) { hasAutoDrawnRef.current = true; return; }
+    } catch { return; }
+
+    const session = await drawTeamsIntelligent({ silent: true });
+    if (session) {
       hasAutoDrawnRef.current = true;
-      const res = await drawTeamsIntelligent();
-      if (res) toast.success('Sorteio automático realizado!');
-    } else {
-      setDrawStatus('insufficient');
+      toast.success('Sorteio automático realizado!');
     }
   };
+  tryAutoDrawRef.current = tryAutoDraw;
 
   // ─────────────────────────────────────────────
   // EFFECTS
@@ -818,6 +821,29 @@ export const BabaProvider = ({ children }) => {
     };
     init();
   }, [user]);
+
+  // Presidente/coordenador?
+  useEffect(() => {
+    if (!currentBaba?.id || !user?.id) { setCanManageBaba(false); return; }
+    if (String(currentBaba.president_id) === String(user.id)) { setCanManageBaba(true); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('user_roles').select('role')
+          .eq('baba_id', currentBaba.id).eq('user_id', user.id).eq('role', 'admin')
+          .maybeSingle();
+        if (!cancelled) setCanManageBaba(!!data);
+      } catch { if (!cancelled) setCanManageBaba(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [currentBaba?.id, currentBaba?.president_id, user?.id]);
+
+  // drawConfig do contexto acompanha o PADRÃO do baba (antes ficava fixo em 5/reserva)
+  useEffect(() => {
+    if (!currentBaba) return;
+    setDrawConfig(getDrawDefaults(currentBaba));
+  }, [currentBaba?.id, currentBaba?.players_per_team, currentBaba?.draw_strategy]);
 
   useEffect(() => {
     if (!currentBaba || !user) return;
@@ -881,13 +907,11 @@ export const BabaProvider = ({ children }) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (nextGameDay) {
-        setCanConfirm(new Date() < nextGameDay.deadline);
-        if (drawStatus === 'waiting' && !isDrawing) tryAutoDraw();
-      }
+      if (nextGameDay) setCanConfirm(new Date() < nextGameDay.deadline);
+      tryAutoDrawRef.current?.();
     }, 60000);
     return () => clearInterval(interval);
-  }, [nextGameDay?.dateStr, gameConfirmations.length, drawStatus, isDrawing]);
+  }, [nextGameDay?.dateStr]);
 
   // ─────────────────────────────────────────────
   // PROVIDER VALUE
@@ -898,7 +922,7 @@ export const BabaProvider = ({ children }) => {
       myBabas, currentBaba, setCurrentBaba, players, loading,
       createBaba, joinBaba, updateBaba, deleteBaba, uploadBabaImage, generateInviteCode,
       gameConfirmations, myConfirmation, canConfirm, confirmationDeadline, nextGameDay,
-      countdown, currentMatch, matchPlayers, isDrawing, drawStatus,
+      countdown, currentMatch, matchPlayers, isDrawing, drawStatus, drawVersion, canManageBaba,
       drawTeamsIntelligent, drawConfig, setDrawConfig,
       confirmPresence, cancelConfirmation, reloadConfirmations, // Sprint 9: + reloadConfirmations
       ratePlayer, getAllRatings, setManualWeight,

@@ -112,10 +112,16 @@ const WatchPage = () => {
           </div>
         ) : (
           <>
-            {sessionStatus === 'active' && (
+            {sessionStatus === 'active' && (liveMatch || standings.length > 0) && (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30">
                 <Radio size={13} className="text-red-400 animate-pulse" />
                 <span className="text-[10px] font-black uppercase text-red-400">Ao vivo — atualiza sozinho</span>
+              </div>
+            )}
+            {sessionStatus === 'active' && !liveMatch && standings.length === 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-cyan-electric/10 border border-cyan-electric/30">
+                <Trophy size={13} className="text-cyan-electric" />
+                <span className="text-[10px] font-black uppercase text-cyan-electric">Times sorteados — a partida ainda não começou</span>
               </div>
             )}
 
