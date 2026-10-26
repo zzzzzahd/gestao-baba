@@ -1,9 +1,8 @@
-// src/__tests__/hooks/useRatings_useRealtimeMatch_useOfflineQueue.test.js
-// Sprint T-7 — Hooks: useRatings, useRealtimeMatch, useOfflineQueue
+// src/__tests__/hooks/useRealtimeMatch_useOfflineQueue.test.js
+// Sprint T-7 — Hooks: useRealtimeMatch, useOfflineQueue (useRatings removido na auditoria)
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useRatings } from '../../hooks/useRatings';
 import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 import { useOfflineQueue } from '../../hooks/useOfflineQueue';
 
@@ -29,104 +28,6 @@ const mockSupabase = vi.hoisted(() => ({
   removeChannel: vi.fn(),
 }));
 vi.mock('../../services/supabase', () => ({ supabase: mockSupabase }));
-
-// ══════════════════════════════════════════════════════════════════════════════
-// useRatings
-// ══════════════════════════════════════════════════════════════════════════════
-const { mockFetchRatingsSummary, mockUpsertRating, mockUpdateManualWeight } = vi.hoisted(() => ({
-  mockFetchRatingsSummary: vi.fn(),
-  mockUpsertRating:        vi.fn(),
-  mockUpdateManualWeight:  vi.fn(),
-}));
-
-vi.mock('../../services/ratingsService', () => ({
-  fetchRatingsSummary: (...args) => mockFetchRatingsSummary(...args),
-  upsertRating:        (...args) => mockUpsertRating(...args),
-  updateManualWeight:  (...args) => mockUpdateManualWeight(...args),
-}));
-
-const currentBaba = { id: 'baba1' };
-const user        = { id: 'user1' };
-const players     = [{ id: 'p1', user_id: 'user1' }];
-
-const mkRatings = (opts) =>
-  renderHook(() => useRatings({ currentBaba, user, players, ...opts }));
-
-describe('useRatings › getAllRatings', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFetchRatingsSummary.mockResolvedValue([{ player_id: 'p1', final_rating: 4.2 }]);
-    mockUpsertRating.mockResolvedValue(undefined);
-    mockUpdateManualWeight.mockResolvedValue(undefined);
-  });
-
-  it('retorna lista de ratings do serviço', async () => {
-    const { result } = mkRatings();
-    let data;
-    await act(async () => { data = await result.current.getAllRatings(); });
-    expect(data).toHaveLength(1);
-    expect(data[0].final_rating).toBe(4.2);
-  });
-
-  it('retorna [] quando currentBaba=null', async () => {
-    const { result } = renderHook(() => useRatings({ currentBaba: null, user, players }));
-    let data;
-    await act(async () => { data = await result.current.getAllRatings(); });
-    expect(data).toEqual([]);
-  });
-
-  it('retorna [] em caso de erro', async () => {
-    mockFetchRatingsSummary.mockRejectedValueOnce(new Error('fail'));
-    const { result } = mkRatings();
-    let data;
-    await act(async () => { data = await result.current.getAllRatings(); });
-    expect(data).toEqual([]);
-  });
-});
-
-describe('useRatings › ratePlayer', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUpsertRating.mockResolvedValue(undefined);
-  });
-
-  it('chama upsertRating com dados corretos', async () => {
-    const { result } = mkRatings();
-    await act(async () =>
-      result.current.ratePlayer('p2', { skill: 4, physical: 3, commitment: 5 })
-    );
-    expect(mockUpsertRating).toHaveBeenCalledWith(
-      expect.objectContaining({ ratedId: 'p2', skill: 4, physical: 3, commitment: 5 })
-    );
-  });
-
-  it('não chama upsert quando sem user', async () => {
-    const { result } = renderHook(() => useRatings({ currentBaba, user: null, players }));
-    await act(async () =>
-      result.current.ratePlayer('p2', { skill: 3, physical: 3, commitment: 3 })
-    );
-    expect(mockUpsertRating).not.toHaveBeenCalled();
-  });
-});
-
-describe('useRatings › setManualWeight', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUpdateManualWeight.mockResolvedValue(undefined);
-  });
-
-  it('chama updateManualWeight com playerId, babaId e weight', async () => {
-    const { result } = mkRatings();
-    await act(async () => result.current.setManualWeight('p1', 4.5));
-    expect(mockUpdateManualWeight).toHaveBeenCalledWith('p1', 'baba1', 4.5);
-  });
-
-  it('não chama quando currentBaba=null', async () => {
-    const { result } = renderHook(() => useRatings({ currentBaba: null, user, players }));
-    await act(async () => result.current.setManualWeight('p1', 3));
-    expect(mockUpdateManualWeight).not.toHaveBeenCalled();
-  });
-});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // useRealtimeMatch
