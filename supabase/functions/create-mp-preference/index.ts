@@ -86,9 +86,9 @@ Deno.serve(async (req: Request) => {
       },
       notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
       back_urls: {
-        success: "https://www.draftplay.app.com/loja?status=success",
-        failure: "https://www.draftplay.app.com/loja?status=failure",
-        pending: "https://www.draftplay.app.com/loja?status=pending",
+        success: "https://www.draftplay.app.br/dpstore?status=success",
+        failure: "https://www.draftplay.app.br/dpstore?status=failure",
+        pending: "https://www.draftplay.app.br/dpstore?status=pending",
       },
       auto_return: "approved",
     };
