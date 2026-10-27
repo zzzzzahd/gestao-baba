@@ -56,3 +56,9 @@ supabase/.temp/
 /playwright/.auth/
 
 testsprite_tests\tmp\config.json
+# Saídas locais de execuções de teste (não versionar)
+test-batch-*.txt
+test-batch-*.json
+test-results-run.txt
+test-json-*.json
+vitest-*.json
