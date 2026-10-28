@@ -207,7 +207,6 @@ gestao-baba/
 │   │   ├── LoginPage.jsx
 │   │   ├── DashboardPage.jsx
 │   │   ├── HomePage.jsx
-│   │   ├── MatchPage.jsx
 │   │   ├── RankingsPage.jsx
 │   │   └── FinancialPage.jsx
 │   ├── services/            # Serviços (Supabase)

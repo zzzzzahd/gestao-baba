@@ -62,3 +62,6 @@ test-batch-*.json
 test-results-run.txt
 test-json-*.json
 vitest-*.json
+
+# Capturas de falha do Playwright (não versionar)
+e2e-failure*.png
