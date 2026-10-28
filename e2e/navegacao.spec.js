@@ -27,7 +27,8 @@ test.describe('Navegação a partir da landing', () => {
       return;
     }
     await btn.click();
-    await expect(page).toHaveURL(/\/visitor/, { timeout: 10_000 });
+    // /visitor redireciona para /ferramentas/sorteador; aceita os dois destinos.
+    await expect(page).toHaveURL(/\/(visitor|ferramentas\/sorteador)/, { timeout: 10_000 });
   });
 });
 
