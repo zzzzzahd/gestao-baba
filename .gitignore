@@ -65,3 +65,6 @@ vitest-*.json
 
 # Capturas de falha do Playwright (não versionar)
 e2e-failure*.png
+
+# Saída dos roteiros de vídeo (fica só o último vídeo de cada roteiro, gerado localmente)
+video-demo/output/

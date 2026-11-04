@@ -35,7 +35,7 @@ import {
 import {
   log, sleep, injectFakeCursor, moveMouse, clickWithPause,
   typeSlowly, waitForVisible, ensureDir, runScene, dismissBlockingOverlays,
-  closeByBackdropClick,
+  closeByBackdropClick, finalizeVideo,
 } from './demo-helpers.js';
 import { login } from './demo-auth.js';
 
@@ -470,6 +470,7 @@ async function main() {
   await sleep(1500);
   await context.close();
   await browser.close();
+  await finalizeVideo(page, 'admin'); // mantém só o último vídeo (substitui o anterior)
 
   const videoFiles = fs.readdirSync(VIDEO_DIR).filter((f) => f.endsWith('.webm'));
   const latestVideo = videoFiles
