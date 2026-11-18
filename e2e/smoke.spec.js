@@ -49,9 +49,10 @@ test.describe('Privacidade e Termos', () => {
 });
 
 test.describe('Modo visitante', () => {
-  test('rota /visitor responde', async ({ page }) => {
+  // /visitor é um redirecionamento legado (desde 15/10/2026) para a ferramenta pública.
+  test('rota /visitor redireciona para o sorteador de times', async ({ page }) => {
     await page.goto('/visitor');
-    await expect(page).toHaveURL(/\/visitor/);
+    await expect(page).toHaveURL(/\/ferramentas\/sorteador/, { timeout: 10_000 });
     await expect(page.locator('body')).toBeVisible();
   });
 });

@@ -56,3 +56,15 @@ supabase/.temp/
 /playwright/.auth/
 
 testsprite_tests\tmp\config.json
+# Saídas locais de execuções de teste (não versionar)
+test-batch-*.txt
+test-batch-*.json
+test-results-run.txt
+test-json-*.json
+vitest-*.json
+
+# Capturas de falha do Playwright (não versionar)
+e2e-failure*.png
+
+# Saída dos roteiros de vídeo (fica só o último vídeo de cada roteiro, gerado localmente)
+video-demo/output/

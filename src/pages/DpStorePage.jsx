@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Coins, Sparkles, Crown, Loader2, ShoppingBag, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext'; // ajuste se o hook/caminho for outro
 import {
@@ -28,6 +29,8 @@ export default function DpStorePage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null); // retorno do Mercado Pago (?status=)
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const loadAll = useCallback(async () => {
     if (!user?.id) return;
@@ -54,6 +57,32 @@ export default function DpStorePage() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Retorno do checkout do Mercado Pago: /dpstore?status=success|pending|failure
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (!status) return undefined;
+
+    const NOTICES = {
+      success: 'Pagamento aprovado! Seus DP entram na carteira em instantes.',
+      pending: 'Pagamento pendente. Assim que for confirmado, seus DP entram na carteira.',
+      failure: 'O pagamento não foi concluído. Você pode tentar de novo.',
+    };
+    if (NOTICES[status]) setNotice({ status, text: NOTICES[status] });
+
+    // Remove o parâmetro da URL para a mensagem não reaparecer ao recarregar.
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    setSearchParams(next, { replace: true });
+
+    // O crédito vem pelo webhook e pode demorar alguns segundos: atualiza a carteira uma vez.
+    if (status === 'success') {
+      const t = setTimeout(() => loadAll(), 5000);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleBuyPackage(pkg) {
     setBusyId(pkg.id);
@@ -103,6 +132,21 @@ export default function DpStorePage() {
       </div>
 
       <div className="px-4 py-4">
+        {notice && (
+          <div
+            role="status"
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              notice.status === 'success'
+                ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                : notice.status === 'pending'
+                  ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400'
+                  : 'border-red-500/30 bg-red-500/10 text-red-400'
+            }`}
+          >
+            {notice.text}
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error}

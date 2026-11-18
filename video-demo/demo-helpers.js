@@ -7,7 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { SPEED, SCREENSHOT_DIR } from './demo-config.js';
+import { SPEED, SCREENSHOT_DIR, VIDEO_DIR } from './demo-config.js';
 
 // ── Log padronizado ──────────────────────────────────────────────────────────
 
@@ -201,5 +201,30 @@ export async function runScene(page, { number, title, optional = false }, fn) {
       log.info('Cena obrigatória falhou — o roteiro continua, mas a cena fica marcada como falha no relatório final.');
     }
     return { title, ok: false, error: err.message, screenshot: shotPath };
+  }
+}
+
+// ── Vídeo final com nome fixo (só o último fica) ───────────────────────────────
+
+/**
+ * Chamar DEPOIS de `context.close()`. O Playwright grava o vídeo com um nome
+ * aleatório; esta função move o arquivo para `VIDEO_DIR/<name>.webm`,
+ * SUBSTITUINDO o vídeo da gravação anterior, e apaga o arquivo de nome
+ * aleatório. Assim a pasta nunca acumula versões: fica sempre o último vídeo de
+ * cada roteiro (ex.: demo.webm, admin.webm, social.webm).
+ * Retorna o caminho final ou null se não houver vídeo.
+ */
+export async function finalizeVideo(page, name) {
+  const video = page.video();
+  if (!video) return null;
+  const target = path.join(VIDEO_DIR, `${name}.webm`);
+  try {
+    fs.rmSync(target, { force: true });
+    await video.saveAs(target); // espera a gravação terminar de ser escrita
+    await video.delete().catch(() => {});
+    return target;
+  } catch (err) {
+    log.error(`Não foi possível finalizar o vídeo "${name}": ${err.message}`);
+    return null;
   }
 }

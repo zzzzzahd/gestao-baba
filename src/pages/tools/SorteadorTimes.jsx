@@ -9,7 +9,8 @@ import { Trash2, Shuffle, Play, Timer, Target, ListOrdered } from 'lucide-react'
 import { ToolLayout, Panel, ErrorList, Segmented, Field, CopyButton, inputCls } from '../../components/tools/ui';
 import ExportTeamsImage from '../../components/tools/ExportTeamsImage';
 import { TOOLS } from '../../content/toolsCatalog';
-import { balanceTeams, teamCount, parsePlayerList } from '../../utils/teamBalancer';
+import { balanceTeams, teamCount } from '../../utils/teamBalancer';
+import { parseDetailedPlayerList, normalizeName } from '../../utils/parseDetailedPlayerList';
 
 const tool = TOOLS.find((t) => t.slug === 'sorteador');
 const STORAGE_KEY = 'visitor_players_list'; // mesma chave do modo visitante: listas antigas continuam valendo
@@ -33,6 +34,7 @@ export default function SorteadorTimes() {
   const [leftover, setLeftover] = useState('reserve');
   const [result, setResult] = useState(null);
   const [formError, setFormError] = useState('');
+  const [importInfo, setImportInfo] = useState(null); // { text, warnings } após importar uma lista
   const resultRef = useRef(null);
 
   // Carrega/salva só no navegador (nada vai para servidor).
@@ -57,7 +59,8 @@ export default function SorteadorTimes() {
   const numTeams = teamCount(players.length, perTeam, leftover);
   const allEqualLevels = players.length > 0 && players.every((p) => p.stars === players[0].stars);
 
-  const exists = (n) => players.some((p) => p.name.toLowerCase() === n.toLowerCase());
+  // Compara sem diferenciar maiúsculas e acentos (João = joao), igual à importação.
+  const exists = (n) => players.some((p) => normalizeName(p.name) === normalizeName(n));
 
   // Campo "Jogadores por time": deixa digitar/apagar livremente e só aplica o limite ao sair do campo.
   const handlePerTeamChange = (e) => {
@@ -81,17 +84,42 @@ export default function SorteadorTimes() {
     if (!n) { setFormError('Digite o nome do jogador.'); return; }
     if (exists(n)) { setFormError(`"${n}" já está na lista.`); return; }
     setFormError('');
+    setImportInfo(null);
     setPlayers((prev) => [...prev, { id: newId(), name: n.slice(0, 40), position, stars }]);
     setName('');
     setResult(null);
   };
 
+  // Aceita "1. Nome" (posição linha, nível 2) ou "1. Nome - Linha - 2" (tudo preenchido).
   const importPaste = () => {
-    const { names, duplicates } = parsePlayerList(paste);
-    const fresh = names.filter((n) => !exists(n));
-    if (!names.length) { setFormError('Nenhum nome encontrado no texto colado.'); return; }
-    setFormError(duplicates.length || fresh.length < names.length ? 'Alguns nomes repetidos foram ignorados.' : '');
-    setPlayers((prev) => [...prev, ...fresh.map((n) => ({ id: newId(), name: n, position: 'linha', stars: 2 }))]);
+    const { players: parsed, duplicates: dupInPaste, warnings } = parseDetailedPlayerList(paste);
+    if (!parsed.length && !dupInPaste.length) {
+      setImportInfo(null);
+      setFormError('Nenhum nome encontrado no texto colado.');
+      return;
+    }
+
+    const seen = new Set(players.map((p) => normalizeName(p.name)));
+    let duplicates = dupInPaste.length;
+    const fresh = [];
+    parsed.forEach((p) => {
+      if (seen.has(normalizeName(p.name))) { duplicates += 1; return; }
+      fresh.push({ id: newId(), name: p.name, position: p.position, stars: p.stars });
+    });
+
+    if (!fresh.length) {
+      setImportInfo(null);
+      setFormError('Todos os nomes colados já estão na lista.');
+      return;
+    }
+
+    const imported = `${fresh.length} ${fresh.length === 1 ? 'jogador importado' : 'jogadores importados'}.`;
+    const ignored = duplicates
+      ? ` ${duplicates} ${duplicates === 1 ? 'nome repetido ignorado' : 'nomes repetidos ignorados'}.`
+      : '';
+    setFormError('');
+    setImportInfo({ text: `${imported}${ignored}`, warnings });
+    setPlayers((prev) => [...prev, ...fresh]);
     setPaste('');
     setResult(null);
   };
@@ -133,7 +161,7 @@ export default function SorteadorTimes() {
       metaDescription={tool.description}
       intro="Monte a lista de jogadores, informe o nível e a posição de cada um (se quiser) e sorteie times parelhos para o baba. Sem cadastro, direto no navegador."
       howTo={[
-        'Adicione os jogadores um a um ou cole a lista do grupo (um nome por linha). Quem for colado entra como "na média" e "linha".',
+        'Adicione os jogadores um a um ou cole a lista do grupo, um por linha. Só o nome já basta ("1. João": entra como "na média" e "linha"). Para já trazer tudo preenchido, use "1. João - Linha - 2" (nível: 1 abaixo da média, 2 na média, 3 acima da média; posição: Linha ou Goleiro).',
         'Ajuste o nível (abaixo, na média ou acima) e a posição (linha ou goleiro) de cada jogador na lista.',
         'Defina quantos jogam por time e o que fazer com quem sobrar. Clique em sortear; sorteie de novo quantas vezes quiser.',
         'Copie os times para mandar no grupo ou clique em "Começar a partida" para abrir o placar com cronômetro e fila de times.',
@@ -190,20 +218,40 @@ export default function SorteadorTimes() {
           + Adicionar
         </button>
 
-        <Field label="Ou cole uma lista (um nome por linha)">
-          <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} className={inputCls} placeholder={'1. João\n2. Maria'} />
+        <Field
+          label="Ou cole uma lista (um jogador por linha)"
+          hint="Só o nome ou completo: 1. Nome - Linha - 2 (nível: 1 abaixo, 2 na média, 3 acima)"
+        >
+          <textarea
+            rows={5}
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            className={inputCls}
+            placeholder={'1. João\n2. Bruno - Linha - 3\n3. Tiago - Goleiro - 2'}
+          />
         </Field>
         <button type="button" onClick={importPaste} disabled={!paste.trim()} className="px-5 py-3 rounded-xl border border-white/15 bg-white/5 text-xs font-black uppercase tracking-wider disabled:opacity-40">
           Importar lista
         </button>
         {formError && <p role="alert" className="text-[12px] text-red-400 font-bold">{formError}</p>}
+        {importInfo && (
+          <div role="status" className="space-y-1">
+            <p className="text-[12px] text-green-400 font-bold">{importInfo.text}</p>
+            {importInfo.warnings.length > 0 && (
+              <ul className="text-[11px] text-yellow-300 space-y-0.5 list-disc pl-4">
+                {importInfo.warnings.slice(0, 5).map((w) => <li key={w}>{w}</li>)}
+                {importInfo.warnings.length > 5 && <li>e mais {importInfo.warnings.length - 5} aviso(s).</li>}
+              </ul>
+            )}
+          </div>
+        )}
       </Panel>
 
       {players.length > 0 && (
         <section aria-labelledby="lista" className="card-glass rounded-2xl border border-border-mid p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 id="lista" className="text-base font-black">Jogadores ({players.length})</h2>
-            <button type="button" onClick={() => { setPlayers([]); setResult(null); }} className="flex items-center gap-1 text-[11px] font-black text-red-400 uppercase tracking-wider">
+            <button type="button" onClick={() => { setPlayers([]); setResult(null); setImportInfo(null); }} className="flex items-center gap-1 text-[11px] font-black text-red-400 uppercase tracking-wider">
               <Trash2 size={12} aria-hidden="true" /> Limpar tudo
             </button>
           </div>

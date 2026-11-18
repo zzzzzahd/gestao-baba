@@ -116,12 +116,66 @@ describe('Sorteador', () => {
     const teams = screen.getByLabelText('Times sorteados', { selector: 'section' });
     expect(within(teams).getAllByRole('listitem')).toHaveLength(6);
   });
+  it('mostra o nome de cada jogador na lista e permite corrigir nome, posição e nível', () => {
+    localStorage.clear();
+    wrap(<SorteadorTimes />);
+    type(/Ou cole uma lista/i, 'Ana\nBia');
+    fireEvent.click(screen.getByRole('button', { name: 'Importar lista' }));
+    expect(screen.getByLabelText('Nome do jogador 1').value).toBe('Ana');
+    expect(screen.getByLabelText('Nome do jogador 2').value).toBe('Bia');
+    fireEvent.change(screen.getByLabelText('Nome do jogador 2'), { target: { value: 'Beatriz' } });
+    expect(screen.getByLabelText('Nome do jogador 2').value).toBe('Beatriz');
+    fireEvent.change(screen.getByLabelText('Posição de Beatriz'), { target: { value: 'goleiro' } });
+    expect(screen.getByLabelText('Posição de Beatriz').value).toBe('goleiro');
+    fireEvent.change(screen.getByLabelText('Nível de Beatriz'), { target: { value: '3' } });
+    expect(screen.getByLabelText('Nível de Beatriz').value).toBe('3');
+    // nome apagado volta para um nome padrão ao sair do campo
+    fireEvent.change(screen.getByLabelText('Nome do jogador 1'), { target: { value: '   ' } });
+    fireEvent.blur(screen.getByLabelText('Nome do jogador 1'));
+    expect(screen.getByLabelText('Nome do jogador 1').value).toBe('Jogador 1');
+  });
   it('avisa quando faltam jogadores', () => {
     localStorage.clear();
     wrap(<SorteadorTimes />);
     type('Nome', 'Ana');
     fireEvent.click(screen.getByRole('button', { name: '+ Adicionar' }));
     expect(screen.getByRole('alert').textContent).toMatch(/pelo menos 10 jogadores/i);
+  });
+});
+
+describe('Sorteador — importação detalhada da lista', () => {
+  const colar = (texto) => {
+    localStorage.clear();
+    wrap(<SorteadorTimes />);
+    type(/Ou cole uma lista/i, texto);
+    fireEvent.click(screen.getByRole('button', { name: 'Importar lista' }));
+  };
+  it('lê nome, posição e nível, e usa o padrão (linha, nível 2) quando só vem o nome', () => {
+    colar('1. Ana\n2. Bruno - Goleiro - 3\n3. Tiago - Linha - 1');
+    expect(screen.getByText(/3 jogadores importados/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Nome do jogador 2').value).toBe('Bruno');
+    expect(screen.getByLabelText('Posição de Ana').value).toBe('linha');
+    expect(screen.getByLabelText('Nível de Ana').value).toBe('2');
+    expect(screen.getByLabelText('Posição de Bruno').value).toBe('goleiro');
+    expect(screen.getByLabelText('Nível de Bruno').value).toBe('3');
+    expect(screen.getByLabelText('Nível de Tiago').value).toBe('1');
+  });
+  it('ignora repetidos sem diferenciar maiúsculas e acentos e informa quantos', () => {
+    colar('João\njoao\nBia');
+    expect(screen.getByText(/2 jogadores importados\. 1 nome repetido ignorado\./)).toBeInTheDocument();
+    expect(screen.getByLabelText('Nome do jogador 1').value).toBe('João');
+  });
+  it('avisa quando posição ou nível não são reconhecidos e usa o padrão', () => {
+    colar('Carlos - banana');
+    expect(screen.getByText(/Linha 1: "banana" não foi reconhecido/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Nome do jogador 1').value).toBe('Carlos');
+    expect(screen.getByLabelText('Posição de Carlos').value).toBe('linha');
+  });
+  it('a lista importada continua com nome editável', () => {
+    colar('Bruno - Goleiro - 3');
+    fireEvent.change(screen.getByLabelText('Nome do jogador 1'), { target: { value: 'Bruninho' } });
+    expect(screen.getByLabelText('Posição de Bruninho').value).toBe('goleiro');
+    expect(screen.getByLabelText('Nível de Bruninho').value).toBe('3');
   });
 });
 
