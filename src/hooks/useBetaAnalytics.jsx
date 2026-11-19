@@ -38,14 +38,16 @@ export function useBetaAnalytics() {
     funnel[step] = new Date().toISOString();
     saveFunnel(funnel);
 
-    // Tentar salvar no banco (ignora erro se tabela não existir)
+    // Tentar salvar no banco (nunca quebra a tela). As colunas da tabela são
+    // event_name e properties; o RLS só aceita user_id = auth.uid().
     try {
-      await supabase.from('beta_events').insert({
+      const { error } = await supabase.from('beta_events').insert({
         user_id:    user?.id ?? null,
-        event:      step,
-        metadata,
+        event_name: step,
+        properties: metadata,
         created_at: new Date().toISOString(),
       });
+      if (error) console.debug('[BetaAnalytics] não salvou no banco:', error.message);
     } catch {}
 
     console.debug('[BetaAnalytics] funnel step:', step, metadata);
